@@ -133,7 +133,7 @@ class Operator(OperatorBase):
             src_dir = self.input_root / unique_id
         files = [
             p for p in sorted(src_dir.rglob("*"))
-            if p.is_file() and p.suffix.lower() != ".zip"
+            if p.is_file() and p.suffix.lower() != ".zip" and p.name != "metadata.json"
         ]
         if not files:
             raise OperatorError(f"no input files under {src_dir}")

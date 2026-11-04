@@ -69,16 +69,18 @@ def build(index_dir: Path, embeddings: list[dict], items_by_id: dict, model_vers
         "sourceFile TEXT, locator TEXT, text TEXT DEFAULT '')"
     )
     by_channel: dict[str, list[tuple[int, np.ndarray]]] = {"clip": [], "clap": []}
-    rowid = 0
+    # SQLite 隐式 rowid 从 1 开始，FAISS id 必须与之一致，否则检索结果会整体错位一条
+    rowid = 1
     counts = {"text": 0, "image": 0, "video": 0, "audio": 0}
     for emb in embeddings:
         item = items_by_id.get(emb["itemId"], {})
         modality = emb["modality"]
         channel = CHANNEL_OF[modality]
         conn.execute(
-            "INSERT INTO items VALUES (?,?,?,?,?,?)",
+            "INSERT INTO items (rowid, itemId, modality, channel, sourceFile, locator, text) "
+            "VALUES (?,?,?,?,?,?,?)",
             (
-                emb["itemId"], modality, channel,
+                rowid, emb["itemId"], modality, channel,
                 item.get("sourceFile", ""), json.dumps(item.get("locator", {}), ensure_ascii=False),
                 item.get("text", ""),
             ),
