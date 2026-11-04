@@ -1,0 +1,49 @@
+# 跨模态检索中心 · 算子服务统一配置
+# 甲方部署只需改本文件，不改代码。
+
+server:
+  host: 0.0.0.0
+  port: 6300
+  internal_only: true        # 只允许后端内网访问，部署时由运维绑定内网网卡/防火墙
+
+paths:
+  runtime_root: runtime      # 算子运行目录（上传/输出），相对项目根
+  dataset_root: dataset      # 只读数据集根目录（demo/评测数据）
+  model_root: D:/models      # 模型权重根目录；容器内挂到 /weight
+
+# 向量化模型（model_root 下的子目录名）
+models:
+  chinese_clip: chinese-clip-vit-base-patch16   # 文本/图像/视频帧通道
+  clap: clap-htsat-fused                        # 音频通道（含文本塔，文本查询可检音频）
+  reranker: bge-reranker-v2-m3                  # 精排模型（重排开关开启时使用）
+  model_version: "cmr-embed-v1"                 # 写入索引头，换模型即失效重建
+
+# 检索服务默认参数（调用方可经请求覆盖）
+retrieval:
+  active_index: runtime/demo_index   # 当前可检索索引目录（后端投产后可改）
+  top_k: 20
+  weights: { text: 25, image: 25, audio: 25, video: 25 }   # 四模态融合权重，合计须为 100
+  rerank: false
+  rerank_top_n: 50
+  word_weight: 2.0                   # 精确词命中加成系数
+
+# 已注册算子；id 即路由前缀 /{id}/...
+operators:
+  - id: 401m_ingest_check
+    enabled: true
+  - id: 402m_dataset_score
+    enabled: true
+  - id: 403m_modal_parse
+    enabled: true
+  - id: 404m_embed
+    enabled: true
+  - id: 405m_index_build
+    enabled: true
+  - id: 406m_recall_check
+    enabled: true
+  - id: 407m_query_understand
+    enabled: true
+  - id: 408m_retrieval
+    enabled: true
+  - id: 409m_evaluate
+    enabled: true

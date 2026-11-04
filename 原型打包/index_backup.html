@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>跨模态检索中心 · 系统门户 v5.0</title>
+<style>
+  :root{
+    --workspace-bg:#f6f9fe; --content-card:#ffffff;
+    --system-blue:#4169f6; --system-blue-weak:#f1f5ff; --ink:#1f2937; --muted:#667085;
+    --radius:8px; --line:#e5ecf7;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:var(--workspace-bg);display:flex;flex-direction:column;overflow:hidden}
+
+  /* ===== 顶部系统栏 ===== */
+  .sysbar{height:52px;background:var(--content-card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:0 20px;flex-shrink:0;box-shadow:0 1px 4px rgba(31,41,55,.06);z-index:10}
+  .sys-logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;color:var(--ink);white-space:nowrap}
+  .sys-logo .mark{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#4169f6,#6f9bff);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0}
+  .sys-logo small{color:var(--muted);font-weight:500;font-size:11px;margin-left:2px}
+  .sys-crumb{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);white-space:nowrap}
+  .sys-crumb .cur{color:var(--ink);font-weight:600;background:var(--system-blue-weak);padding:5px 12px;border-radius:6px;font-size:13px;border:1px solid #dce6f5}
+
+  /* ===== 内容区 ===== */
+  .sys-frame{flex:1;width:100%;border:0;background:var(--workspace-bg)}
+</style>
+</head>
+<body>
+
+<div class="sysbar">
+  <div class="sys-logo"><span class="mark">跨</span>跨模态检索中心 <small>原型 v5.0 · 系统门户</small></div>
+  <div class="sys-crumb">当前页 <span class="cur" id="sysPage">检索台</span></div>
+</div>
+
+<iframe id="sysFrame" class="sys-frame" src="P1_检索台_v5.0_20261025.html" title="跨模态检索中心系统内容区"></iframe>
+
+<script>
+/* ===== 系统门户壳逻辑（最薄形态）
+   页面协议（九页已注入 sysBridge v2）：页面加载 → 向壳 postMessage {type:'sys-page', page, name}
+   壳唯一职责：顶栏显示当前页名；页面间跳转全部由 iframe 内 href 自然完成 */
+var PAGES = {
+  'P1':'检索台', 'P2':'结果页', 'P3':'任务详情', 'P4':'库管理',
+  'P5':'策略管理', 'P6':'任务管理', 'P7':'结果运营', 'P8':'评测', 'P9':'检索历史'
+};
+window.addEventListener('message', function(e){
+  var d = e.data || {};
+  if(d.type === 'sys-page' && d.page && PAGES[d.page]){
+    document.getElementById('sysPage').textContent = d.name || PAGES[d.page];
+  }
+});
+</script>
+</body>
+</html>

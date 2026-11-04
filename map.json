@@ -1,0 +1,11 @@
+{
+  "401m_ingest_check": { "tag": "ingest_check", "name": "数据接入校验", "type": "batch" },
+  "402m_dataset_score": { "tag": "dataset_score", "name": "数据集评定", "type": "batch" },
+  "403m_modal_parse": { "tag": "modal_parse", "name": "模态内容解析", "type": "batch" },
+  "404m_embed":       { "tag": "embed",      "name": "多模态向量化", "type": "batch+online" },
+  "405m_index_build": { "tag": "index_build", "name": "向量索引构建", "type": "batch" },
+  "406m_recall_check": { "tag": "recall_check", "name": "投产召回率校验", "type": "batch" },
+  "407m_query_understand": { "tag": "query_understand", "name": "查询理解", "type": "online" },
+  "408m_retrieval": { "tag": "retrieval", "name": "检索服务", "type": "online" },
+  "409m_evaluate":  { "tag": "evaluate", "name": "评测执行", "type": "batch" }
+}

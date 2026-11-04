@@ -1,0 +1,103 @@
+import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
+
+// 菜单/路由与 03-API契约 路由表一致；permission 为空表示三角色可见
+// role 维度：admin=管理员 operator=运营 user=普通检索用户
+export const routes = [
+  {
+    path: '/login',
+    name: 'login',
+    component: () => import('../views/LoginView.vue'),
+    meta: { title: '登录' },
+  },
+  {
+    path: '/',
+    component: () => import('../layout/PortalLayout.vue'),
+    redirect: '/search',
+    children: [
+      {
+        path: 'search',
+        name: 'search',
+        component: () => import('../views/search/SearchConsoleView.vue'),
+        meta: { title: '检索台', icon: 'Search', permission: 'cmr:search:create' },
+      },
+      {
+        path: 'search/results/:resultSetId',
+        name: 'search-result',
+        component: () => import('../views/search/SearchResultView.vue'),
+        meta: { title: '检索结果', icon: 'Document', permission: 'cmr:search:create', hidden: true },
+      },
+      {
+        path: 'library',
+        name: 'library',
+        component: () => import('../views/dataset/LibraryView.vue'),
+        meta: { title: '库管理', icon: 'FolderOpened', permission: 'cmr:dataset:page' },
+      },
+      {
+        path: 'tasks',
+        name: 'tasks',
+        component: () => import('../views/task/TaskManageView.vue'),
+        meta: { title: '任务管理', icon: 'List', permission: 'cmr:task:page' },
+      },
+      {
+        path: 'tasks/:id',
+        name: 'task-detail',
+        component: () => import('../views/task/TaskDetailView.vue'),
+        meta: { title: '任务详情', icon: 'Tickets', permission: 'cmr:task:page', hidden: true },
+      },
+      {
+        path: 'strategies',
+        name: 'strategies',
+        component: () => import('../views/strategy/StrategyView.vue'),
+        meta: { title: '策略管理', icon: 'SetUp', permission: 'cmr:strategy:page' },
+      },
+      {
+        path: 'evaluation',
+        name: 'evaluation',
+        component: () => import('../views/evaluation/EvaluationView.vue'),
+        meta: { title: '评测', icon: 'DataAnalysis', permission: 'cmr:eval:page' },
+      },
+      {
+        path: 'operation',
+        name: 'operation',
+        component: () => import('../views/operation/OperationView.vue'),
+        meta: { title: '结果运营', icon: 'Service', permission: 'cmr:feedback:page' },
+      },
+      {
+        path: 'history',
+        name: 'history',
+        component: () => import('../views/history/SearchHistoryView.vue'),
+        meta: { title: '检索历史', icon: 'Clock', permission: 'cmr:search:page' },
+      },
+    ],
+  },
+  { path: '/:pathMatch(.*)*', redirect: '/' },
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+})
+
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
+  if (to.name === 'login') {
+    return true
+  }
+  if (!auth.token) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+  if (!auth.user) {
+    await auth.fetchUser()
+    if (!auth.user) {
+      return { name: 'login' }
+    }
+  }
+  const permission = to.meta.permission as string | undefined
+  if (permission && !auth.permissions.has(permission)) {
+    return { name: 'search' }
+  }
+  return true
+})
+
+export default router

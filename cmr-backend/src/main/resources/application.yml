@@ -1,0 +1,70 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /hs-api
+
+spring:
+  application:
+    name: hsmty-module-cmr-server
+  threads:
+    virtual:
+      enabled: true
+  servlet:
+    multipart:
+      # 数据集压缩包上传：与前端 nginx client_max_body_size 对齐
+      max-file-size: ${CMR_UPLOAD_MAX:2048MB}
+      max-request-size: ${CMR_UPLOAD_MAX:2048MB}
+      file-size-threshold: 2MB
+  datasource:
+    url: jdbc:mysql://${CMR_DB_HOST:127.0.0.1}:${CMR_DB_PORT:3306}/${CMR_DB_NAME:cmr}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${CMR_DB_USER:cmr}
+    password: ${CMR_DB_PASSWORD:cmr}
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/changelog-master.xml
+  data:
+    redis:
+      host: ${CMR_REDIS_HOST:127.0.0.1}
+      port: ${CMR_REDIS_PORT:6379}
+
+mybatis-flex:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    logic-delete-column: del_flag
+    normal-value-of-logic-delete: "F"
+    deleted-value-of-logic-delete: "T"
+
+springdoc:
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+  api-docs:
+    enabled: true
+
+logging:
+  level:
+    com.hsmty.cmr: INFO
+
+cmr:
+  operator:
+    base-url: ${CMR_OPERATOR_BASE:http://127.0.0.1:6300}
+    timeout-search-ms: 15000
+    timeout-batch-ms: 1800000
+  volume:
+    dataset: ${CMR_DATASET_DIR:../dataset}
+    runtime: ${CMR_RUNTIME_DIR:../runtime}
+  jwt:
+    secret: ${CMR_JWT_SECRET:change-me-in-production-0123456789abcdef}
+    expire-hours: 12
+  crypto:
+    key: ${CMR_CRYPTO_KEY:change-me-crypto-32bytes-0123456789!}
+  eval:
+    default-eval-file: dataset/eval/default.jsonl
+    lines:
+      recall: 0.8
+      precision: null
+      ndcg: null
+  build:
+    concurrency: 1
+    retry-max: 3

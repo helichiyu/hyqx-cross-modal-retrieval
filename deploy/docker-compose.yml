@@ -1,0 +1,113 @@
+# 跨模态检索中心 · 一体化部署（MySQL + Redis + 算子 + 后端 + 前端）
+#
+# 用法（在本目录执行）：
+#   cp .env.example .env      # 改密码/密钥/端口
+#   把三个模型目录放到仓库根 weight/ 下（见 docs/部署与运维手册.md）
+#   docker compose up -d --build
+# 访问：http://<宿主机>:${CMR_WEB_PORT:-8080}
+#
+# 网络暴露面：仅前端端口对外；MySQL/Redis/算子/后端均只在 cmr 内部网络，
+# 算子 6300 端口不映射到宿主机（验收要求浏览器网络不可达）。
+name: cmr
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: cmr-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${CMR_DB_ROOT_PASSWORD:-root-change-me}
+      MYSQL_DATABASE: ${CMR_DB_NAME:-cmr}
+      MYSQL_USER: ${CMR_DB_USER:-cmr}
+      MYSQL_PASSWORD: ${CMR_DB_PASSWORD:-cmr-change-me}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+    volumes:
+      - cmr-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: cmr-redis
+    command: ["redis-server", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # 算子服务：仅内部网络可达，不发布 6300
+  operators:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: cmr-operators:1.0
+    container_name: cmr-operators
+    environment:
+      CMR_MODEL_ROOT: /weight
+      TZ: Asia/Shanghai
+    volumes:
+      # 模型权重：宿主机目录（三个模型子目录），不进镜像
+      - ${CMR_WEIGHT_DIR:-../weight}:/weight:ro
+      # 与后端共享同一份数据集/运行目录，逻辑路径 dataset/...、runtime/... 两侧一致
+      - ../dataset:/app/dataset:ro
+      - ../runtime:/app/runtime
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ../cmr-backend
+      dockerfile: Dockerfile
+    image: cmr-backend:1.0
+    container_name: cmr-backend
+    environment:
+      TZ: Asia/Shanghai
+      JAVA_OPTS: ${CMR_JAVA_OPTS:--Xms512m -Xmx2g}
+      CMR_DB_HOST: mysql
+      CMR_DB_PORT: "3306"
+      CMR_DB_NAME: ${CMR_DB_NAME:-cmr}
+      CMR_DB_USER: ${CMR_DB_USER:-cmr}
+      CMR_DB_PASSWORD: ${CMR_DB_PASSWORD:-cmr-change-me}
+      CMR_REDIS_HOST: redis
+      CMR_REDIS_PORT: "6379"
+      CMR_OPERATOR_BASE: http://operators:6300
+      CMR_DATASET_DIR: /app/dataset
+      CMR_RUNTIME_DIR: /app/runtime
+      CMR_JWT_SECRET: ${CMR_JWT_SECRET:-change-me-jwt-secret-at-least-32-bytes}
+      CMR_CRYPTO_KEY: ${CMR_CRYPTO_KEY:-change-me-crypto-key-32-bytes-0001}
+    volumes:
+      - ../dataset:/app/dataset
+      - ../runtime:/app/runtime
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      operators:
+        condition: service_started
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../cmr-web
+      dockerfile: Dockerfile
+    image: cmr-web:1.0
+    container_name: cmr-web
+    ports:
+      - "${CMR_WEB_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  cmr-mysql-data:

@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="cmr-schema-users-20261103" author="cmr" context="mysql">
+        <sql>
+            CREATE TABLE IF NOT EXISTS cmr_user (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                username VARCHAR(64) NOT NULL COMMENT '登录名',
+                password VARCHAR(100) NOT NULL COMMENT 'BCrypt 密码',
+                nickname VARCHAR(64) COMMENT '显示名',
+                role VARCHAR(20) NOT NULL DEFAULT 'user' COMMENT 'admin/operator/user',
+                status CHAR(1) NOT NULL DEFAULT '1' COMMENT '1启用0停用',
+                create_id BIGINT COMMENT '创建人', create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F' COMMENT '逻辑删除',
+                UNIQUE KEY uk_username (username)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 用户';
+        </sql>
+    </changeSet>
+
+    <changeSet id="cmr-schema-dataset-20261103" author="cmr" context="mysql">
+        <sql>
+            CREATE TABLE IF NOT EXISTS cmr_datasource (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                biz_no VARCHAR(32) NOT NULL COMMENT 'SRC 编号',
+                name VARCHAR(128) NOT NULL COMMENT '名称',
+                endpoint VARCHAR(512) COMMENT '接口地址(http/https)',
+                protocol VARCHAR(32) DEFAULT 'upload' COMMENT '协议：http/api/upload',
+                auth_type VARCHAR(32) DEFAULT 'none' COMMENT 'none/token/basic',
+                auth_config VARCHAR(1024) COMMENT '认证信息(AES 加密)',
+                remark VARCHAR(512),
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                UNIQUE KEY uk_biz_no (biz_no)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 数据源';
+
+            CREATE TABLE IF NOT EXISTS cmr_dataset (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                biz_no VARCHAR(32) NOT NULL COMMENT 'DS 编号',
+                datasource_id BIGINT COMMENT '来源数据源',
+                name VARCHAR(128) NOT NULL COMMENT '数据集名称',
+                version VARCHAR(32) COMMENT '版本',
+                scene VARCHAR(64) COMMENT '业务场景',
+                status VARCHAR(20) NOT NULL DEFAULT 'ingest' COMMENT 'ingest/scoring/stored/indexing/searchable/stuck/rejected',
+                stuck_reason VARCHAR(512) COMMENT '卡住原因',
+                file_root VARCHAR(256) COMMENT '原始文件逻辑目录 dataset/ds/...',
+                meta_json JSON COMMENT '401 报告摘要',
+                score DECIMAL(6,4) COMMENT '402 评分',
+                decision VARCHAR(16) COMMENT 'pass/suspend/reject',
+                item_count INT DEFAULT 0 COMMENT '解析条目数',
+                modality_json JSON COMMENT '分模态条数',
+                current_index_id BIGINT COMMENT '当前激活索引',
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                UNIQUE KEY uk_biz_no (biz_no), KEY idx_status (status), KEY idx_create_time (create_time)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 数据集(库管理状态机)';
+
+            CREATE TABLE IF NOT EXISTS cmr_index (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                dataset_id BIGINT NOT NULL COMMENT '所属数据集',
+                index_dir VARCHAR(256) NOT NULL COMMENT '逻辑目录 runtime/index/...',
+                model_version VARCHAR(32) COMMENT '向量模型版本',
+                status VARCHAR(16) NOT NULL DEFAULT 'candidate' COMMENT 'candidate/active/retired',
+                counts_json JSON COMMENT '分模态条数',
+                check_result_json JSON COMMENT '406 投产校验结果',
+                activated_time DATETIME COMMENT '激活时间',
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                UNIQUE KEY uk_index_dir (index_dir), KEY idx_dataset (dataset_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 索引';
+
+            CREATE TABLE IF NOT EXISTS cmr_task (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                biz_no VARCHAR(32) NOT NULL COMMENT 'TASK 编号',
+                type VARCHAR(16) NOT NULL COMMENT 'build/eval/search',
+                ref_id BIGINT COMMENT '关联对象 id',
+                status VARCHAR(16) NOT NULL DEFAULT 'ready' COMMENT 'ready/running/done/failed',
+                fail_type VARCHAR(16) COMMENT 'engine/data',
+                fail_disposal VARCHAR(16) COMMENT 'retrying/recovered/isolated',
+                retry_count INT DEFAULT 0,
+                current_step VARCHAR(32) COMMENT '当前环节 401..406/eval/search',
+                payload_json JSON COMMENT '入参快照',
+                error_msg VARCHAR(1024),
+                started_time DATETIME, finished_time DATETIME,
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                UNIQUE KEY uk_biz_no (biz_no), KEY idx_ref (ref_id, type), KEY idx_status (status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 任务';
+
+            CREATE TABLE IF NOT EXISTS cmr_task_log (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                task_id BIGINT NOT NULL,
+                step VARCHAR(32) NOT NULL COMMENT '401/402/.../eval',
+                status VARCHAR(16) NOT NULL COMMENT 'start/ok/fail',
+                operator_output_json JSON COMMENT '算子响应摘要',
+                message VARCHAR(1024),
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                KEY idx_task (task_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 任务步骤日志';
+        </sql>
+    </changeSet>
+
+    <changeSet id="cmr-schema-search-20261103" author="cmr" context="mysql">
+        <sql>
+            CREATE TABLE IF NOT EXISTS cmr_search_history (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                biz_no VARCHAR(32) NOT NULL COMMENT 'SRH 编号',
+                result_set_id VARCHAR(40) NOT NULL COMMENT 'RST 结果集编号(算子)',
+                task_id BIGINT,
+                query_text VARCHAR(1024) COMMENT '文本查询',
+                query_file VARCHAR(256) COMMENT '查询文件逻辑路径',
+                query_modality VARCHAR(16) COMMENT 'text/image/audio/video',
+                clarified TINYINT(1) DEFAULT 0 COMMENT '是否经澄清',
+                scene VARCHAR(64),
+                strategy_version_id BIGINT COMMENT '所用策略版本',
+                strategy_snapshot_json JSON COMMENT 'weights/rerank/topK',
+                item_count INT DEFAULT 0,
+                elapsed_ms INT,
+                adopt_status VARCHAR(16) NOT NULL DEFAULT 'unadopted' COMMENT 'unadopted/adopted/discarded',
+                user_id BIGINT,
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                UNIQUE KEY uk_biz_no (biz_no), UNIQUE KEY uk_result_set (result_set_id),
+                KEY idx_create_time (create_time), KEY idx_adopt (adopt_status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 检索历史';
+
+            CREATE TABLE IF NOT EXISTS cmr_result_item (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                search_id BIGINT NOT NULL COMMENT '检索历史 id',
+                result_set_id VARCHAR(40) NOT NULL COMMENT '冗余 RST',
+                rank INT NOT NULL,
+                item_id VARCHAR(64) COMMENT '算子条目 id',
+                modality VARCHAR(16),
+                score DECIMAL(10,6),
+                source_file VARCHAR(512) COMMENT '逻辑路径',
+                locator_json JSON,
+                text TEXT,
+                clicked TINYINT(1) DEFAULT 0 COMMENT '冗余:是否被点击',
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                KEY idx_search (search_id, rank)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 结果集条目快照';
+
+            CREATE TABLE IF NOT EXISTS cmr_click_event (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                search_id BIGINT NOT NULL,
+                result_rank INT NOT NULL,
+                item_id VARCHAR(64),
+                user_id BIGINT,
+                clicked_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                KEY idx_search (search_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 点击事件(无点击筛选依据)';
+        </sql>
+    </changeSet>
+
+    <changeSet id="cmr-schema-strategy-eval-20261103" author="cmr" context="mysql">
+        <sql>
+            CREATE TABLE IF NOT EXISTS cmr_strategy (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                biz_no VARCHAR(32) NOT NULL COMMENT 'STG 编号',
+                name VARCHAR(128) NOT NULL COMMENT '名称',
+                scene VARCHAR(64) NOT NULL DEFAULT 'all' COMMENT '适用场景',
+                status VARCHAR(16) NOT NULL DEFAULT 'draft' COMMENT 'draft/active',
+                current_version INT DEFAULT 0 COMMENT '当前生效版本号',
+                remark VARCHAR(512),
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                UNIQUE KEY uk_biz_no (biz_no), UNIQUE KEY uk_name (name)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 策略';
+
+            CREATE TABLE IF NOT EXISTS cmr_strategy_version (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                strategy_id BIGINT NOT NULL,
+                version_no INT NOT NULL,
+                weights_json JSON NOT NULL COMMENT '{text,image,audio,video} 合计100',
+                rerank TINYINT(1) DEFAULT 0,
+                top_k INT DEFAULT 20,
+                status VARCHAR(16) NOT NULL DEFAULT 'draft' COMMENT 'draft/published/rollback',
+                source VARCHAR(16) DEFAULT 'new' COMMENT 'new/rollback',
+                published_time DATETIME,
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                KEY idx_strategy (strategy_id, version_no)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 策略版本';
+
+            CREATE TABLE IF NOT EXISTS cmr_eval_set (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                biz_no VARCHAR(32) NOT NULL COMMENT 'EVAL 编号',
+                name VARCHAR(128) NOT NULL,
+                filters_json JSON COMMENT '{zeroResult,noClick,reSearch}',
+                status VARCHAR(16) NOT NULL DEFAULT 'labeling' COMMENT 'labeling/done',
+                query_count INT DEFAULT 0,
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                UNIQUE KEY uk_biz_no (biz_no)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 评测集';
+
+            CREATE TABLE IF NOT EXISTS cmr_eval_item (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                eval_set_id BIGINT NOT NULL,
+                search_id BIGINT COMMENT '溯源检索历史',
+                query VARCHAR(1024) NOT NULL,
+                answers_json JSON COMMENT '标准答案数组',
+                labeled TINYINT(1) DEFAULT 0,
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                KEY idx_eval_set (eval_set_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 评测集条目';
+
+            CREATE TABLE IF NOT EXISTS cmr_eval_record (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                biz_no VARCHAR(32) NOT NULL,
+                eval_set_id BIGINT NOT NULL,
+                index_id BIGINT,
+                strategy_version_id BIGINT COMMENT '评测对象策略版本(空=系统默认)',
+                task_id BIGINT,
+                metrics_json JSON, lines_json JSON,
+                conclusion VARCHAR(8) COMMENT 'pass/fail',
+                failed_lines_json JSON,
+                comparison_json JSON, per_query_json JSON,
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                UNIQUE KEY uk_biz_no (biz_no), KEY idx_eval_set (eval_set_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 评测历史';
+        </sql>
+    </changeSet>
+
+    <changeSet id="cmr-schema-operation-20261103" author="cmr" context="mysql">
+        <sql>
+            CREATE TABLE IF NOT EXISTS cmr_feedback (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                biz_no VARCHAR(32) NOT NULL COMMENT 'FBK 编号',
+                search_id BIGINT NOT NULL COMMENT '关联检索历史',
+                type VARCHAR(32) NOT NULL COMMENT 'inaccurate/ranking/wrong_source/zero_result',
+                description VARCHAR(1024),
+                status VARCHAR(16) NOT NULL DEFAULT 'pending' COMMENT 'pending/processing/closed',
+                target VARCHAR(32) COMMENT 'strategy/datasource/backfill',
+                result_note VARCHAR(512),
+                handler_id BIGINT,
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                UNIQUE KEY uk_biz_no (biz_no), KEY idx_status (status), KEY idx_search (search_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 反馈单';
+
+            CREATE TABLE IF NOT EXISTS cmr_recommend_word (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                biz_no VARCHAR(32) NOT NULL COMMENT 'REC 编号',
+                word VARCHAR(128) NOT NULL,
+                scene VARCHAR(64) DEFAULT 'all',
+                enabled TINYINT(1) DEFAULT 1,
+                sort INT DEFAULT 0,
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                UNIQUE KEY uk_biz_no (biz_no), UNIQUE KEY uk_word (word)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 运营推荐词';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

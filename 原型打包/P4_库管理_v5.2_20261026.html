@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>库管理 · 跨模态检索中心</title>
+<style>
+:root{
+  /* 冷白蓝 token（与 P1 定稿基准一致） */
+  --workspace-bg:#f6f9fe;
+  --content-soft:#fbfdff;
+  --content-line:#e6edf8;
+  --system-blue:#4169f6;
+  --system-blue-weak:#f1f5ff;
+  --ink:#1f2937;
+  --muted:#667085;
+  --success:#34a853;
+  --warning:#f0a020;
+  --error:#e5484d;
+  --text-primary:#262626;
+  --radius:8px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--workspace-bg);color:var(--text-primary);font-size:14px;line-height:1.5;display:flex;
+}
+button{font-family:inherit;cursor:pointer}
+::selection{background:rgba(65,105,246,.16)}
+
+/* ============ 左侧全局导航（与 P1 同壳，不改） ============ */
+.sidebar{width:220px;flex-shrink:0;background:#fff;border-right:1px solid var(--content-line);display:flex;flex-direction:column;height:100vh;position:sticky;top:0}
+.nav-scroll{flex:1;overflow-y:auto;padding:10px 12px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 10px;margin-bottom:2px;border-radius:6px;color:#344054;font-size:13px;cursor:pointer;user-select:none;text-decoration:none}
+.nav-item .ico{width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:#8a96ad;flex-shrink:0}
+.nav-item .ico svg{width:16px;height:16px;display:block}
+.nav-item:hover{background:var(--system-blue-weak);color:var(--system-blue)}
+.nav-item.active{background:var(--system-blue-weak);color:var(--system-blue);font-weight:600;box-shadow:inset 2px 0 0 var(--system-blue)}
+.nav-item.active .ico{color:var(--system-blue)}
+.nav-divider{height:1px;background:var(--content-line);margin:8px 10px}
+
+/* ============ 主区 ============ */
+.main{flex:1;min-width:0;height:100vh;overflow-y:auto}
+.content{padding:18px 24px 40px;display:flex;flex-direction:column;gap:14px;max-width:1180px;width:100%;margin:0 auto}
+.page-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:18px 20px;
+  border:1px solid #e4edf8;
+  border-radius:10px;
+  background:#fff;
+}
+.ph-main{min-width:0}
+.page-head h1{font-size:20px;font-weight:700;color:#111827;line-height:1.3}
+.page-head p{font-size:13px;color:#667085;line-height:1.65;margin-top:5px;max-width:760px}
+
+/* ===== 研发说明入口（九页统一：头部胶囊按钮 + 右侧抽屉） ===== */
+.dev-entry{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px 0 5px;border:1px solid #d7e0f0;border-radius:999px;background:#fff;color:#667085;font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+.dev-entry:hover{border-color:#b9c9ff;background:var(--system-blue-weak);color:var(--system-blue)}
+.dev-entry:hover .de-q{background:var(--system-blue);color:#fff}
+.dev-entry:focus-visible{outline:2px solid #cdd9ff;outline-offset:1px}
+.dev-entry .de-q{width:20px;height:20px;border-radius:50%;flex:0 0 auto;background:var(--system-blue-weak);color:var(--system-blue);font-size:12px;font-weight:700;line-height:20px;text-align:center;transition:background .15s,color .15s}
+/* 右侧抽屉：520px / 全高 / 从右滑入 + 半透明遮罩 */
+.dev-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:10000;opacity:0;pointer-events:none;transition:opacity .22s}
+.dev-mask.open{opacity:1;pointer-events:auto}
+.dev-drawer{position:fixed;top:0;right:0;width:720px;max-width:100vw;height:100vh;background:#f6f8fc;z-index:10001;display:flex;flex-direction:column;transform:translateX(102%);transition:transform .28s ease;box-shadow:-8px 0 30px rgba(15,23,42,.18)}
+.dev-drawer.open{transform:translateX(0)}
+.dev-head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:#fff;border-bottom:1px solid #e4eaf3;flex:0 0 auto}
+.dev-head h3{margin:0;font-size:15px;color:#1f2937}
+.dev-head .dh-tag{font-size:11px;font-weight:600;color:#b54708;background:#fdf3e6;border-radius:4px;padding:2px 8px}
+.dev-close{margin-left:auto;width:28px;height:28px;border:none;background:#f2f4f8;border-radius:6px;font-size:15px;line-height:1;cursor:pointer;color:#475467;flex:0 0 auto}
+.dev-close:hover{background:#e6eaf2}
+.dev-body{flex:1;min-height:0;overflow:auto;padding:16px 18px 36px}
+.dev-stack{display:flex;flex-direction:column;gap:12px}
+
+/* 面板 */
+.panel{padding:14px 16px;border:1px solid #e4edf8;border-radius:var(--radius);background:#fff;display:flex;flex-direction:column;gap:10px}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.sec-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.sec-title{font-size:15px;font-weight:700;color:#1f2a44;white-space:nowrap}
+.sec-sub{font-size:11.5px;color:#9aa6bd}
+.view-badge{font-size:10.5px;font-weight:700;color:var(--system-blue);background:var(--system-blue-weak);border:1px solid #d7e0ff;border-radius:4px;padding:1px 6px;white-space:nowrap}
+.hint{font-size:11.5px;color:#8a96ad;font-variant-numeric:tabular-nums}
+.note{font-size:11.5px;color:#8a96ad;line-height:1.7;padding:0 2px}
+
+/* 输入边界：数据源小条 */
+.src-strip{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px dashed #cdd9f5;border-radius:7px;background:var(--system-blue-weak);padding:6px 9px}
+.ib-k{flex-shrink:0;font-size:10.5px;font-weight:700;color:var(--system-blue);background:#fff;border:1px solid #d7e0ff;border-radius:4px;padding:1px 6px;white-space:nowrap}
+.src-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
+.src-chip{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #dbe4f5;border-radius:999px;padding:2px 4px 2px 9px;font-size:11.5px;color:#344054;max-width:100%}
+.src-chip .dot{width:7px;height:7px;border-radius:50%;background:#c8cfdd;flex-shrink:0}
+.src-chip .dot.on{background:var(--success)}
+.sc-name{font-weight:600;color:#273244;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-proto{color:#8a96ad;font-size:10.5px;white-space:nowrap}
+.src-chip b{font-variant-numeric:tabular-nums;color:#1f2a44;font-weight:700}
+.sc-unit{color:#8a96ad;font-size:10.5px}
+.btn-link{border:0;border-left:1px solid #e6edf8;background:transparent;color:var(--system-blue);font-size:11px;font-weight:600;padding:0 6px;margin-left:2px;white-space:nowrap}
+.btn-link:hover{text-decoration:underline}
+.btn-link:disabled{color:#9aa6bd;cursor:default}
+
+/* 状态流转说明条 */
+.flowline{display:flex;flex-wrap:wrap;align-items:center;gap:4px 5px;border:1px dashed #e2e9f5;border-radius:6px;background:#f8fbff;padding:5px 9px;font-size:11px;color:#8a96ad;line-height:1.6}
+.ff{font-weight:700;color:#6d7a92;margin-right:2px}
+.fchip{font-size:10.5px;font-weight:600;border-radius:4px;padding:0 6px;border:1px solid #e6edf8;background:#fff;color:#475467;white-space:nowrap}
+.fchip.run{color:#335be8;border-color:#d7e0ff;background:#f5f8ff}
+.fchip.ok{color:#1e7f4b;border-color:#c9ecd7;background:#f3fbf6}
+.fchip.warn{color:#a9741a;border-color:#f0d9a8;background:#fffaf0}
+.fchip.fail{color:#c0392b;border-color:#f6cdcd;background:#fdf5f5}
+.farr{color:#b6c1d6}
+
+/* 数据表 */
+.dtable{border:1px solid #eef2f8;border-radius:8px;overflow-x:auto}
+table.dt{width:100%;min-width:640px;border-collapse:collapse;font-size:12.5px}
+table.dt th{background:#f4f6fb;color:#7a8493;font-weight:600;font-size:11px;text-align:left;padding:8px 11px;border-bottom:1px solid #e6edf8;white-space:nowrap}
+table.dt td{padding:7px 11px;border-bottom:1px solid #eef2f8;color:#344054;vertical-align:middle}
+table.dt tbody tr:last-child td{border-bottom:0}
+table.dt tbody tr:hover td{background:#f8fbff}
+table.dt tbody tr.stuck td{background:#fffdf7}
+table.dt tbody tr.stuck td:first-child{box-shadow:inset 3px 0 0 var(--warning)}
+table.dt tbody tr.stuck:hover td{background:#fff9ee}
+
+/* ================= 分页组件（表格下方 · 右对齐） ================= */
+.pager-bar{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:#667085}
+.pager-total{color:#8a96ad;margin-right:4px;font-variant-numeric:tabular-nums}
+.pager-btn,.pager-num{height:28px;border:1px solid #d7e0f0;background:#fff;border-radius:5px;color:#475467;font-size:12px;cursor:pointer;font-family:inherit}
+.pager-btn{padding:0 10px}
+.pager-num{min-width:28px;padding:0 6px;font-variant-numeric:tabular-nums}
+.pager-btn:hover:not(:disabled),.pager-num:hover:not(.is-cur){border-color:#4169f6;color:#4169f6}
+.pager-btn:disabled{opacity:.45;cursor:not-allowed}
+.pager-num.is-cur{background:#4169f6;border-color:#4169f6;color:#fff;font-weight:700;cursor:default}
+.pager-gap{color:#98a2b3;padding:0 2px}
+
+.mono{font-family:ui-monospace,Consolas,"Courier New",monospace;font-variant-numeric:tabular-nums;word-break:break-all}
+.ds-name{font-size:12px;font-weight:600;color:#273244;line-height:1.5}
+.ds-meta{font-size:10.5px;color:#9aa6bd;margin-left:6px;line-height:1.5}
+.stk{color:#a9741a;font-weight:600}
+.cell-mute{color:#aab4c8}
+a.link{color:var(--system-blue);text-decoration:none;font-weight:600}
+a.link:hover{text-decoration:underline}
+.row-flash td{animation:rowFlash 1s ease-out}
+@keyframes rowFlash{from{background:#e3ecff}to{background:transparent}}
+
+/* 按钮 */
+.btn-primary{height:30px;padding:0 14px;border:0;border-radius:6px;background:var(--system-blue);color:#fff;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px;box-shadow:0 2px 6px rgba(65,105,246,.2);transition:all .15s}
+.btn-primary:hover{background:#335be8}
+.btn-primary:disabled{opacity:.6;cursor:not-allowed}
+.btn-mini{height:24px;padding:0 10px;border:1px solid #d7e0f0;border-radius:5px;background:#fff;color:var(--system-blue);font-size:11.5px;font-weight:600;white-space:nowrap}
+.btn-mini:hover{border-color:#b9c9ff;background:var(--system-blue-weak)}
+.btn-mini.act{border-color:#f0d9a8;background:#fffaf0;color:#a9741a}
+.btn-mini.act:hover{border-color:#e8c987;background:#fdf3e1}
+.btn-mini.view{color:#667085;border-color:#e6edf8}
+.btn-ghost{height:32px;padding:0 16px;border:1px solid #d7e0f0;border-radius:6px;background:#fff;color:#475467;font-size:13px;font-weight:600}
+.btn-ghost:hover{border-color:#b9c9ff;background:var(--system-blue-weak);color:var(--system-blue)}
+
+/* 徽章 */
+.badge{font-size:10.5px;padding:1px 7px;border-radius:9px;font-weight:600;display:inline-block;white-space:nowrap;line-height:1.7}
+.badge.ok{background:#e8f7ec;color:var(--success)}
+.badge.fail{background:#fdecec;color:var(--error)}
+.badge.run{background:#e9f0ff;color:var(--system-blue)}
+.badge.warn{background:#fdf3e1;color:#c98a12}
+.badge.pend{background:#f0f2f6;color:#667085}
+
+/* 弹层 */
+.modal-mask{position:fixed;inset:0;z-index:180;background:rgba(20,32,70,.36);display:none;align-items:flex-start;justify-content:center;padding:44px 16px 24px;overflow-y:auto}
+.modal-mask.open{display:flex}
+.modal{width:100%;max-width:720px;background:#fff;border:1px solid #e4edf8;border-radius:12px;box-shadow:0 20px 50px rgba(20,32,70,.26);overflow:hidden;animation:modalIn .16s ease-out}
+.modal.wide{max-width:840px}
+@keyframes modalIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;border-bottom:1px solid #eef2f8;background:#fbfdff}
+.modal-x{width:26px;height:26px;flex-shrink:0;border:0;border-radius:6px;background:transparent;color:#8a96ad;font-size:18px;line-height:1}
+.modal-x:hover{background:#eef2fb;color:#475467}
+.modal-sub{font-size:11.5px;color:#667085;line-height:1.7;padding:10px 16px 0}
+.modal-body{display:flex;flex-direction:column;gap:11px;padding:12px 16px 16px;max-height:72vh;overflow-y:auto}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;border-top:1px dashed #eef2f8;padding-top:12px;margin-top:2px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field > label{font-size:12px;font-weight:600;color:#475467}
+.field .req{color:var(--error);font-weight:700}
+.field .opt{font-size:10.5px;font-weight:400;color:#9aa6bd}
+.field input,.field select{height:32px;width:100%;border:1px solid #cfd8e8;border-radius:6px;padding:0 9px;font-size:12.5px;background:#fff;color:#1f2a44;outline:none;font-family:inherit}
+.field input:focus,.field select:focus{border-color:#8fa3ff;box-shadow:0 0 0 2px rgba(65,105,246,.12)}
+.field input::placeholder{color:#b3bccd}
+.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modal-note{font-size:11px;color:#8a6a1f;background:#fdf8ee;border:1px dashed #f0d9a8;border-radius:6px;padding:6px 9px;line-height:1.65}
+
+/* 研发说明内容 */
+.help-lead{font-size:12.5px;color:#475467;line-height:1.75;background:var(--system-blue-weak);border:1px dashed #cdd9f5;border-radius:8px;padding:9px 12px}
+.help-lead b{color:#1f2a44;font-weight:700}
+.hb-t{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:#1f2a44;margin-bottom:6px}
+.hb-t::before{content:"";width:3px;height:12px;border-radius:2px;background:var(--system-blue)}
+.help-table{min-width:0}
+.help-table th{font-size:10.5px;padding:6px 9px}
+.help-table td{padding:5px 9px;font-size:11.5px;line-height:1.55}
+.help-table td.mod{font-weight:700;color:var(--system-blue);white-space:nowrap;font-variant-numeric:tabular-nums}
+.help-table td.rng{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:10.5px;color:#5b6472;white-space:nowrap}
+.help-table td.cov{color:#1e7f4b;font-weight:600}
+.map-table{width:100%;border-collapse:collapse;font-size:11.5px}
+.map-table th{background:#f4f6fb;color:#7a8493;font-weight:600;font-size:10.5px;text-align:left;padding:6px 9px;border:1px solid #e6edf8;white-space:nowrap}
+.map-table td{padding:5px 9px;border:1px solid #eef2f8;color:#475467;line-height:1.55;vertical-align:top}
+.map-table td.mk{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:10.5px;color:#5b6472;white-space:nowrap}
+.help-note{font-size:11.5px;color:#475467;line-height:1.75;border-top:1px dashed #eef2f8;padding-top:9px}
+.help-note b{color:#1f2a44;font-weight:700}
+
+/* 全局消息 */
+.toast{position:fixed;top:56px;left:50%;transform:translateX(-50%) translateY(-12px);z-index:200;background:#2b3245;color:#fff;font-size:13px;padding:9px 18px;border-radius:7px;box-shadow:0 8px 24px rgba(20,32,70,.25);opacity:0;pointer-events:none;transition:all .2s;max-width:80vw}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#c0392b}
+.toast.ok{background:#1e8e4a}
+
+@media (max-width:1000px){
+  .content{padding:14px 14px 28px}
+  .page-head{flex-direction:column;gap:8px}
+}
+@media (max-width:560px){
+  .field-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ 左侧导航（九页互通 · 本页 active，不改） ============ -->
+<aside class="sidebar">
+  <div class="nav-scroll">
+    <a class="nav-item" href="P1_检索台_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span>检索台</a>
+    <a class="nav-item" href="P9_检索历史_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></svg></span>检索历史</a>
+    <div class="nav-divider"></div>
+    <a class="nav-item admin-nav active" href="P4_库管理_v5.2_20261026.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6"/><path d="M5 12v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6"/></svg></span>库管理</a>
+    <a class="nav-item admin-nav" href="P5_策略管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="10" cy="17" r="1.6"/></svg></span>策略管理</a>
+    <a class="nav-item admin-nav" href="P6_任务管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="12" height="16" rx="2"/><path d="M9 5V3.5h6V5"/><path d="M9 10h6M9 14h6M9 18h4"/></svg></span>任务管理</a>
+    <a class="nav-item admin-nav" href="P7_结果运营_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>结果运营</a>
+    <a class="nav-item admin-nav" href="P8_评测_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="13" width="3" height="4"/><rect x="12" y="9" width="3" height="8"/><rect x="17" y="5" width="3" height="12"/></svg></span>效果评测</a>
+  </div>
+</aside>
+
+<!-- ============ 主区 ============ -->
+<div class="main">
+<div class="content">
+
+  <header class="page-head">
+    <div class="ph-main">
+      <h1>库管理</h1>
+      <p>把上游数据集变成可检索库：登记数据源后，数据集自动跑到「可检索」；卡住才需要处理。</p>
+    </div>
+    <button class="dev-entry" id="devEntry" type="button" onclick="openDev()" title="研发说明"><span class="de-q" aria-hidden="true">?</span>研发说明</button>
+  </header>
+
+  <!-- ============ 数据集列表（用户正文的全部） ============ -->
+  <section class="panel" aria-label="数据集列表">
+    <div class="panel-head">
+      <div class="sec-head">
+        <span class="sec-title">数据集列表</span>
+        <span class="view-badge">联动视图</span>
+        <span class="sec-sub">看状态 / 卡点 / 处理</span>
+      </div>
+      <span class="hint" id="dsHint">显示 7 条 · 3 条卡住</span>
+    </div>
+
+    <!-- 输入边界：数据源登记（列表上方小条，不单独成区） -->
+    <div class="src-strip">
+      <span class="ib-k">输入边界</span>
+      <span class="src-chips" id="srcChips">
+        <span class="src-chip" data-src="数据集管理-生产池" data-count="10" data-status="已连接" title="https://ds.example/prod · 自动拉取 · 已连接 · Token">
+          <i class="dot on" data-role="srcdot"></i>
+          <span class="sc-name">数据集管理-生产池</span>
+          <span class="sc-proto">自动拉取</span>
+          <b data-role="srccount">10</b><span class="sc-unit">个</span>
+          <button class="btn-link" type="button" onclick="testSource(this)">测试连接</button>
+        </span>
+        <span class="src-chip" data-src="数据集管理-测试池" data-count="0" data-status="已连接" title="https://ds.example/test · 推送接收 · 已连接 · Token">
+          <i class="dot on" data-role="srcdot"></i>
+          <span class="sc-name">数据集管理-测试池</span>
+          <span class="sc-proto">推送接收</span>
+          <b data-role="srccount">0</b><span class="sc-unit">个</span>
+          <button class="btn-link" type="button" onclick="testSource(this)">测试连接</button>
+        </span>
+      </span>
+      <button class="btn-primary" type="button" onclick="openAddSource()"><span aria-hidden="true">＋</span> 登记数据源</button>
+    </div>
+    <div class="note">一个数据源 = 一个数据集管理池；2 个池子登记 2 次；池下的数据集自动进入下方列表。</div>
+
+    <div class="flowline" aria-label="数据集状态流转">
+      <span class="ff">状态</span>
+      <span class="fchip run">接入中</span><span class="farr">→</span>
+      <span class="fchip run">评定中</span><span class="farr">→</span>
+      <span class="fchip run">已入库</span><span class="farr">→</span>
+      <span class="fchip run">建索引中</span><span class="farr">→</span>
+      <span class="fchip ok">可检索</span>
+      <span class="farr">／</span>
+      <span class="fchip warn">卡住</span>
+      <span class="fchip fail">已剔除</span>
+    </div>
+
+    <div class="dtable">
+      <table class="dt">
+        <thead>
+          <tr><th>数据集</th><th>来源</th><th>当前状态</th><th>卡点</th><th>操作</th></tr>
+        </thead>
+        <tbody id="dsBody">
+          <tr class="stuck" data-ds="PKG261025F9K2VB" data-status="卡住">
+            <td><span class="ds-name mono">PKG261025F9K2VB</span><span class="ds-meta">四模态产物 · 7,260 条</span></td>
+            <td>数据集管理-生产池</td>
+            <td><span class="badge warn" data-role="dsst">卡住</span></td>
+            <td class="stk" data-role="dsper">质量分 0.29（0.25–0.32）· 评定挂起</td>
+            <td data-role="dsops"><button class="btn-mini act" type="button" onclick="doJudge(this)" title="质量分落在 0.25–0.32，人工判定入池（放行）或剔除">裁决</button></td>
+          </tr>
+          <tr class="stuck" data-ds="PKG261026E4R7TY" data-status="卡住">
+            <td><span class="ds-name mono">PKG261026E4R7TY</span><span class="ds-meta">业务源发布接入 · 8,310 条</span></td>
+            <td>数据集管理-生产池</td>
+            <td><span class="badge warn" data-role="dsst">卡住</span></td>
+            <td class="stk" data-role="dsper">召回率 93.7% &lt; 95% · 投产待确认</td>
+            <td data-role="dsops"><button class="btn-mini act" type="button" onclick="doConfirm(this)" title="召回率 &lt;95%，人工确认是否投产">确认</button></td>
+          </tr>
+          <tr class="stuck" data-ds="PKG261026D3P8RY" data-status="卡住">
+            <td><span class="ds-name mono">PKG261026D3P8RY</span><span class="ds-meta">对齐语料包 · 4,870 条</span></td>
+            <td>数据集管理-生产池</td>
+            <td><span class="badge warn" data-role="dsst">卡住</span></td>
+            <td class="stk" data-role="dsper">视频 × 专业 覆盖率 12% · 治理异常</td>
+            <td data-role="dsops"><button class="btn-mini act" type="button" onclick="doHandle(this)" title="治理异常（覆盖缺失 / 模态分布 / 索引恢复等），处理后继续自动跑">处理</button></td>
+          </tr>
+          <tr data-ds="PKG261027C9K4WD" data-status="接入中">
+            <td><span class="ds-name mono">PKG261027C9K4WD</span><span class="ds-meta">图文对齐包 · 6,420 条</span></td>
+            <td>数据集管理-生产池</td>
+            <td><span class="badge run" data-role="dsst">接入中</span></td>
+            <td>目录拉取 3/3 源</td>
+            <td data-role="dsops"><button class="btn-mini view" type="button" onclick="viewDs(this)">查看</button></td>
+          </tr>
+          <tr data-ds="PKG261027B7M2QT" data-status="建索引中">
+            <td><span class="ds-name mono">PKG261027B7M2QT</span><span class="ds-meta">四模态产物 · 11,050 条</span></td>
+            <td>数据集管理-生产池</td>
+            <td><span class="badge run" data-role="dsst">建索引中</span></td>
+            <td>向量化 62%</td>
+            <td data-role="dsops"><button class="btn-mini view" type="button" onclick="viewDs(this)">查看</button></td>
+          </tr>
+          <tr data-ds="PKG261020A3F9KX" data-status="可检索">
+            <td><span class="ds-name mono">PKG261020A3F9KX</span><span class="ds-meta">对齐语料包 · 18,240 条</span></td>
+            <td>数据集管理-生产池</td>
+            <td><span class="badge ok" data-role="dsst">可检索</span></td>
+            <td><span class="cell-mute">—</span><span class="ds-meta">投产校验：<a class="link" href="P5_策略管理_v5.0_20261025.html#fromP4">策略管理</a></span></td>
+            <td data-role="dsops"><button class="btn-mini view" type="button" onclick="viewDs(this)">查看</button></td>
+          </tr>
+          <tr data-ds="PKG261025C4H8TZ" data-status="已剔除">
+            <td><span class="ds-name mono">PKG261025C4H8TZ</span><span class="ds-meta">四模态产物 · 5,940 条</span></td>
+            <td>数据集管理-生产池</td>
+            <td><span class="badge fail" data-role="dsst">已剔除</span></td>
+            <td>质量分 0.21 &lt; 0.25 · 自动剔除</td>
+            <td data-role="dsops"><button class="btn-mini view" type="button" onclick="viewDs(this)">查看</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pager-bar" id="dsPager"></div>
+    <div class="note">正常自动跑完到「可检索」，卡住才转人工：评定挂起（0.25–0.32）→「裁决」；投产召回率 &lt;95% →「确认」；治理异常 →「处理」。</div>
+  </section>
+
+
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ===== 登记数据源（输入边界 · 数据集管理池） ===== -->
+<div class="modal-mask" id="addSrcMask" onclick="closeAddSource(event)">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="addSrcTitle">
+    <div class="modal-head">
+      <span class="sec-title" id="addSrcTitle">登记数据源</span>
+      <button class="modal-x" type="button" aria-label="关闭" onclick="closeAddSource()">×</button>
+    </div>
+    <p class="modal-sub">登记要对接的数据集管理池，一个池子登记一次；池下的数据集由上游发布 / 推送后自动进入上方列表。</p>
+    <form class="modal-body" id="addSrcForm" onsubmit="return submitSource(event)">
+      <div class="field">
+        <label for="srcName">数据源名称 <span class="req" aria-hidden="true">*</span></label>
+        <input id="srcName" type="text" maxlength="40" placeholder="如：数据集管理-生产池" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="srcEndpoint">接口地址 <span class="req" aria-hidden="true">*</span></label>
+        <input id="srcEndpoint" type="text" maxlength="120" placeholder="https://ds.example/prod" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field-grid">
+        <div class="field">
+          <label for="srcAuth">认证方式 <span class="opt">可选</span></label>
+          <select id="srcAuth">
+            <option selected>Token</option>
+            <option>无</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="srcProtocol">协议</label>
+          <select id="srcProtocol">
+            <option selected>自动拉取</option>
+            <option>推送接收</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="srcDesc">描述 <span class="opt">可选</span></label>
+        <input id="srcDesc" type="text" maxlength="60" placeholder="如：生产环境数据集管理池，每日 02:00 同步" autocomplete="off">
+      </div>
+      <div class="modal-note">登记对象是「数据集管理池」而不是单个数据集：提交后状态为「未连接」，点「测试连接」验证接口；库管理不在此处手动建数据集。</div>
+      <div class="modal-foot">
+        <button class="btn-ghost" type="button" onclick="closeAddSource()">取消</button>
+        <button class="btn-primary" type="submit">登记数据源</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===== 研发需求说明（入口在头部卡片右上角 · 右侧抽屉） ===== -->
+<div class="dev-mask" id="devMask" onclick="closeDev()"></div>
+<div class="dev-drawer" id="devDrawer" role="dialog" aria-modal="true" aria-label="研发需求说明">
+  <div class="dev-head">
+    <h3>研发需求说明</h3>
+    <span class="dh-tag">给研发</span>
+    <button type="button" class="dev-close" id="devClose" title="关闭（Esc）" aria-label="关闭" onclick="closeDev()">×</button>
+  </div>
+  <div class="dev-body dev-stack">
+      <p class="help-lead">这 15 个 COSMIC 模块是<b>后台处理环节与研发交付依据</b>；正文只保留数据集状态、卡点与卡住处理。用户看到的每个状态，都是后台一组模块处理后的结果。</p>
+
+      <div>
+        <div class="hb-t">一、15 个模块与 F-CR 范围</div>
+        <div class="dtable">
+          <table class="dt help-table">
+            <thead>
+              <tr><th>模块</th><th>模块名</th><th>F-CR 范围</th><th>覆盖方式</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="mod">1A</td><td>检索库内容质量管理</td><td class="rng">F-CR-001 ~ 003</td><td class="cov">状态「接入中」</td></tr>
+              <tr><td class="mod">1B</td><td>检索库质量验收与接入确认</td><td class="rng">F-CR-008 ~ 012</td><td class="cov">状态「评定中」+ 卡住复核</td></tr>
+              <tr><td class="mod">1C</td><td>检索库数据集接入条件评定</td><td class="rng">F-CR-016 ~ 018</td><td class="cov">状态「评定中」+ 裁决</td></tr>
+              <tr><td class="mod">1D</td><td>检索库质量抽样核验</td><td class="rng">F-CR-044 ~ 046</td><td class="cov">状态「评定中」</td></tr>
+              <tr><td class="mod">2A</td><td>检索库元数据治理</td><td class="rng">F-CR-013 ~ 015</td><td class="cov">状态「已入库」</td></tr>
+              <tr><td class="mod">2B</td><td>检索索引构建质量管理</td><td class="rng">F-CR-004 ~ 007</td><td class="cov">状态「建索引中」</td></tr>
+              <tr><td class="mod">2C</td><td>检索库投产验收确认</td><td class="rng">F-CR-047 ~ 050</td><td class="cov">状态「可检索」+ 确认</td></tr>
+              <tr><td class="mod">2D</td><td>检索库增量更新管理</td><td class="rng">F-CR-019 ~ 025</td><td class="cov">状态「可检索」（增量）</td></tr>
+              <tr><td class="mod">3A</td><td>检索库覆盖缺失治理</td><td class="rng">F-CR-029 ~ 031</td><td class="cov">状态「卡住」+ 处理</td></tr>
+              <tr><td class="mod">3B</td><td>检索库最新内容维护</td><td class="rng">F-CR-032 ~ 034</td><td class="cov">状态「可检索」（增量）</td></tr>
+              <tr><td class="mod">3C</td><td>检索库模态分布治理</td><td class="rng">F-CR-035 ~ 038</td><td class="cov">状态「卡住」+ 处理</td></tr>
+              <tr><td class="mod">3D</td><td>检索索引质量恢复</td><td class="rng">F-CR-039 ~ 043</td><td class="cov">状态「卡住」+ 处理</td></tr>
+              <tr><td class="mod">3E</td><td>检索索引内容影响评估</td><td class="rng">F-CR-026 ~ 028</td><td class="cov">状态「卡住」+ 处理</td></tr>
+              <tr><td class="mod">3F</td><td>检索库容量评估与扩容规划</td><td class="rng">F-CR-051 ~ 052</td><td class="cov">状态「可检索」（容量）</td></tr>
+              <tr><td class="mod">3G</td><td>检索库失效内容与质量问题处理</td><td class="rng">F-CR-053 ~ 056</td><td class="cov">状态「卡住」+ 处理</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <div class="hb-t">二、页面与 COSMIC 的映射</div>
+        <table class="map-table">
+          <thead>
+            <tr><th>页面元素（用户可见）</th><th>承载方式</th><th>COSMIC 模块</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>数据源登记（输入边界）</td><td>非 COSMIC 模块；登记数据集管理池，为接入提供目录来源</td><td class="mk">—（1A 的输入）</td></tr>
+            <tr><td>状态「接入中」</td><td>状态流转，自动</td><td class="mk">1A</td></tr>
+            <tr><td>状态「评定中」</td><td>状态流转，自动</td><td class="mk">1B / 1C / 1D</td></tr>
+            <tr><td>状态「已入库」</td><td>状态流转，自动</td><td class="mk">2A</td></tr>
+            <tr><td>状态「建索引中」</td><td>状态流转，自动</td><td class="mk">2B</td></tr>
+            <tr><td>状态「可检索」</td><td>状态流转；投产校验跳「策略管理」</td><td class="mk">2C / 2D</td></tr>
+            <tr><td>状态「卡住」</td><td>转人工：裁决 / 确认 / 处理</td><td class="mk">1C · 2C · 3A–3G</td></tr>
+            <tr><td>状态「已剔除」</td><td>评定结论，自动</td><td class="mk">1C</td></tr>
+            <tr><td>「? 研发说明」</td><td>本面板，仅研发 / 产品查看</td><td class="mk">15 个模块的交付依据</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="help-note"><b>三、覆盖说明：</b>本页 F-CR-001 ~ 056 共 56 个功能过程，全部落在 15 个后台模块；正文不出现模块编号与 F-CR，只以 7 个数据集状态 + 卡住处理呈现。正常数据集由状态自动推进，只有卡住时才出现人工动作（裁决 / 确认 / 处理），因此功能过程由状态流转与卡住处理覆盖。</p>
+  </div>
+</div>
+
+<script>
+/* ================= 工具 ================= */
+var toastTimer;
+function byId(id){ return document.getElementById(id); }
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtNum(n){
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+function toast(msg, type){
+  var t = byId('toast');
+  if(!t){ return; }
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.className = 'toast'; }, 3000);
+}
+
+/* ================= 输入边界：数据源登记 ================= */
+function openAddSource(){
+  var mask = byId('addSrcMask');
+  if(!mask){ return; }
+  mask.classList.add('open');
+  var n = byId('srcName');
+  if(n){ setTimeout(function(){ try{ n.focus(); }catch(e){} }, 30); }
+}
+function closeAddSource(ev){
+  if(ev && ev.target && ev.target.closest && ev.target.closest('.modal')){ return; }
+  var mask = byId('addSrcMask');
+  if(mask){ mask.classList.remove('open'); }
+}
+function resetAddSource(){
+  var f = byId('addSrcForm');
+  if(f){ f.reset(); }
+}
+function submitSource(ev){
+  if(ev && ev.preventDefault){ ev.preventDefault(); }
+  var nameEl = byId('srcName');
+  var epEl = byId('srcEndpoint');
+  var name = nameEl ? nameEl.value.trim() : '';
+  var endpoint = epEl ? epEl.value.trim() : '';
+  if(!name){
+    toast('请填写数据源名称，如「数据集管理-生产池」', 'err');
+    if(nameEl){ nameEl.focus(); }
+    return false;
+  }
+  if(!endpoint){
+    toast('请填写接口地址（endpoint）', 'err');
+    if(epEl){ epEl.focus(); }
+    return false;
+  }
+  if(!/^https?:\/\/[^\s]+$/i.test(endpoint)){
+    toast('接口地址需以 http:// 或 https:// 开头', 'err');
+    if(epEl){ epEl.focus(); }
+    return false;
+  }
+  var proto = byId('srcProtocol').value;
+  var auth = byId('srcAuth').value;
+  var descEl = byId('srcDesc');
+  var desc = descEl ? descEl.value.trim() : '';
+  var chip = document.createElement('span');
+  chip.className = 'src-chip';
+  chip.setAttribute('data-src', name);
+  chip.setAttribute('data-count', '0');
+  chip.setAttribute('data-status', '未连接');
+  chip.setAttribute('title', endpoint + ' · ' + proto + ' · 认证 ' + auth + ' · 未连接' + (desc ? ' · ' + desc : ''));
+  chip.innerHTML =
+    '<i class="dot" data-role="srcdot"></i>' +
+    '<span class="sc-name">' + esc(name) + '</span>' +
+    '<span class="sc-proto">' + esc(proto) + '</span>' +
+    '<b data-role="srccount">0</b><span class="sc-unit">个</span>' +
+    '<button class="btn-link" type="button" onclick="testSource(this)">测试连接</button>';
+  var box = byId('srcChips');
+  if(box){ box.appendChild(chip); }
+  resetAddSource();
+  closeAddSource();
+  toast('数据源已登记：' + name + '，点「测试连接」验证接口', 'ok');
+  return false;
+}
+function testSource(btn){
+  var chip = btn && btn.closest ? btn.closest('.src-chip') : null;
+  if(!chip || btn.disabled){ return; }
+  var dot = chip.querySelector('[data-role="srcdot"]');
+  var n = parseInt(chip.getAttribute('data-count') || '0', 10);
+  var name = chip.getAttribute('data-src') || '数据源';
+  var wasOff = !dot || !dot.classList.contains('on');
+  var old = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '测试中…';
+  setTimeout(function(){
+    btn.disabled = false;
+    btn.textContent = old;
+    if(dot){ dot.classList.add('on'); }
+    chip.setAttribute('data-status', '已连接');
+    var t = chip.getAttribute('title') || '';
+    chip.setAttribute('title', t.replace('未连接', '已连接'));
+    toast(wasOff
+      ? '连接成功：' + name + '，等待上游数据集接入'
+      : '连接正常：' + name + ' · 上游返回 ' + fmtNum(n) + ' 个数据集', 'ok');
+  }, 700);
+}
+
+/* ================= 分页组件（每页 10 条） ================= */
+var dsPage = 1;
+var DS_PAGE_SIZE = 10;
+var PAGER_GO = {};
+function pagerNumbers(page, pages){
+  var out = [], i;
+  if(pages <= 7){
+    for(i = 1; i <= pages; i++){ out.push(i); }
+  }else{
+    out.push(1);
+    var s = Math.max(2, page - 1), e = Math.min(pages - 1, page + 1);
+    if(s > 2){ out.push('...'); }
+    for(i = s; i <= e; i++){ out.push(i); }
+    if(e < pages - 1){ out.push('...'); }
+    out.push(pages);
+  }
+  return out;
+}
+function renderPager(containerId, total, page, pageSize){
+  var box = document.getElementById(containerId);
+  if(!box){ return; }
+  pageSize = pageSize || 10;
+  var pages = Math.max(1, Math.ceil(total / pageSize));
+  if(page > pages){ page = pages; }
+  if(page < 1){ page = 1; }
+  var go = PAGER_GO[containerId] || 'goPage';
+  var html = '<span class="pager-total">共 ' + total + ' 条</span>' +
+    '<button class="pager-btn" type="button" onclick="' + go + '(' + (page - 1) + ')"' + (page <= 1 ? ' disabled' : '') + '>上一页</button>';
+  pagerNumbers(page, pages).forEach(function(p){
+    if(p === '...'){ html += '<span class="pager-gap">…</span>'; }
+    else{
+      html += '<button class="pager-num' + (p === page ? ' is-cur' : '') + '" type="button" onclick="' + go + '(' + p + ')"' +
+        (p === page ? ' aria-current="page"' : '') + '>' + p + '</button>';
+    }
+  });
+  html += '<button class="pager-btn" type="button" onclick="' + go + '(' + (page + 1) + ')"' + (page >= pages ? ' disabled' : '') + '>下一页</button>';
+  box.innerHTML = html;
+}
+function renderDsPager(){
+  var rows = document.querySelectorAll('#dsBody tr');
+  var total = rows.length;
+  var pages = Math.max(1, Math.ceil(total / DS_PAGE_SIZE));
+  if(dsPage > pages){ dsPage = pages; }
+  if(dsPage < 1){ dsPage = 1; }
+  var start = (dsPage - 1) * DS_PAGE_SIZE;
+  for(var i = 0; i < rows.length; i++){
+    rows[i].style.display = (i >= start && i < start + DS_PAGE_SIZE) ? '' : 'none';
+  }
+  renderPager('dsPager', total, dsPage, DS_PAGE_SIZE);
+}
+function goPage(n){
+  var pages = Math.max(1, Math.ceil(document.querySelectorAll('#dsBody tr').length / DS_PAGE_SIZE));
+  if(n < 1){ n = 1; }
+  if(n > pages){ n = pages; }
+  dsPage = n;
+  renderDsPager();
+}
+
+/* ================= 数据集列表：状态、卡点与处理 ================= */
+var STATUS_CLASS = { '接入中':'run', '评定中':'run', '已入库':'run', '建索引中':'run', '可检索':'ok', '卡住':'warn', '已剔除':'fail' };
+function dsRowOf(btn){
+  return btn && btn.closest ? btn.closest('tr') : null;
+}
+function flashRow(tr){
+  if(!tr){ return; }
+  tr.classList.add('row-flash');
+  setTimeout(function(){ tr.classList.remove('row-flash'); }, 1000);
+}
+function updateDsHint(){
+  var hint = byId('dsHint');
+  if(!hint){ return; }
+  var rows = document.querySelectorAll('#dsBody tr');
+  var stuck = document.querySelectorAll('#dsBody tr.stuck').length;
+  hint.textContent = '显示 ' + rows.length + ' 条 · ' + stuck + ' 条卡住';
+}
+function finishRow(btn, status, perText, msg){
+  var tr = dsRowOf(btn);
+  if(!tr){ return; }
+  tr.classList.remove('stuck');
+  tr.setAttribute('data-status', status);
+  var badge = tr.querySelector('[data-role="dsst"]');
+  if(badge){
+    badge.className = 'badge ' + (STATUS_CLASS[status] || 'run');
+    badge.textContent = status;
+  }
+  var per = tr.querySelector('[data-role="dsper"]');
+  if(per){
+    per.textContent = perText;
+    per.className = 'cell-mute';
+  }
+  var ops = tr.querySelector('[data-role="dsops"]');
+  if(ops){
+    ops.innerHTML = '<button class="btn-mini view" type="button" onclick="viewDs(this)">查看</button>';
+  }
+  flashRow(tr);
+  updateDsHint();
+  toast(msg, 'ok');
+}
+function doJudge(btn){
+  var tr = dsRowOf(btn);
+  if(!tr){ return; }
+  finishRow(btn, '已入库', '— · 已裁决入池，自动继续入库', '已裁决：' + tr.getAttribute('data-ds') + ' 入池，自动进入入库');
+}
+function doConfirm(btn){
+  var tr = dsRowOf(btn);
+  if(!tr){ return; }
+  finishRow(btn, '可检索', '— · 已投产，默认策略校验见「策略管理」', '已确认投产：' + tr.getAttribute('data-ds') + ' 可检索；请到策略管理校验默认策略');
+}
+function doHandle(btn){
+  var tr = dsRowOf(btn);
+  if(!tr){ return; }
+  finishRow(btn, '建索引中', '— · 覆盖异常已修复，重建索引中', '已处理：' + tr.getAttribute('data-ds') + ' 覆盖异常已修复，重跑索引');
+}
+function viewDs(btn){
+  var tr = dsRowOf(btn);
+  if(!tr){ return; }
+  var ds = tr.getAttribute('data-ds') || '数据集';
+  var st = tr.getAttribute('data-status') || '—';
+  var perEl = tr.querySelector('[data-role="dsper"]');
+  var per = perEl ? perEl.textContent.trim() : '';
+  flashRow(tr);
+  toast(ds + ' · 当前状态 ' + st + (per ? ' · ' + per : ''), 'ok');
+}
+
+/* ================= 研发说明抽屉（九页统一：头部胶囊入口 + 右侧 520px 抽屉） ================= */
+function openDev(){
+  var d = byId('devDrawer'), m = byId('devMask');
+  if(d){ d.classList.add('open'); }
+  if(m){ m.classList.add('open'); }
+  document.body.style.overflow = 'hidden';
+}
+function closeDev(){
+  var d = byId('devDrawer'), m = byId('devMask');
+  if(d){ d.classList.remove('open'); }
+  if(m){ m.classList.remove('open'); }
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){
+    var m1 = byId('addSrcMask');
+    if(m1 && m1.classList.contains('open')){ closeAddSource(); }
+    closeDev();
+  }
+});
+
+/* ===== 分页初始化 ===== */
+renderDsPager();
+
+/* ===== 系统门户桥接（index.html 壳用，单页直开无副作用） ===== */
+(function(){
+  try{
+    if(window.parent && window.parent !== window){
+      window.parent.postMessage({type:'sys-page', page:'P4', name:'库管理'}, '*');
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

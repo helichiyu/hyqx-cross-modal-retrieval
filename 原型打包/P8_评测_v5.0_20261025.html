@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>评测 · 跨模态检索中心</title>
+<style>
+:root{
+  --workspace-bg:#f6f9fe;
+  --content-soft:#fbfdff;
+  --content-line:#e6edf8;
+  --system-blue:#4169f6;
+  --system-blue-weak:#f1f5ff;
+  --muted:#667085;
+  --success:#1e8e4a;
+  --warning:#b7791f;
+  --error:#c0392b;
+  --text-primary:#262626;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--workspace-bg);
+  color:var(--text-primary);
+  font-size:14px;
+  line-height:1.55;
+  display:flex;
+}
+button{font-family:inherit;cursor:pointer}
+a{color:inherit;text-decoration:none}
+::selection{background:rgba(65,105,246,.16)}
+
+/* ============ 左侧全局导航 ============ */
+.sidebar{
+  width:220px;flex-shrink:0;
+  background:#fff;border-right:1px solid var(--content-line);
+  display:flex;flex-direction:column;
+  height:100vh;position:sticky;top:0;
+}
+.nav-scroll{flex:1;overflow-y:auto;padding:14px 12px}
+.nav-item{
+  display:flex;align-items:center;gap:9px;
+  padding:9px 10px;margin-bottom:2px;border-radius:6px;color:#344054;font-size:13px;
+  cursor:pointer;user-select:none;
+}
+.nav-item .ico{width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:#8a96ad;flex-shrink:0}
+.nav-item .ico svg{width:16px;height:16px;display:block}
+.nav-item:hover{background:var(--system-blue-weak);color:var(--system-blue)}
+.nav-item.active{
+  background:var(--system-blue-weak);color:var(--system-blue);font-weight:600;
+  box-shadow:inset 2px 0 0 var(--system-blue);
+}
+.nav-item.active .ico{color:var(--system-blue)}
+.nav-divider{height:1px;background:var(--content-line);margin:8px 10px}
+
+/* ============ 主区 ============ */
+.main{flex:1;min-width:0;height:100vh;overflow-y:auto}
+.content{padding:22px 28px 40px;display:flex;flex-direction:column;gap:16px;max-width:1180px;width:100%;margin:0 auto}
+
+/* 页头 */
+.page-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:18px 20px;
+  border:1px solid #e4edf8;
+  border-radius:10px;
+  background:#fff;
+}
+.page-head h1{font-size:20px;font-weight:700;color:#111827;line-height:1.3}
+.page-head p{font-size:13px;color:#667085;line-height:1.65;margin-top:5px;max-width:760px}
+
+/* 面板 */
+.panel{padding:15px 18px;border:1px solid #e4edf8;border-radius:10px;background:#fff;display:flex;flex-direction:column;gap:13px}
+.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.sec-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sec-head::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--system-blue);flex:0 0 auto}
+.sec-title{font-size:15px;font-weight:700;color:#1f2a44}
+
+/* 评测集列表 */
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{background:#f6f8fc;color:#8c98ad;font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid #e6edf8;white-space:nowrap}
+.tbl td{padding:10px;border-bottom:1px solid #eef3fa;color:#475467;vertical-align:middle}
+.tbl tbody tr:last-child td{border-bottom:0}
+.tbl tbody tr:hover{background:#fbfdff}
+.tbl td.set-name{font-weight:600;color:#273244}
+.tbl td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbl td.src{color:#475467;white-space:nowrap}
+.tbl .col-act{text-align:right}
+.tbl td.act{text-align:right}
+
+/* ================= 分页组件（表格下方 · 右对齐） ================= */
+.pager-bar{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:#667085}
+.pager-total{color:#8a96ad;margin-right:4px;font-variant-numeric:tabular-nums}
+.pager-btn,.pager-num{height:28px;border:1px solid #d7e0f0;background:#fff;border-radius:5px;color:#475467;font-size:12px;cursor:pointer;font-family:inherit}
+.pager-btn{padding:0 10px}
+.pager-num{min-width:28px;padding:0 6px;font-variant-numeric:tabular-nums}
+.pager-btn:hover:not(:disabled),.pager-num:hover:not(.is-cur){border-color:#4169f6;color:#4169f6}
+.pager-btn:disabled{opacity:.45;cursor:not-allowed}
+.pager-num.is-cur{background:#4169f6;border-color:#4169f6;color:#fff;font-weight:700;cursor:default}
+.pager-gap{color:#98a2b3;padding:0 2px}
+.st{display:inline-flex;align-items:center;font-size:10.5px;line-height:1;padding:4px 8px;border-radius:10px;background:#f3f5f9;color:#8c98ad;font-weight:600;white-space:nowrap}
+.st.ok{background:#eaf7ef;color:var(--success)}
+.st.bad{background:#fdeceb;color:var(--error)}
+.st.doing{background:#fff6e6;color:var(--warning)}
+.btn-mini{height:26px;padding:0 10px;border:1px solid #dbe5f4;border-radius:5px;background:#fff;color:var(--system-blue);font-size:11.5px;font-weight:600}
+.btn-mini:hover{border-color:var(--system-blue);background:#f7f9ff}
+
+/* 按钮 */
+.btn-primary{
+  height:34px;padding:0 16px;border:0;border-radius:6px;
+  background:var(--system-blue);color:#fff;font-size:12.5px;font-weight:600;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  box-shadow:0 3px 8px rgba(65,105,246,.2);transition:background .15s;
+}
+.btn-primary:hover{background:#335be8}
+.btn-ghost{height:32px;padding:0 14px;border-radius:6px;border:1px solid #d7e0f0;background:#fff;color:#475467;font-size:12px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn-ghost:hover{border-color:var(--system-blue);color:var(--system-blue)}
+
+/* 工作台跑评测 */
+.run-bar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;padding:11px 12px;border:1px solid #e8eff9;border-radius:8px;background:var(--content-soft)}
+.field{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#8c98ad;font-weight:600}
+.field select{height:33px;min-width:220px;border:1px solid #cfd8e8;border-radius:6px;background:#fff;color:#273244;font-size:12.5px;padding:0 9px;outline:none}
+.field select:focus{border-color:#8fa3ff;box-shadow:0 0 0 2px rgba(65,105,246,.12)}
+.base-chip{height:33px;display:inline-flex;align-items:center;gap:6px;padding:0 10px;border:1px dashed #d7e0f0;border-radius:6px;font-size:11.5px;color:#667085;background:#fff;margin-left:auto;white-space:nowrap}
+.base-chip b{color:#344054;font-weight:600}
+
+/* 指标结果 */
+.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.metric{border:1px solid #e4edf8;border-radius:9px;padding:12px 14px;background:linear-gradient(180deg,#fff 0%,#f8fbff 100%);display:flex;flex-direction:column;gap:5px;min-width:0}
+.m-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.m-name{font-size:12.5px;font-weight:700;color:#273244}
+.m-sub{font-size:10.5px;color:#98a2b3}
+.m-val{font-size:28px;font-weight:800;color:#273244;line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.m-base{font-size:11px;color:#8c98ad;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+.tag{font-size:10px;font-weight:700;padding:3px 7px;border-radius:9px;background:#f3f5f9;color:#8c98ad;white-space:nowrap}
+.tag.ok{background:#eaf7ef;color:var(--success)}
+.tag.bad{background:#fdeceb;color:var(--error)}
+.delta{font-weight:700;font-size:11px;color:#8c98ad;font-variant-numeric:tabular-nums}
+.delta.up{color:var(--success)}
+.delta.down{color:var(--error)}
+.metric-cap{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:0 2px 9px}
+.mc-title{font-size:13.5px;font-weight:700;color:#1f2a44}
+.mc-title b{color:var(--system-blue);font-weight:700}
+.mc-meta{font-size:11px;color:#8c98ad;font-variant-numeric:tabular-nums}
+
+/* 报告 */
+.verdict{border:1px solid #dbe7fb;border-radius:9px;background:linear-gradient(180deg,#fff 0%,#f8fbff 100%);padding:14px 16px;display:flex;flex-direction:column;gap:9px}
+.v-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.v-kicker{font-size:11px;font-weight:700;color:var(--system-blue);background:var(--system-blue-weak);border-radius:10px;padding:3px 8px}
+.v-time{font-size:10.5px;color:#98a2b3;font-variant-numeric:tabular-nums}
+.v-text{font-size:15px;font-weight:700;color:#1f2a44;line-height:1.55}
+.v-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;border-top:1px dashed #e6eef9;padding-top:10px}
+
+/* 对比上次评测 */
+.v-cmp{display:flex;flex-direction:column;gap:7px;border-top:1px dashed #e6eef9;padding-top:10px}
+.v-cmp-head{font-size:11.5px;font-weight:700;color:#8c98ad;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.v-cmp-head span{font-weight:600;color:#98a2b3;font-variant-numeric:tabular-nums}
+.v-cmp-items{display:flex;gap:8px;flex-wrap:wrap}
+.v-cmp-item{font-size:11.5px;color:#667085;background:#f8fafd;border:1px solid #e8eff9;border-radius:7px;padding:5px 10px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.v-cmp-item b{color:#273244;font-weight:700}
+.v-cmp-item i{font-style:normal}
+
+/* 评测历史 */
+.hist-note{font-size:11px;color:#98a2b3;font-variant-numeric:tabular-nums}
+.hist-tbl td:first-child{color:#667085;font-variant-numeric:tabular-nums}
+.hist-tbl td.pass-cell{white-space:nowrap}
+
+/* 空态 */
+.empty{padding:28px 12px;text-align:center;font-size:12px;color:#98a2b3;border:1px dashed #e2ebf7;border-radius:8px;background:var(--content-soft)}
+
+/* 权限态 */
+.perm-gate{display:none}
+.perm-gate.show{display:flex;justify-content:center;padding:60px 20px}
+.pg-card{text-align:center;padding:44px 40px;border:1px solid #e4edf8;border-radius:12px;background:#fff;max-width:720px}
+.pg-card h3{font-size:17px;color:#1f2a44;margin-bottom:8px}
+.pg-card p{font-size:12.5px;color:var(--muted)}
+
+/* 弹窗 */
+.modal-mask{position:fixed;inset:0;background:rgba(23,33,66,.42);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-mask.show{display:flex}
+.modal-box{width:560px;max-width:100%;max-height:90vh;background:#fff;border-radius:10px;box-shadow:0 16px 48px rgba(20,32,70,.28);display:flex;flex-direction:column;overflow:hidden;animation:pop .18s ease}
+@keyframes pop{from{transform:translateY(8px) scale(.98);opacity:0}to{transform:none;opacity:1}}
+.modal-head{padding:15px 20px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex:0 0 auto}
+.modal-head h3{font-size:15px;color:#1f2a44;line-height:1.4}
+.modal-close{border:0;background:transparent;color:#b3bccc;font-size:20px;line-height:1;padding:0 2px}
+.modal-close:hover{color:#667085}
+.modal-body{padding:12px 20px 4px;font-size:12.5px;color:#475467;overflow:auto;display:flex;flex-direction:column;gap:9px;min-height:0}
+.modal-foot{padding:12px 20px 16px;display:flex;justify-content:flex-end;gap:9px;border-top:1px solid #f0f4fb;margin-top:10px;flex:0 0 auto}
+.form-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;align-items:center;font-size:12px;color:#475467}
+.form-row select,.form-row input{height:32px;border:1px solid #cfd8e8;border-radius:5px;padding:0 9px;font-size:12px;outline:none;background:#fff;color:#273244;min-width:0}
+.form-row select:focus,.form-row input:focus{border-color:#8fa3ff;box-shadow:0 0 0 2px rgba(65,105,246,.12)}
+.kv{display:grid;grid-template-columns:84px minmax(0,1fr);gap:8px;font-size:12px;color:#667085;padding:7px 0;border-bottom:1px dashed #eef2f8;line-height:1.55}
+.kv:last-child{border-bottom:0}
+.kv b{color:#273244;font-weight:600;overflow-wrap:anywhere}
+.form-note{font-size:11px;color:#98a2b3;line-height:1.65;padding:2px 2px 0}
+
+/* 筛选条件多选 */
+.form-row.chk-row{align-items:flex-start}
+.form-row.chk-row > span{padding-top:8px}
+.checks{display:flex;flex-direction:column;gap:6px;min-width:0;padding:2px 0}
+.chk{display:flex;align-items:center;gap:7px;font-size:12px;color:#273244;line-height:1.5;cursor:pointer}
+.form-row .chk input[type="checkbox"]{width:14px;height:14px;min-width:14px;margin:0;padding:0;border:0;background:transparent;accent-color:var(--system-blue);flex:0 0 auto}
+.form-row .chk input[type="checkbox"]:focus{box-shadow:none;border:0}
+.chk small{font-size:10.5px;color:#98a2b3;font-weight:400}
+.req{font-style:normal;color:var(--error);font-weight:700;margin-left:2px}
+
+/* 标注 */
+.anno-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11.5px;color:#8c98ad;font-variant-numeric:tabular-nums}
+.anno-bar b{color:var(--system-blue);font-weight:700}
+.anno-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid #e4edf8;border-radius:8px;background:var(--content-soft)}
+.anno-main{flex:1;min-width:0}
+.anno-q{font-size:12.5px;color:#273244;font-weight:600;line-height:1.5}
+.anno-res{font-size:11px;color:#8c98ad;margin-top:3px}
+.anno-pick{display:flex;gap:6px;flex:0 0 auto}
+.pick{height:28px;min-width:46px;border:1px solid #dbe5f4;border-radius:5px;background:#fff;color:#667085;font-size:11.5px;font-weight:600}
+.pick:hover{border-color:#8fa3ff;color:var(--system-blue)}
+.pick.on{background:#eaf7ef;border-color:#9ad9b3;color:var(--success)}
+.pick.on[data-v="0"]{background:#fdeceb;border-color:#efb1a9;color:var(--error)}
+
+/* Toast */
+.toast{
+  position:fixed;top:26px;left:50%;transform:translateX(-50%) translateY(-10px);
+  z-index:300;background:#2b3245;color:#fff;font-size:12.5px;
+  padding:8px 16px;border-radius:7px;box-shadow:0 8px 24px rgba(20,32,70,.25);
+  opacity:0;pointer-events:none;transition:all .2s;max-width:min(90vw,720px);text-align:center;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#c0392b}
+.toast.ok{background:#1e8e4a}
+
+/* ===== 研发说明入口（九页统一：头部胶囊按钮 + 右侧抽屉） ===== */
+.dev-entry{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px 0 5px;border:1px solid #d7e0f0;border-radius:999px;background:#fff;color:#667085;font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+.dev-entry:hover{border-color:#b9c9ff;background:var(--system-blue-weak);color:var(--system-blue)}
+.dev-entry:hover .de-q{background:var(--system-blue);color:#fff}
+.dev-entry:focus-visible{outline:2px solid #cdd9ff;outline-offset:1px}
+.dev-entry .de-q{width:20px;height:20px;border-radius:50%;flex:0 0 auto;background:var(--system-blue-weak);color:var(--system-blue);font-size:12px;font-weight:700;line-height:20px;text-align:center;transition:background .15s,color .15s}
+/* 右侧抽屉：520px / 全高 / 从右滑入 + 半透明遮罩 */
+.dev-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:10000;opacity:0;pointer-events:none;transition:opacity .22s}
+.dev-mask.open{opacity:1;pointer-events:auto}
+.dev-drawer{position:fixed;top:0;right:0;width:720px;max-width:100vw;height:100vh;background:#f6f8fc;z-index:10001;display:flex;flex-direction:column;transform:translateX(102%);transition:transform .28s ease;box-shadow:-8px 0 30px rgba(15,23,42,.18)}
+.dev-drawer.open{transform:translateX(0)}
+.dev-head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:#fff;border-bottom:1px solid #e4eaf3;flex:0 0 auto}
+.dev-head h3{margin:0;font-size:15px;color:#1f2937}
+.dev-head .dh-tag{font-size:11px;font-weight:600;color:#b54708;background:#fdf3e6;border-radius:4px;padding:2px 8px}
+.dev-close{margin-left:auto;width:28px;height:28px;border:none;background:#f2f4f8;border-radius:6px;font-size:15px;line-height:1;cursor:pointer;color:#475467;flex:0 0 auto}
+.dev-close:hover{background:#e6eaf2}
+.dev-body{flex:1;min-height:0;overflow:auto;padding:16px 18px 36px}
+.dev-lead{font-size:11.5px;color:#667085;line-height:1.65;margin-bottom:10px}
+.dev-block{background:#fff;border:1px solid #e4eaf3;border-radius:8px;padding:11px 13px;margin-bottom:10px}
+.dev-block h4{font-size:12px;color:#1f2934;margin-bottom:5px}
+.dev-block p{font-size:11.5px;color:#667085;line-height:1.7}
+.dev-block p + p{margin-top:6px}
+.dev-block ul{margin:2px 0 0 16px}
+.dev-block li{font-size:11.5px;color:#667085;line-height:1.7;margin-bottom:3px}
+.dev-block li b{color:#344054}
+.dev-table{width:100%;border-collapse:collapse;background:#fff;font-size:11px;border:1px solid #e4eaf3;border-radius:8px;overflow:hidden}
+.dev-table th{background:#fbfcfe;color:#98a2b3;font-weight:600;text-align:left;padding:7px 9px;border-bottom:1px solid #eef2f8;white-space:nowrap}
+.dev-table td{padding:7px 9px;border-bottom:1px solid #eef2f8;color:#475467;vertical-align:top;line-height:1.55}
+.dev-table tr:last-child td{border-bottom:0}
+.dev-table td:first-child{font-weight:600;color:#273244;white-space:normal}
+.why-table th:nth-child(2),.why-table td:nth-child(2){width:64px;white-space:nowrap}
+
+@media (max-width:1100px){
+  .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:760px){
+  .sidebar{display:none}
+  .content{padding:16px 14px 30px}
+  .page-head h1{font-size:20px}
+  .metrics{grid-template-columns:1fr}
+  .base-chip{margin-left:0}
+  .field,.field select{width:100%;min-width:0}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ 左侧导航 ============ -->
+<aside class="sidebar" aria-label="全局导航">
+  <div class="nav-scroll">
+    <a class="nav-item" href="P1_检索台_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span>检索台</a>
+    <a class="nav-item" href="P9_检索历史_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></svg></span>检索历史</a>
+    <div class="nav-divider"></div>
+    <a class="nav-item" href="P4_库管理_v5.2_20261026.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6"/><path d="M5 12v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6"/></svg></span>库管理</a>
+    <a class="nav-item" href="P5_策略管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="10" cy="17" r="1.6"/></svg></span>策略管理</a>
+    <a class="nav-item" href="P6_任务管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="12" height="16" rx="2"/><path d="M9 5V3.5h6V5"/><path d="M9 10h6M9 14h6M9 18h4"/></svg></span>任务管理</a>
+    <a class="nav-item" href="P7_结果运营_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>结果运营</a>
+    <a class="nav-item active" aria-current="page" href="P8_评测_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="13" width="3" height="4"/><rect x="12" y="9" width="3" height="8"/><rect x="17" y="5" width="3" height="12"/></svg></span>效果评测</a>
+  </div>
+</aside>
+
+<!-- ============ 主区 ============ -->
+<div class="main">
+
+  <div class="perm-gate" id="permGate">
+    <div class="pg-card">
+      <h3>当前账号无管理员页面权限</h3>
+      <p>本页为管理员页面，正式由登录态与库授权决定访问权限，原型不提供角色切换。</p>
+    </div>
+  </div>
+
+  <div class="content" id="pageBody">
+
+    <section class="page-head">
+      <div>
+        <h1>评测</h1>
+        <p>检索准不准，改策略有没有变好。</p>
+      </div>
+      <button class="dev-entry" id="devEntry" type="button" onclick="openDev()" title="研发说明"><span class="de-q" aria-hidden="true">?</span>研发说明</button>
+    </section>
+
+    <!-- ① 评测集 -->
+    <section class="panel" aria-labelledby="secSets">
+      <div class="panel-head">
+        <div class="sec-head">
+          <h2 class="sec-title" id="secSets">① 评测集</h2>
+        </div>
+        <button class="btn-ghost" type="button" onclick="openNewSet()">＋ 新建评测集</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead>
+            <tr><th>评测集名称</th><th>条数</th><th>来源</th><th>状态</th><th class="col-act">操作</th></tr>
+          </thead>
+          <tbody id="setRows"></tbody>
+        </table>
+      </div>
+      <div class="pager-bar" id="setPager"></div>
+    </section>
+
+    <!-- ② 评测工作台 -->
+    <section class="panel" aria-labelledby="secBench">
+      <div class="panel-head">
+        <div class="sec-head">
+          <h2 class="sec-title" id="secBench">② 评测工作台</h2>
+        </div>
+      </div>
+      <div class="run-bar">
+        <label class="field">评测集
+          <select id="runSet"></select>
+        </label>
+        <label class="field">评测对象（策略）
+          <select id="runStrategy"></select>
+        </label>
+        <button class="btn-primary" type="button" onclick="runEval()">开始评测</button>
+        <div class="base-chip">对比基线 <b id="baseChipVal">—</b></div>
+      </div>
+      <div id="metricBox">
+        <div class="metric-cap">
+          <span class="mc-title">指标</span>
+          <span class="mc-meta">尚未评测</span>
+        </div>
+        <div class="metrics">
+          <div class="metric">
+            <div class="m-top"><span class="m-name">召回率</span></div>
+            <div class="m-sub">Recall@5</div>
+            <div class="m-val">—</div>
+            <div class="m-base">上次基线 —</div>
+          </div>
+          <div class="metric">
+            <div class="m-top"><span class="m-name">精确率</span></div>
+            <div class="m-sub">Precision</div>
+            <div class="m-val">—</div>
+            <div class="m-base">上次基线 —</div>
+          </div>
+          <div class="metric">
+            <div class="m-top"><span class="m-name">排序质量（NDCG）</span></div>
+            <div class="m-sub">排序质量（NDCG@10）</div>
+            <div class="m-val">—</div>
+            <div class="m-base">上次基线 —</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ③ 报告 -->
+    <section class="panel" aria-labelledby="secReport">
+      <div class="panel-head">
+        <div class="sec-head">
+          <h2 class="sec-title" id="secReport">③ 报告</h2>
+        </div>
+      </div>
+      <div id="reportBox">
+        <div class="empty">完成评测后生成本次结论</div>
+      </div>
+    </section>
+
+    <!-- 评测历史 -->
+    <section class="panel" aria-labelledby="secHistory">
+      <div class="panel-head">
+        <div class="sec-head">
+          <h2 class="sec-title" id="secHistory">评测历史</h2>
+        </div>
+        <span class="hist-note" id="histMeta"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl hist-tbl">
+          <thead>
+            <tr><th>时间</th><th>评测对象（策略）</th><th>评测集</th><th>召回率</th><th>精确率</th><th>排序质量（NDCG）</th><th>结论</th></tr>
+          </thead>
+          <tbody id="histRows"></tbody>
+        </table>
+      </div>
+      <div class="pager-bar" id="histPager"></div>
+    </section>
+
+  </div>
+</div>
+
+<!-- 通用弹窗 -->
+<div class="modal-mask" id="modalMask">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modalTitle">评测集</h3>
+      <button class="modal-close" type="button" onclick="closeModal()" aria-label="关闭">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- 研发需求说明（入口在头部卡片右上角 · 右侧抽屉） -->
+<div class="dev-mask" id="devMask" onclick="closeDev()"></div>
+<div class="dev-drawer" id="devDrawer" role="dialog" aria-modal="true" aria-label="研发需求说明">
+  <div class="dev-head">
+    <h3>研发需求说明</h3>
+    <span class="dh-tag">给研发</span>
+    <button type="button" class="dev-close" id="devClose" title="关闭（Esc）" aria-label="关闭" onclick="closeDev()">×</button>
+  </div>
+  <div class="dev-body">
+    <p class="dev-lead">评测 = 用某个策略跑评测集，算指标，判断这个策略好不好；换策略再跑就是对比。</p>
+    <div class="dev-block">
+      <h4>1 评测的定位</h4>
+      <p>验证检索效果，判断策略改动是否有效。P5 改完 → P8 验证 → 再发布。</p>
+    </div>
+    <div class="dev-block">
+      <h4>2 评测集从哪来</h4>
+      <p>评测集 = 检索历史里的真实 query → 筛出「已暴露问题的 query」→ 人工标注标准答案（标出每条 query 下哪些结果对 / 错）→ 形成评测集。</p>
+      <p>链路：检索历史 → 新建评测集（勾选问题信号：零结果 / 无点击 / 复搜 + 业务场景 + 时间范围）→ 筛出这批 query → 生成「标注中」评测集 → 逐条标对 / 错 → 完成标注 → 「已完成」，工作台才可选。</p>
+      <p>评测集来源 = 从检索历史筛「问题 query」（零结果 / 无点击 / 复搜）+ 人工标注；标注完成前不可用。</p>
+      <p><b>为什么筛问题 query</b>：专项评测集测「难点修好没有」，比通用评测集有用——通用集把难点摊平在均值里，看不出这几类 query 到底修没修好。</p>
+      <p>演示口径：筛出的 query 固定演示 8 条；标注面板只列前 4 条 query，标注完这 4 条即视为整批完成；「标注中」的评测集在下拉里置灰不可选。</p>
+    </div>
+    <div class="dev-block">
+      <h4>3 指标怎么算出来</h4>
+      <p>工作台 = 用「评测对象（某个策略）」去检索「评测集里的每条 query」→ 把检索结果和「标准答案」对比 → 算出召回率 / 精确率 / NDCG。</p>
+      <p>评测集提供「标准答案」，策略提供「检索能力」，两者一比才有指标；只有评测集没有对象，就没有检索结果可比；只有对象没有标准答案，就判断不了对错。</p>
+      <ul>
+        <li><b>召回率 Recall@5</b>：该 query 的标准答案里，落进前 5 条的比例。</li>
+        <li><b>精确率</b>：返回结果里判对（命中标准答案）的条数，占返回条数的比例。</li>
+        <li><b>NDCG@10</b>：按位置折损累计命中，命中越靠前得分越高；再除以理想排序，归一到 0–1。</li>
+      </ul>
+      <p>每条 query 各算一遍再取平均，就是本次指标；同一评测集换评测对象再跑，就是两条策略的对比结果。</p>
+      <p><b>验收线从哪来</b>：验收线＝业务定的目标值（当前演示：召回率 ≥ 0.90、精确率 ≥ 0.90、NDCG ≥ 0.85）；正式由业务/评测标准配置，页面只读取并判断达标 / 未达标。</p>
+    </div>
+    <div class="dev-block">
+      <h4>4 评测对象、评测历史与报告</h4>
+      <ul>
+        <li><b>评测对象</b>：从策略管理（P5）来，可选当前生效策略 / 候选草稿 / 系统默认兜底；它只提供检索能力，不带标准答案。</li>
+        <li><b>评测历史</b>：每点一次「开始评测」就存一条记录（时间 / 评测对象 / 评测集 / 三项指标 / 结论），新记录插在最前；记录按当时的策略版本留存，旧版本下线后仍显示原名称。演示数据为两条历史记录，刷新页面后回到这两条。</li>
+        <li><b>基线</b>：取评测历史里「同一评测集」的最近一条，指标卡与报告都按它算涨跌；该评测集第一次评测时没有上一条，指标卡显示「—」，报告对比行也显示「—」。</li>
+        <li><b>报告</b>：给出本次评测结论，并逐项列出与上次评测的涨跌。</li>
+      </ul>
+    </div>
+    <div class="dev-block">
+      <h4>5 闭环</h4>
+      <p>评测 → 发现短板 → 转策略调整（P5）→ 改完再评测。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= 数据 ================= */
+var SETS = [
+  { id: 'dom', name: '专业场景评测集', count: 64, status: '已完成', scene: '专业', range: '近30天',
+    signals: ['zero', 'click'], src: '检索历史 · 零结果/无点击' },
+  { id: 'gen', name: '通用检索评测集', count: 120, status: '已完成', scene: '通用', range: '近90天',
+    signals: ['click', 'reform'], src: '检索历史 · 无点击/复搜' }
+];
+
+/* 问题信号：评测集按这些信号从检索历史里筛 query */
+var SIGNALS = [
+  { id: 'zero', label: '零结果', hint: '搜索无返回',
+    samples: [
+      { q: '闸机断电后怎么恢复通行', r: '无返回 · 0 条结果' },
+      { q: '巡检机器人夜间告警截图在哪看', r: '无返回 · 0 条结果' },
+      { q: '承包商入场证到期怎么续', r: '无返回 · 0 条结果' },
+      { q: '外协人员安全培训记录在哪查', r: '无返回 · 0 条结果' }
+    ] },
+  { id: 'click', label: '无点击', hint: '有结果但无点击',
+    samples: [
+      { q: '相似度阈值调高会影响召回吗', r: '返回 6 条 · 0 点击' },
+      { q: '两张不同来源的图纸怎么对齐', r: '返回 4 条 · 0 点击' },
+      { q: '发票代码在扫描件里怎么定位', r: '返回 8 条 · 0 点击' },
+      { q: '合同扫描件的签署页怎么定位', r: '返回 7 条 · 0 点击' }
+    ] },
+  { id: 'reform', label: '复搜', hint: '搜完换词',
+    samples: [
+      { q: '作业票编号怎么查', r: '首搜 2 条 · 换词重搜 3 次' },
+      { q: '视频里的人能按图搜到吗', r: '首搜 1 条 · 换词重搜 2 次' },
+      { q: '图纸版本号怎么查', r: '首搜 1 条 · 换词重搜 2 次' },
+      { q: '训练数据筛选怎么用', r: '首搜 3 条 · 换词重搜 2 次' }
+    ] }
+];
+
+/* 演示口径：问题信号筛选固定筛出 8 条 query，标注面板只列前 4 条 */
+var DEMO_PICK = 8;
+
+/* 评测对象：本次用哪条策略跑（当前生效 / 候选 / 兜底） */
+var STRATS = [
+  { id: 'stg-job',   name: '作业场景检索策略 v3', role: '当前生效', adj: { recall: 0,     prec: 0,     ndcg: 0 } },
+  { id: 'stg-tight', name: '阈值收紧草稿 v1',     role: '候选',     adj: { recall: -0.03, prec: 0.06,  ndcg: 0.01 } },
+  { id: 'stg-def',   name: '系统默认策略 v3',     role: '兜底',     adj: { recall: -0.06, prec: -0.05, ndcg: -0.04 } }
+];
+
+/* 验收线：三项指标各自的门槛 */
+var LINES = { recall: 0.90, prec: 0.90, ndcg: 0.85 };
+var KEYS = ['recall', 'prec', 'ndcg'];
+var METRIC_META = {
+  recall: { label: '召回率', sub: 'Recall@5' },
+  prec:   { label: '精确率', sub: 'Precision' },
+  ndcg:   { label: '排序质量（NDCG）', sub: '排序质量（NDCG@10）' }
+};
+
+/* 各评测集在当前生效策略下的基准表现（未叠加策略调整） */
+var RESULTS = {
+  dom: { recall: 0.91, prec: 0.86, ndcg: 0.83 },
+  gen: { recall: 0.92, prec: 0.84, ndcg: 0.86 }
+};
+
+/* 评测历史：每次评测存一条，新记录插在最前；基线取同一评测集的最近一条 */
+var HISTORY = [
+  { id: 'h1', at: new Date(Date.now() - 32 * 3600 * 1000), sid: 'stg-job-v2', sname: '作业场景检索策略 v2',
+    setId: 'gen', setName: '通用检索评测集', count: 120, recall: 0.90, prec: 0.87, ndcg: 0.85 },
+  { id: 'h2', at: new Date(Date.now() - 100 * 3600 * 1000), sid: 'stg-job-v2', sname: '作业场景检索策略 v2',
+    setId: 'dom', setName: '专业场景评测集', count: 64, recall: 0.88, prec: 0.88, ndcg: 0.82 }
+];
+var histSeq = 2;
+
+var setSeq = 0;
+var lastRun = null;
+var annoSetId = null;
+var annoDraft = {};
+
+/* ================= 基础工具 ================= */
+function $(id){ return document.getElementById(id); }
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+function fmt(n){ return Number(n).toFixed(2); }
+function pad(n){ return (n < 10 ? '0' : '') + n; }
+function timeStr(d){
+  d = d || new Date();
+  return pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+function toast(msg, type){
+  var t = $('toast');
+  if(!t) return;
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(function(){ t.className = 'toast'; }, 2400);
+}
+function findSet(id){
+  for(var i = 0; i < SETS.length; i++){
+    if(SETS[i].id === id) return SETS[i];
+  }
+  return null;
+}
+function findStrat(id){
+  for(var i = 0; i < STRATS.length; i++){
+    if(STRATS[i].id === id) return STRATS[i];
+  }
+  return null;
+}
+
+/* ================= 分页组件（每页 10 条） ================= */
+var SET_PAGE = 1;
+var HIST_PAGE = 1;
+var SET_PAGE_SIZE = 10;
+var HIST_PAGE_SIZE = 10;
+var PAGER_GO = {};
+function pagerNumbers(page, pages){
+  var out = [], i;
+  if(pages <= 7){
+    for(i = 1; i <= pages; i++){ out.push(i); }
+  }else{
+    out.push(1);
+    var s = Math.max(2, page - 1), e = Math.min(pages - 1, page + 1);
+    if(s > 2){ out.push('...'); }
+    for(i = s; i <= e; i++){ out.push(i); }
+    if(e < pages - 1){ out.push('...'); }
+    out.push(pages);
+  }
+  return out;
+}
+function renderPager(containerId, total, page, pageSize){
+  var box = document.getElementById(containerId);
+  if(!box){ return; }
+  pageSize = pageSize || 10;
+  var pages = Math.max(1, Math.ceil(total / pageSize));
+  if(page > pages){ page = pages; }
+  if(page < 1){ page = 1; }
+  var go = PAGER_GO[containerId] || 'goPage';
+  var html = '<span class="pager-total">共 ' + total + ' 条</span>' +
+    '<button class="pager-btn" type="button" onclick="' + go + '(' + (page - 1) + ')"' + (page <= 1 ? ' disabled' : '') + '>上一页</button>';
+  pagerNumbers(page, pages).forEach(function(p){
+    if(p === '...'){ html += '<span class="pager-gap">…</span>'; }
+    else{
+      html += '<button class="pager-num' + (p === page ? ' is-cur' : '') + '" type="button" onclick="' + go + '(' + p + ')"' +
+        (p === page ? ' aria-current="page"' : '') + '>' + p + '</button>';
+    }
+  });
+  html += '<button class="pager-btn" type="button" onclick="' + go + '(' + (page + 1) + ')"' + (page >= pages ? ' disabled' : '') + '>下一页</button>';
+  box.innerHTML = html;
+}
+function goPage(n){
+  var pages = Math.max(1, Math.ceil(SETS.length / SET_PAGE_SIZE));
+  if(n < 1){ n = 1; }
+  if(n > pages){ n = pages; }
+  SET_PAGE = n;
+  renderSets();
+}
+function goPageHist(n){
+  var pages = Math.max(1, Math.ceil(HISTORY.length / HIST_PAGE_SIZE));
+  if(n < 1){ n = 1; }
+  if(n > pages){ n = pages; }
+  HIST_PAGE = n;
+  renderHistory();
+}
+PAGER_GO['setPager'] = 'goPage';
+PAGER_GO['histPager'] = 'goPageHist';
+
+/* ================= ① 评测集 ================= */
+function renderSets(){
+  var body = $('setRows');
+  if(!body) return;
+  var total = SETS.length;
+  var pages = Math.max(1, Math.ceil(total / SET_PAGE_SIZE));
+  if(SET_PAGE > pages){ SET_PAGE = pages; }
+  if(SET_PAGE < 1){ SET_PAGE = 1; }
+  var start = (SET_PAGE - 1) * SET_PAGE_SIZE;
+  if(total === 0){
+    body.innerHTML = '<tr><td colspan="5"><div class="empty">暂无评测集</div></td></tr>';
+    renderPager('setPager', 0, 1, SET_PAGE_SIZE);
+    renderRunOptions();
+    return;
+  }
+  body.innerHTML = SETS.slice(start, start + SET_PAGE_SIZE).map(function(s){
+    var done = s.status === '已完成';
+    var st = done ? 'ok' : 'doing';
+    var act = done
+      ? '<button class="btn-mini" type="button" onclick="viewSet(\'' + s.id + '\')">查看</button>'
+      : '<button class="btn-mini" type="button" onclick="openAnno(\'' + s.id + '\')">标注</button>';
+    return '<tr>' +
+      '<td class="set-name">' + esc(s.name) + '</td>' +
+      '<td class="num">' + s.count + ' 条</td>' +
+      '<td class="src">' + esc(s.src) + '</td>' +
+      '<td><span class="st ' + st + '">' + esc(s.status) + '</span></td>' +
+      '<td class="act">' + act + '</td>' +
+    '</tr>';
+  }).join('');
+  renderPager('setPager', total, SET_PAGE, SET_PAGE_SIZE);
+  renderRunOptions();
+}
+
+function renderRunOptions(){
+  var sel = $('runSet');
+  if(!sel) return;
+  var cur = sel.value;
+  var doneList = SETS.filter(function(s){ return s.status === '已完成'; });
+  sel.disabled = !doneList.length;
+  if(!doneList.length){
+    sel.innerHTML = '<option value="">暂无已完成评测集</option>';
+    renderBaseChip('');
+    return;
+  }
+  sel.innerHTML = SETS.map(function(s){
+    var done = s.status === '已完成';
+    return '<option value="' + s.id + '"' + (done ? '' : ' disabled') + '>' +
+      esc(s.name) + ' · ' + s.count + ' 条' + (done ? '' : '（该评测集未完成标注）') +
+    '</option>';
+  }).join('');
+  var curSet = cur ? findSet(cur) : null;
+  sel.value = (curSet && curSet.status === '已完成') ? cur : doneList[0].id;
+  renderBaseChip(sel.value);
+}
+
+function renderStrategyOptions(){
+  var sel = $('runStrategy');
+  if(!sel) return;
+  var cur = sel.value;
+  sel.innerHTML = STRATS.map(function(t){
+    return '<option value="' + t.id + '">策略 · ' + esc(t.name) + '（' + esc(t.role) + '）</option>';
+  }).join('');
+  if(cur && findStrat(cur)) sel.value = cur;
+}
+
+function viewSet(id){
+  var s = findSet(id);
+  if(!s) return;
+  var sigs = signalLabels(s.signals || []);
+  var body = '<div class="kv"><span>名称</span><b>' + esc(s.name) + '</b></div>';
+  if(sigs.length){
+    body += '<div class="kv"><span>筛选条件</span><b>' + esc(sigs.join(' / ')) + '</b></div>';
+  }
+  body +=
+    '<div class="kv"><span>业务场景</span><b>' + esc(s.scene || '不限') + '</b></div>' +
+    '<div class="kv"><span>时间范围</span><b>' + esc(s.range || '近30天') + '</b></div>' +
+    '<div class="kv"><span>条数</span><b>' + s.count + ' 条</b></div>' +
+    '<div class="kv"><span>来源</span><b>' + esc(s.src) + '</b></div>' +
+    '<div class="kv"><span>状态</span><b>' + esc(s.status) + '</b></div>' +
+    '<div class="kv"><span>内容</span><b>query + 标准答案</b></div>' +
+    '<div class="kv"><span>标注方式</span><b>人工判定每条 query 下的结果对 / 错</b></div>';
+  showModal('评测集 · ' + s.name, body,
+    '<button class="btn-ghost" type="button" onclick="closeModal()">关闭</button>');
+}
+
+function openNewSet(){
+  showModal('新建评测集',
+    '<div class="form-row"><span>名称<i class="req">*</i></span><input id="newSetName" placeholder="如 作业场景难点评测集"></div>' +
+    '<div class="form-row chk-row"><span>筛选条件</span><div class="checks">' +
+      '<label class="chk"><input type="checkbox" id="sig-zero" value="zero" checked><span>零结果 <small>搜索无返回</small></span></label>' +
+      '<label class="chk"><input type="checkbox" id="sig-click" value="click" checked><span>无点击 <small>有结果但无点击</small></span></label>' +
+      '<label class="chk"><input type="checkbox" id="sig-reform" value="reform" checked><span>复搜 <small>搜完换词</small></span></label>' +
+    '</div></div>' +
+    '<div class="form-row"><span>业务场景</span><select id="newSetScene">' +
+      '<option value="">不限</option><option>通用</option><option>专业</option><option>作业</option><option>训练数据筛选</option>' +
+    '</select></div>' +
+    '<div class="form-row"><span>时间范围</span><select id="newSetRange">' +
+      '<option>近7天</option><option selected>近30天</option><option>近90天</option>' +
+    '</select></div>' +
+    '<p class="form-note">从检索历史筛出已暴露问题的 query（零结果/无点击/复搜），标注后用于验证难点是否修好。</p>',
+    '<button class="btn-ghost" type="button" onclick="closeModal()">取消</button>' +
+    '<button class="btn-primary" type="button" onclick="filterAdd()">筛选并加入</button>');
+  setTimeout(function(){ var el = $('newSetName'); if(el) el.focus(); }, 30);
+}
+
+function pickedSignals(){
+  var out = [];
+  SIGNALS.forEach(function(sig){
+    var el = $('sig-' + sig.id);
+    if(el && el.checked) out.push(sig.id);
+  });
+  return out;
+}
+
+function signalLabels(ids){
+  return SIGNALS.filter(function(sig){ return ids.indexOf(sig.id) >= 0; })
+    .map(function(sig){ return sig.label; });
+}
+
+function filterAdd(){
+  var nameEl = $('newSetName');
+  var sceneEl = $('newSetScene');
+  var rangeEl = $('newSetRange');
+  if(!nameEl || !sceneEl || !rangeEl) return;
+  var name = nameEl.value.trim();
+  if(!name){ toast('请填写评测集名称', 'err'); nameEl.focus(); return; }
+  var ids = pickedSignals();
+  if(!ids.length){ toast('至少选择一项筛选条件（问题信号）', 'err'); return; }
+  setSeq++;
+  SETS.push({
+    id: 's' + setSeq,
+    name: name,
+    count: DEMO_PICK,
+    status: '标注中',
+    scene: sceneEl.value || '不限',
+    range: rangeEl.value,
+    src: '检索历史 · ' + signalLabels(ids).join('/'),
+    signals: ids
+  });
+  renderSets();
+  closeModal();
+  toast('已筛出 ' + DEMO_PICK + ' 条问题 query · 待人工标注', 'ok');
+}
+
+/* 标注样张：按评测集勾选的问题信号取样，均只列前 4 条 */
+function annoPool(s){
+  var ids = (s.signals && s.signals.length) ? s.signals : SIGNALS.map(function(sig){ return sig.id; });
+  var picked = SIGNALS.filter(function(sig){ return ids.indexOf(sig.id) >= 0; });
+  var out = [];
+  for(var i = 0; out.length < 4 && i < 4; i++){
+    picked.forEach(function(sig){
+      if(out.length < 4 && sig.samples[i]) out.push(sig.samples[i]);
+    });
+  }
+  return out;
+}
+
+function openAnno(id){
+  var s = findSet(id);
+  if(!s) return;
+  var pool = annoPool(s);
+  var sigs = signalLabels(s.signals || []);
+  var tagLeft = sigs.length ? sigs.join('/') : (s.scene || '通用');
+  annoSetId = s.id;
+  annoDraft = {};
+  var rows = pool.map(function(it, i){
+    return '<div class="anno-row" id="annoRow' + i + '">' +
+      '<div class="anno-main">' +
+        '<div class="anno-q">' + (i + 1) + '. ' + esc(it.q) + '</div>' +
+        '<div class="anno-res">' + esc(it.r) + '</div>' +
+      '</div>' +
+      '<div class="anno-pick">' +
+        '<button type="button" class="pick" data-v="1" onclick="markAnno(' + i + ',1)">对</button>' +
+        '<button type="button" class="pick" data-v="0" onclick="markAnno(' + i + ',0)">错</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  showModal('标注 · ' + s.name,
+    '<div class="anno-bar"><span>已标注 <b id="annoDone">0</b> / ' + pool.length + '</span>' +
+      '<span>' + esc(tagLeft) + ' · ' + esc(s.range || '近30天') + '</span></div>' +
+    rows,
+    '<button class="btn-ghost" type="button" onclick="closeModal()">取消</button>' +
+    '<button class="btn-primary" type="button" onclick="finishAnno()">完成标注</button>');
+}
+
+function markAnno(i, v){
+  annoDraft[i] = v;
+  var row = $('annoRow' + i);
+  if(row){
+    Array.prototype.forEach.call(row.querySelectorAll('.pick'), function(b){
+      b.classList.toggle('on', Number(b.getAttribute('data-v')) === v);
+    });
+  }
+  var n = 0;
+  for(var k in annoDraft){ if(Object.prototype.hasOwnProperty.call(annoDraft, k)) n++; }
+  var el = $('annoDone');
+  if(el) el.textContent = n;
+}
+
+function finishAnno(){
+  var s = findSet(annoSetId);
+  if(!s) return;
+  var pool = annoPool(s);
+  var n = 0;
+  for(var k in annoDraft){ if(Object.prototype.hasOwnProperty.call(annoDraft, k)) n++; }
+  if(n < pool.length){ toast('还有 ' + (pool.length - n) + ' 条未标注，逐条选择对 / 错后再完成', 'err'); return; }
+  s.status = '已完成';
+  renderSets();
+  closeModal();
+  toast('标注完成 · 评测集可用于评测', 'ok');
+}
+
+/* ================= ② 评测工作台 ================= */
+function hashStr(str){
+  var h = 0;
+  for(var i = 0; i < str.length; i++){ h = (h * 31 + str.charCodeAt(i)) % 9973; }
+  return h;
+}
+function round2(v){ return Math.round(v * 100) / 100; }
+function getResults(s){
+  if(RESULTS[s.id]) return RESULTS[s.id];
+  var h = hashStr(s.id + s.name);
+  RESULTS[s.id] = {
+    recall: round2(0.84 + (h % 9) / 100),
+    prec:   round2(0.80 + (h % 8) / 100),
+    ndcg:   round2(0.79 + (h % 10) / 100)
+  };
+  return RESULTS[s.id];
+}
+
+/* 本次指标 = 评测集基准 + 策略调整 */
+function runVals(r, strat){
+  var out = {};
+  KEYS.forEach(function(k){ out[k] = round2(r[k] + (strat.adj[k] || 0)); });
+  return out;
+}
+function countPass(vals){
+  var n = 0;
+  KEYS.forEach(function(k){ if(vals[k] >= LINES[k]) n++; });
+  return n;
+}
+function verdictText(setName, vals){
+  var fails = [];
+  KEYS.forEach(function(k){
+    if(vals[k] < LINES[k]) fails.push(METRIC_META[k].label + ' ' + fmt(vals[k]) + '，低于验收线 ' + fmt(LINES[k]));
+  });
+  return fails.length ? setName + '：' + fails.join('；') + '。' : setName + '：三项指标均达标。';
+}
+
+/* 基线 = 评测历史里同一评测集的最近一条 */
+function baselineFor(setId){
+  for(var i = 0; i < HISTORY.length; i++){
+    if(HISTORY[i].setId === setId) return HISTORY[i];
+  }
+  return null;
+}
+function renderBaseChip(setId){
+  var el = $('baseChipVal');
+  if(!el) return;
+  var b = baselineFor(setId);
+  el.textContent = b ? ('上次评测 ' + timeStr(b.at)) : '—';
+}
+
+function runEval(){
+  var sel = $('runSet');
+  var tSel = $('runStrategy');
+  if(!sel || !tSel) return;
+  var s = findSet(sel.value);
+  if(!s){ toast('请选择评测集', 'err'); return; }
+  if(s.status !== '已完成'){ toast('该评测集未完成标注，暂不可评测', 'err'); return; }
+  var strat = findStrat(tSel.value);
+  if(!strat){ toast('请选择评测对象', 'err'); return; }
+  var r = getResults(s);
+  var base = baselineFor(s.id);
+  var at = new Date();
+  var vals = runVals(r, strat);
+
+  histSeq++;
+  var entry = {
+    id: 'h' + histSeq, at: at, sid: strat.id, sname: strat.name,
+    setId: s.id, setName: s.name, count: s.count,
+    recall: vals.recall, prec: vals.prec, ndcg: vals.ndcg
+  };
+  HISTORY.unshift(entry);
+  lastRun = { histId: entry.id, setId: s.id, baseId: base ? base.id : null };
+
+  renderMetrics(s, at, strat, vals, base);
+  renderReport(s, at, strat, vals, base);
+  renderHistory();
+  renderBaseChip(s.id);
+  toast('评测完成 · ' + strat.name + ' · 已生成结论', 'ok');
+}
+
+function renderMetrics(s, at, strat, vals, base){
+  var cards = KEYS.map(function(k){
+    var meta = METRIC_META[k];
+    var v = vals[k];
+    var pass = v >= LINES[k];
+    var baseHtml = '上次基线 —';
+    if(base){
+      var bv = base[k];
+      var d = round2(v - bv);
+      var dir = d > 0 ? 'up' : (d < 0 ? 'down' : 'flat');
+      var arrow = d > 0 ? '↑' : (d < 0 ? '↓' : '→');
+      baseHtml = '上次基线 ' + fmt(bv) + ' <span class="delta ' + dir + '">' + arrow + ' ' + Math.abs(d).toFixed(2) + '</span>';
+    }
+    return '<div class="metric">' +
+      '<div class="m-top"><span class="m-name">' + meta.label + '</span><span class="tag ' + (pass ? 'ok' : 'bad') + '">' + (pass ? '达标' : '未达标') + '</span></div>' +
+      '<div class="m-sub">' + meta.sub + ' · 验收线 ' + fmt(LINES[k]) + '</div>' +
+      '<div class="m-val">' + fmt(v) + '</div>' +
+      '<div class="m-base">' + baseHtml + '</div>' +
+    '</div>';
+  }).join('');
+  $('metricBox').innerHTML =
+    '<div class="metric-cap">' +
+      '<span class="mc-title">用 <b>' + esc(strat.name) + '</b> 评测</span>' +
+      '<span class="mc-meta">评测集 ' + esc(s.name) + ' · ' + s.count + ' 条 · ' + timeStr(at) + '</span>' +
+    '</div>' +
+    '<div class="metrics">' + cards + '</div>';
+}
+
+/* ================= ③ 报告 ================= */
+function renderReport(s, at, strat, vals, base){
+  var roleCls = strat.role === '当前生效' ? ' ok' : '';
+  var cmp;
+  if(base){
+    var items = KEYS.map(function(k){
+      var d = round2(vals[k] - base[k]);
+      var dir = d > 0 ? 'up' : (d < 0 ? 'down' : 'flat');
+      var arrow = d > 0 ? '↑' : (d < 0 ? '↓' : '→');
+      return '<span class="v-cmp-item">' + METRIC_META[k].label + ' <b>' + fmt(vals[k]) + '</b>（上次 ' + fmt(base[k]) +
+        '，<i class="delta ' + dir + '">' + arrow + ' ' + Math.abs(d).toFixed(2) + '</i>）</span>';
+    }).join('');
+    cmp = '<div class="v-cmp">' +
+        '<div class="v-cmp-head">对比上次评测 <span>' + timeStr(base.at) + ' · ' + esc(base.sname) + '</span></div>' +
+        '<div class="v-cmp-items">' + items + '</div>' +
+      '</div>';
+  }else{
+    cmp = '<div class="v-cmp">' +
+        '<div class="v-cmp-head">对比上次评测 <span>—</span></div>' +
+      '</div>';
+  }
+  $('reportBox').innerHTML =
+    '<div class="verdict">' +
+      '<div class="v-top"><span class="v-kicker">本次评测结论</span><span class="v-time">' + timeStr(at) + '</span></div>' +
+      '<p class="v-text">' + esc(verdictText(s.name, vals)) + '</p>' +
+      cmp +
+      '<div class="v-bar">' +
+        '<a class="btn-primary" href="P5_策略管理_v5.0_20261025.html">转策略调整 ↗</a>' +
+      '</div>' +
+    '</div>';
+}
+
+/* ================= 评测历史 ================= */
+function renderHistory(){
+  var body = $('histRows');
+  if(!body) return;
+  var meta = $('histMeta');
+  if(meta) meta.textContent = '共 ' + HISTORY.length + ' 次';
+  var total = HISTORY.length;
+  var pages = Math.max(1, Math.ceil(total / HIST_PAGE_SIZE));
+  if(HIST_PAGE > pages){ HIST_PAGE = pages; }
+  if(HIST_PAGE < 1){ HIST_PAGE = 1; }
+  if(!total){
+    body.innerHTML = '<tr><td colspan="7"><div class="empty">暂无评测记录</div></td></tr>';
+    renderPager('histPager', 0, 1, HIST_PAGE_SIZE);
+    return;
+  }
+  var start = (HIST_PAGE - 1) * HIST_PAGE_SIZE;
+  body.innerHTML = HISTORY.slice(start, start + HIST_PAGE_SIZE).map(function(h){
+    var pass = countPass(h);
+    var isNew = lastRun && lastRun.histId === h.id;
+    return '<tr>' +
+      '<td>' + timeStr(h.at) + (isNew ? ' <span class="tag">本次</span>' : '') + '</td>' +
+      '<td class="src">' + esc(h.sname) + '</td>' +
+      '<td class="src">' + esc(h.setName) + '</td>' +
+      '<td class="num">' + fmt(h.recall) + '</td>' +
+      '<td class="num">' + fmt(h.prec) + '</td>' +
+      '<td class="num">' + fmt(h.ndcg) + '</td>' +
+      '<td class="pass-cell"><span class="st ' + (pass === KEYS.length ? 'ok' : 'bad') + '" title="' + esc(verdictText(h.setName, h)) + '">' +
+        (pass === KEYS.length ? '达标' : '未达标') + ' ' + pass + '/' + KEYS.length + '</span></td>' +
+    '</tr>';
+  }).join('');
+  renderPager('histPager', total, HIST_PAGE, HIST_PAGE_SIZE);
+}
+
+/* ================= 弹窗 ================= */
+function showModal(title, body, foot){
+  $('modalTitle').textContent = title;
+  $('modalBody').innerHTML = body;
+  $('modalFoot').innerHTML = foot;
+  $('modalMask').classList.add('show');
+}
+function closeModal(){
+  $('modalMask').classList.remove('show');
+  annoSetId = null;
+  annoDraft = {};
+}
+
+/* ================= 启动与公共事件 ================= */
+renderSets();
+renderStrategyOptions();
+renderHistory();
+renderBaseChip($('runSet') ? $('runSet').value : '');
+
+var runSetEl = $('runSet');
+if(runSetEl){
+  runSetEl.addEventListener('change', function(){ renderBaseChip(this.value); });
+}
+
+document.querySelectorAll('.modal-mask').forEach(function(mask){
+  mask.addEventListener('click', function(e){
+    if(e.target === mask) closeModal();
+  });
+});
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){
+    closeModal();
+    closeDev();
+  }
+});
+
+/* 研发说明抽屉（九页统一：头部胶囊入口 + 右侧 520px 抽屉） */
+function openDev(){
+  var d = document.getElementById('devDrawer'), m = document.getElementById('devMask');
+  if(d) d.classList.add('open');
+  if(m) m.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeDev(){
+  var d = document.getElementById('devDrawer'), m = document.getElementById('devMask');
+  if(d) d.classList.remove('open');
+  if(m) m.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+/* 系统门户桥接（单页直开无副作用） */
+(function(){
+  try{
+    if(window.parent && window.parent !== window){
+      window.parent.postMessage({type:'sys-page', page:'P8', name:'评测'}, '*');
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

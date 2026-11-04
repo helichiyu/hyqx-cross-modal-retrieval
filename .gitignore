@@ -1,0 +1,36 @@
+# Python 虚拟环境与缓存
+.venv/
+venv/
+env/
+
+# Python 字节码与工具缓存
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 前端依赖与构建产物（由 cmr-web/Dockerfile 内 npm ci + build 生成）
+cmr-web/node_modules/
+cmr-web/dist/
+
+# 日志
+*.log
+
+# 编辑器 / 操作系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 本地环境变量与密钥
+.env
+.env.*
+
+# Maven 构建产物
+target/
+
+# 算子运行产物与打包产物
+runtime/
+dist/

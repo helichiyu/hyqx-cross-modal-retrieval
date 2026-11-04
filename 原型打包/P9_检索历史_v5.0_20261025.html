@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>检索历史 · 跨模态检索中心</title>
+<style>
+:root{
+  /* 清爽冷白蓝 token（与 P1 定稿基准一致） */
+  --workspace-bg:#f6f9fe;
+  --module-bg:#f3f8ff;
+  --content-card:#ffffff;
+  --content-soft:#fbfdff;
+  --content-line:#e6edf8;
+  --content-line-strong:#d9e7f8;
+  --system-blue:#4169f6;
+  --system-blue-weak:#f1f5ff;
+  --ink:#1f2937;
+  --muted:#667085;
+  --success:#34a853;
+  --warning:#f0a020;
+  --error:#e5484d;
+  --text-primary:#262626;
+  --text-secondary:#8c8c8c;
+  --radius:8px;
+  --shadow-card:0 2px 8px rgba(31,58,122,.05);
+  --shadow-pop:0 10px 22px rgba(64,80,112,.14);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--workspace-bg);
+  color:var(--text-primary);
+  font-size:14px;
+  line-height:1.5;
+  display:flex;
+}
+button{font-family:inherit;cursor:pointer}
+::selection{background:rgba(65,105,246,.16)}
+
+/* ============ 左侧全局导航（壳层，与 P1 一致） ============ */
+.sidebar{
+  width:220px;flex-shrink:0;
+  background:#fff;border-right:1px solid var(--content-line);
+  display:flex;flex-direction:column;
+  height:100vh;position:sticky;top:0;
+}
+.brand{
+  padding:18px 18px 14px;
+  display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid var(--content-line);
+}
+.brand .logo{
+  width:30px;height:30px;border-radius:7px;flex-shrink:0;
+  background:linear-gradient(135deg,#4169f6,#6e8cff);
+  display:grid;place-items:center;color:#fff;font-size:15px;font-weight:700;
+}
+.brand b{font-size:14px;color:#16204a;display:block;line-height:1.25}
+.brand span{font-size:11px;color:var(--text-secondary)}
+.nav-scroll{flex:1;overflow-y:auto;padding:10px 12px}
+.nav-item{
+  display:flex;align-items:center;gap:9px;
+  padding:9px 10px;margin-bottom:2px;
+  border-radius:6px;color:#344054;font-size:13px;
+  cursor:pointer;user-select:none;text-decoration:none;
+}
+.nav-item .ico{width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:#8a96ad;flex-shrink:0}
+.nav-item .ico svg{width:16px;height:16px;display:block}
+.nav-item.active .ico{color:var(--system-blue)}
+.nav-item:hover{background:var(--system-blue-weak);color:var(--system-blue)}
+.nav-item.active{
+  background:var(--system-blue-weak);color:var(--system-blue);font-weight:600;
+  box-shadow:inset 2px 0 0 var(--system-blue);
+}
+.nav-divider{height:1px;background:var(--content-line);margin:8px 10px}
+
+/* ============ 主区 ============ */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+@keyframes shimmer{to{background-position:-200% 0}}
+
+.content{padding:20px 24px 32px;display:flex;flex-direction:column;gap:16px;max-width:1280px;width:100%;margin:0 auto}
+.card{border:1px solid #e4edf8;border-radius:var(--radius);background:#fff}
+
+.module-intro{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:18px 20px;
+  border:1px solid #e4edf8;
+  border-radius:10px;
+  background:#fff;
+}
+.module-intro h2{font-size:20px;font-weight:700;color:#111827;margin-bottom:7px;display:flex;align-items:center;gap:10px}
+.module-intro p{color:var(--muted);line-height:1.65;max-width:760px;font-size:13px}
+
+/* 筛选条 */
+.filter-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px}
+.filter-bar .fb-search{
+  flex:1;min-width:260px;height:34px;border:1px solid #d7e0f0;border-radius:7px;
+  padding:0 12px;font-size:13px;outline:none;background:#fff;color:var(--ink);
+}
+.filter-bar .fb-search:focus{border-color:var(--system-blue);box-shadow:0 0 0 3px rgba(65,105,246,.12)}
+.fb-sel{
+  height:34px;border:1px solid #d7e0f0;border-radius:7px;background:#fff;
+  font-size:12.5px;color:#344054;padding:0 8px;outline:none;
+}
+.btn-ghost{
+  height:34px;padding:0 16px;border-radius:6px;border:1px solid #d7e0f0;
+  background:#fff;color:#475467;font-size:13px;text-decoration:none;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.btn-ghost:hover{border-color:var(--system-blue);color:var(--system-blue)}
+.btn-primary{
+  height:34px;padding:0 20px;border:0;border-radius:6px;
+  background:var(--system-blue);color:#fff;font-size:13px;font-weight:600;
+  display:inline-flex;align-items:center;gap:7px;text-decoration:none;
+  box-shadow:0 3px 8px rgba(65,105,246,.25);transition:all .15s;
+}
+.btn-primary:hover{background:#335be8}
+.badge{font-size:11px;padding:2px 9px;border-radius:10px;font-weight:600;display:inline-block}
+.badge.ok{background:#e8f7ec;color:var(--success)}
+.badge.fail{background:#fdecec;color:var(--error)}
+
+/* 历史列表 */
+.sec-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.sec-head .sec-title{font-size:15px;font-weight:700;color:#1f2a44}
+.sec-head .sec-sub{font-size:12px;color:#9aa6bd}
+.sec-head::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--system-blue)}
+.hist-card{padding:16px 18px}
+.hist-card .filter-bar{padding:0 0 12px}
+.mini-table{border:1px solid #eef2f8;border-radius:8px;overflow:hidden;background:#fff}
+.mt-row{
+  min-height:40px;padding:10px 12px;border-top:1px solid #eef2f8;
+  display:grid;gap:8px;align-items:center;font-size:12px;
+}
+.mt-row:first-child{border-top:0}
+.mt-row.head{color:#7a8493;background:#f4f6fb;font-weight:700;font-size:11.5px;min-height:34px}
+.mt-row:not(.head):hover{background:#f8fbff}
+.mt-cols-h{grid-template-columns:132px minmax(0,1.6fr) 82px 68px 66px 124px 150px}
+.mt-row .c{color:var(--muted);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mt-row .b{color:#1f2a44;font-weight:600;font-variant-numeric:tabular-nums}
+.row-link{
+  font-size:12px;color:var(--system-blue);background:none;border:0;text-decoration:none;
+  border-bottom:1px dashed #aebdf5;padding:0;
+}
+.row-link:hover{border-bottom-style:solid}
+.row-link:disabled{color:#b3bccc;border:0;cursor:not-allowed}
+
+/* ================= 分页组件（列表下方 · 右对齐） ================= */
+.pager-bar{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:#667085}
+.pager-total{color:#8a96ad;margin-right:4px;font-variant-numeric:tabular-nums}
+.pager-btn,.pager-num{height:28px;border:1px solid #d7e0f0;background:#fff;border-radius:5px;color:#475467;font-size:12px;cursor:pointer;font-family:inherit}
+.pager-btn{padding:0 10px}
+.pager-num{min-width:28px;padding:0 6px;font-variant-numeric:tabular-nums}
+.pager-btn:hover:not(:disabled),.pager-num:hover:not(.is-cur){border-color:#4169f6;color:#4169f6}
+.pager-btn:disabled{opacity:.45;cursor:not-allowed}
+.pager-num.is-cur{background:#4169f6;border-color:#4169f6;color:#fff;font-weight:700;cursor:default}
+.pager-gap{color:#98a2b3;padding:0 2px}
+
+/* 空态 / 错误态 */
+.state-box{
+  padding:38px 20px;text-align:center;color:#8c98ad;font-size:13px;
+  background:var(--content-soft);border:1px dashed var(--content-line-strong);border-radius:8px;
+}
+.state-box .big{font-size:30px;display:block;margin-bottom:8px}
+.state-box b{color:var(--system-blue)}
+.state-box.err .big{filter:grayscale(.3)}
+.state-box .acts{margin-top:12px;display:flex;gap:8px;justify-content:center}
+
+/* toast */
+.toast{
+  position:fixed;top:56px;left:50%;transform:translateX(-50%) translateY(-12px);
+  z-index:200;background:#2b3245;color:#fff;font-size:13px;
+  padding:9px 18px;border-radius:7px;box-shadow:0 8px 24px rgba(20,32,70,.25);
+  opacity:0;pointer-events:none;transition:all .2s;display:flex;align-items:center;gap:7px;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#c0392b}
+.toast.ok{background:#1e8e4a}
+
+@media (max-width:1100px){
+  .mt-cols-h{grid-template-columns:110px minmax(0,1.4fr) 78px 58px 64px 118px 170px}
+}
+
+/* ===== 研发说明入口（九页统一：头部胶囊按钮 + 右侧抽屉） ===== */
+.dev-entry{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px 0 5px;border:1px solid #d7e0f0;border-radius:999px;background:#fff;color:#667085;font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+.dev-entry:hover{border-color:#b9c9ff;background:var(--system-blue-weak);color:var(--system-blue)}
+.dev-entry:hover .de-q{background:var(--system-blue);color:#fff}
+.dev-entry:focus-visible{outline:2px solid #cdd9ff;outline-offset:1px}
+.dev-entry .de-q{width:20px;height:20px;border-radius:50%;flex:0 0 auto;background:var(--system-blue-weak);color:var(--system-blue);font-size:12px;font-weight:700;line-height:20px;text-align:center;transition:background .15s,color .15s}
+/* 右侧抽屉：520px / 全高 / 从右滑入 + 半透明遮罩 */
+.dev-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:10000;opacity:0;pointer-events:none;transition:opacity .22s}
+.dev-mask.open{opacity:1;pointer-events:auto}
+.dev-drawer{position:fixed;top:0;right:0;width:720px;max-width:100vw;height:100vh;background:#f6f8fc;z-index:10001;display:flex;flex-direction:column;transform:translateX(102%);transition:transform .28s ease;box-shadow:-8px 0 30px rgba(15,23,42,.18)}
+.dev-drawer.open{transform:translateX(0)}
+.dev-head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:#fff;border-bottom:1px solid #e4eaf3;flex:0 0 auto}
+.dev-head h3{margin:0;font-size:15px;color:#1f2937}
+.dev-head .dh-tag{font-size:11px;font-weight:600;color:#b54708;background:#fdf3e6;border-radius:4px;padding:2px 8px}
+.dev-close{margin-left:auto;width:28px;height:28px;border:none;background:#f2f4f8;border-radius:6px;font-size:15px;line-height:1;cursor:pointer;color:#475467;flex:0 0 auto}
+.dev-close:hover{background:#e6eaf2}
+.dev-body{flex:1;min-height:0;overflow:auto;padding:16px 18px 36px}
+.dev-ov{background:#fff;border:1px solid #e4eaf3;border-radius:10px;padding:12px 14px;margin-bottom:12px}
+.dev-ov h4{margin:0 0 5px;font-size:12.5px;color:var(--system-blue)}
+.dev-ov p{margin:0;line-height:1.7;color:#475467;font-size:12px}
+.ov-grid{display:grid;grid-template-columns:1fr;gap:10px}
+.dev-card{background:#fff;border:1px solid #e4eaf3;border-radius:10px;margin-bottom:12px;overflow:hidden;scroll-margin-top:12px}
+.dc-head{display:flex;align-items:center;gap:7px;padding:10px 14px;background:#fbfcfe;border-bottom:1px solid #eef2f8;flex-wrap:wrap}
+.dc-id{font-size:11px;font-weight:700;color:#fff;background:#b54708;border-radius:4px;padding:1px 7px;flex:0 0 auto}
+.dc-name{font-size:13px;font-weight:700;color:#1f2937}
+.dc-body{padding:6px 14px 12px}
+.dc-row{display:flex;gap:10px;padding:6px 0;border-bottom:1px dashed #f0f3f8;font-size:12px;line-height:1.7}
+.dc-row:last-child{border-bottom:none}
+.dc-k{flex:0 0 74px;font-weight:700;color:#344054}
+.dc-v{flex:1;color:#475467}
+.dc-v ul{margin:0;padding-left:16px}
+.dc-v li{margin:2px 0}
+.k-in .dc-k{color:#027a48}.k-out .dc-k{color:#1f5fd4}.k-err .dc-k{color:#c0362c}.k-dep .dc-k{color:#7a5af8}
+.demo-limit{display:inline-block;font-size:10px;font-weight:600;color:#b54708;background:#fdf3e6;border:1px solid #f6d9b0;border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:1px}
+.dev-xref{color:#1f5fd4;font-weight:700;text-decoration:none;border-bottom:1px dashed #9dbcf5;padding:0 1px;white-space:nowrap}
+.dev-xref:hover{background:#eaf1fe;border-bottom-style:solid}
+</style>
+</head>
+<body>
+
+<!-- ============ 左侧导航（九页互通 · 本页 P9 active） ============ -->
+<aside class="sidebar">
+    <div class="nav-scroll">
+    <a class="nav-item" href="P1_检索台_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span>检索台</a>
+    <a class="nav-item active" href="P9_检索历史_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></svg></span>检索历史</a>
+    <div class="nav-divider"></div>
+    <a class="nav-item admin-nav" href="P4_库管理_v5.2_20261026.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6"/><path d="M5 12v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6"/></svg></span>库管理</a>
+    <a class="nav-item admin-nav" href="P5_策略管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="10" cy="17" r="1.6"/></svg></span>策略管理</a>
+    <a class="nav-item admin-nav" href="P6_任务管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="12" height="16" rx="2"/><path d="M9 5V3.5h6V5"/><path d="M9 10h6M9 14h6M9 18h4"/></svg></span>任务管理</a>
+    <a class="nav-item admin-nav" href="P7_结果运营_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>结果运营</a>
+    <a class="nav-item admin-nav" href="P8_评测_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="13" width="3" height="4"/><rect x="12" y="9" width="3" height="8"/><rect x="17" y="5" width="3" height="12"/></svg></span>效果评测</a>
+  </div>
+</aside>
+
+<!-- ============ 主区 ============ -->
+<div class="main">
+
+  <div class="content">
+
+    <!-- 页头介绍 -->
+    <section class="module-intro">
+      <div>
+        <h2>我的查询历史</h2>
+        <p>我的历史检索记录：query / 时间 / 结果数 / 状态，行内可<strong style="color:#475467">查看结果</strong>或<strong style="color:#475467">再次执行</strong>（携 query 回填检索台）。系统全部任务见 <a class="row-link" href="P6_任务管理_v5.0_20261025.html">任务管理</a>（运行视角）。</p>
+      </div>
+      <button class="dev-entry" id="devEntry" type="button" onclick="openDev()" title="研发说明"><span class="de-q" aria-hidden="true">?</span>研发说明</button>
+    </section>
+
+    <!-- ① 历史记录（主视图，置顶） -->
+    <section class="card hist-card">
+      <div class="sec-head">
+        <span class="sec-title">历史记录</span>
+        <span class="sec-sub" id="histCount">共 — 条</span>
+      </div>
+      <div class="filter-bar">
+        <input class="fb-search" id="fbKw" type="text" placeholder="关键词筛选历史 query（如：发票 / 作业 / 窗口）…">
+        <select class="fb-sel" id="fbPair" title="模态对筛选">
+          <option value="">全部模态对</option>
+          <option value="文搜图">文搜图</option>
+          <option value="文搜视频">文搜视频</option>
+        </select>
+        <select class="fb-sel" id="fbStatus" title="状态筛选">
+          <option value="">全部状态</option>
+          <option value="成功">成功</option>
+          <option value="失败">失败</option>
+        </select>
+        <button class="btn-ghost" id="btnClear" type="button">清空筛选</button>
+      </div>
+      <div id="histBox">
+        <div class="mini-table">
+          <div class="mt-row head mt-cols-h"><div>时间</div><div>Query</div><div>模态对</div><div>结果数</div><div>状态</div><div>任务ID</div><div>操作</div></div>
+          <div id="histRows"></div>
+        </div>
+      </div>
+      <div class="pager-bar" id="histPager"></div>
+      <!-- 空态 -->
+      <div class="state-box" id="histEmpty" style="display:none">
+        <span class="big">🗂️</span>
+        没有匹配的历史记录，换个关键词试试，或
+        <a class="row-link" href="P1_检索台_v5.0_20261025.html">前往检索台</a> 发起新检索。
+      </div>
+      <!-- 错误态 -->
+      <div class="state-box err" id="histError" style="display:none">
+        <span class="big">⚠️</span>
+        历史记录加载失败。
+        <div class="acts">
+          <button class="btn-primary" id="btnRetry" type="button">重新载入</button>
+          <a class="btn-ghost" href="P1_检索台_v5.0_20261025.html">回检索台</a>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 研发需求说明（入口在头部卡片右上角 · 右侧抽屉） -->
+<div class="dev-mask" id="devMask" onclick="closeDev()"></div>
+<div class="dev-drawer" id="devDrawer" role="dialog" aria-modal="true" aria-label="研发需求说明">
+  <div class="dev-head">
+    <h3>研发需求说明</h3>
+    <span class="dh-tag">给研发</span>
+    <button type="button" class="dev-close" id="devClose" title="关闭（Esc）" aria-label="关闭" onclick="closeDev()">×</button>
+  </div>
+  <div class="dev-body">
+<div class="dev-card" id="dc-ov" style="scroll-margin-top:12px"><div class="dc-head"><span class="dc-id" style="background:#1f5fd4">总览</span><span class="dc-name">页面定位 / 闭环 / 模块清单 / 编号与演示性质</span></div><div class="dc-body"><div class="ov-grid"><div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>本页定位【设计】</h4><p>「我的查询历史」：七列历史记录列表（置顶，query / 时间 / 模态对 / 结果数 / 状态 / 任务ID / 操作），行内可查看结果、再次执行。</p></div><div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>平台全景闭环【研发】</h4><p><a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a> 发起检索 → 本页沉淀历史 → 查看结果 <a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a> / 查看任务 <a class="dev-xref" href="P3_任务详情_v5.0_20261025.html">P3</a> / 再次执行回填 <a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a>。</p></div><div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>三级模块清单【设计】</h4><p>轻模板页（0 主挂）；联动展示：再次执行→P1、查看结果→P2、查看任务→P3。</p></div><div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>编号规范与演示性质【研发】</h4><p>业务编号按《平台相关ID生成规范-1026》32.1：任务 TASK（等宽可复制）。<br>本页为页内模拟，不请求真实引擎；历史条目/结果为示例数据，不构成交付承诺。</p></div></div></div></div>
+<div class="dev-card" id="dc-f1"><div class="dc-head"><span class="dc-id">F1</span><span class="dc-name">历史列表</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">七列展示我的历史检索记录（时间/Query/模态对/结果数/状态/任务ID/操作），状态徽标区分成功/失败；操作列=查看结果 / 再次执行。</div></div><div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">页面常驻；历史记录来自 <a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a> 发起的检索（仅本人）。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>历史条目（任务号 TASK、query、模态对、结果数、状态）</li></ul></div></div><div class="dc-row"><div class="dc-k">处理规则</div><div class="dc-v">列表只读（历史记录不编辑）；行内动作：查看结果跳 <a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a>?task=、再次执行携 ?q= 回 <a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a>。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>七列历史列表 + 成功/失败徽标 + 行内两动作（查看结果 / 再次执行）</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>失败行「查看结果」置灰（失败无结果集）</li><li>仅展示本人历史（他人在线任务在 P6）</li></ul></div></div><div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">列表态 / 空态 / 错误态。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=<a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a>；下游=<a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a>（查看结果）/ <a class="dev-xref" href="P3_任务详情_v5.0_20261025.html">P3</a>（任务ID）/ <a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a>（再次执行）。</div></div><div class="dc-row"><div class="dc-k">验收点</div><div class="dc-v">七列渲染正确；成功/失败徽标正确；失败行查看结果置灰；两动作携参正确。</div></div></div></div>
+<div class="dev-card" id="dc-f2"><div class="dc-head"><span class="dc-id">F2</span><span class="dc-name">筛选</span></div><div class="dc-body"><div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">按关键词、模态对、状态筛选历史列表。</div></div><div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">筛选条常驻列表上方。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>关键词（query 模糊匹配）、模态对（全部/文搜图/文搜视频）、状态（全部/成功/失败）</li></ul></div></div><div class="dc-row"><div class="dc-k">处理规则</div><div class="dc-v">三条件叠加过滤（AND），实时联动渲染；清空筛选恢复全部。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>过滤后的历史列表 + 计数「共 N 条」</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>过滤后无结果触发空态</li><li>处于错误态时任一筛选输入自动回到列表态</li></ul></div></div><div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">默认全部条件为空。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">本页 F1 列表。</div></div><div class="dc-row"><div class="dc-k">验收点</div><div class="dc-v">三条件叠加正确；清空恢复默认；空态/错误态切换正确。</div></div></div></div>
+<div class="dev-card" id="dc-f3"><div class="dc-head"><span class="dc-id">F3</span><span class="dc-name">再次执行</span></div><div class="dc-body"><div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">将历史 query 回填至 <a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a> 检索台（快速复用）。</div></div><div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">每条历史行的「再次执行」链接。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>目标 query（行内）</li></ul></div></div><div class="dc-row"><div class="dc-k">处理规则</div><div class="dc-v">跳 <a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a> 携 ?q= 参数（URL 编码）；P1 侧读参回填关键词。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>跳转 P1?q=…（回填关键词）</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v">无（纯跳转，不校验权限）。</div></div><div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">静态链接。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">下游=<a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a>（携 ?q=）。</div></div><div class="dc-row"><div class="dc-k">验收点</div><div class="dc-v">跳转 P1 且 ?q= 参数正确（URL 编码）。</div></div></div></div>
+<div class="dev-card" id="dc-f4"><div class="dc-head"><span class="dc-id">F4</span><span class="dc-name">查看结果 / 查看任务</span></div><div class="dc-body"><div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">由历史行进入该次检索的结果页（查看结果）或单任务档案（任务ID）。</div></div><div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">行内「查看结果」（成功行可点）与「任务ID」链接。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>任务号 TASK（行内，等宽可复制）</li></ul></div></div><div class="dc-row"><div class="dc-k">处理规则</div><div class="dc-v">查看结果携 ?task= 跳 <a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a>；任务ID 携 ?task= 跳 <a class="dev-xref" href="P3_任务详情_v5.0_20261025.html">P3</a>；失败行查看结果为置灰文本。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>跳转 P2?task= / P3?task=</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>失败任务无结果集，仅可跳任务详情查看失败态</li></ul></div></div><div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">成功可跳结果 / 失败仅可跳任务。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">下游=<a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a>（结果）/ <a class="dev-xref" href="P3_任务详情_v5.0_20261025.html">P3</a>（任务详情）。</div></div><div class="dc-row"><div class="dc-k">验收点</div><div class="dc-v">跳转参数正确（?task= 随 TASK 编号）；失败行置灰正确。</div></div></div></div>
+<div class="dev-card" id="dc-f6"><div class="dc-head"><span class="dc-id">F6</span><span class="dc-name">空态 / 错误态</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">空态（无匹配）与错误态（历史加载失败）切换。</div></div><div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">列表为空或服务不可用时触发。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>列表结果（空/失败）、系统错误码 HIST-503</li></ul></div></div><div class="dc-row"><div class="dc-k">处理规则</div><div class="dc-v">无匹配→空态引导（换关键词 / 前往 P1）；服务不可用→错误态 + 重新载入 / 回 P1。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>空态提示 + 前往 P1 / 错误态提示 + 重新载入按钮</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>错误码 HIST-503（系统码，保留）；URL 传 fail=1 演示触发错误态</li></ul></div></div><div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">空态 / 错误态（与列表态互斥切换）。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">下游=<a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a>（前往/回检索台）。</div></div><div class="dc-row"><div class="dc-k">验收点</div><div class="dc-v">空态/错误态切换正确；重新载入回到列表态。</div></div></div></div>
+<div class="dev-card" id="dc-f7"><div class="dc-head"><span class="dc-id">F7</span><span class="dc-name">P9 与 P6 的分工</span></div><div class="dc-body"><div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">划清两个任务相关页面的视角：本页=我的查询历史（用户视角），<a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">P6</a>=系统全部任务（运行视角）。</div></div><div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">本页由左栏导航进入，仅列本人发起的检索。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>本页：本人历史（query / 时间 / 结果数 / 状态）</li><li><a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">P6</a>：全部任务（队列 / 引擎健康 / 失败任务 / 配额）</li></ul></div></div><div class="dc-row"><div class="dc-k">处理规则</div><div class="dc-v">本页只管「查过的 query 去哪儿再查/看结果」；任务调度、失败处置、配额与熔断一律回 <a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">P6</a>。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>本页出口：查看结果→<a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a>、任务ID→<a class="dev-xref" href="P3_任务详情_v5.0_20261025.html">P3</a>、再次执行→<a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a></li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>他人在线任务与系统级指标以 <a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">P6</a> 为唯一来源</li></ul></div></div><div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">静态说明。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v"><a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">P6</a> 任务管理（运行视角）；<a class="dev-xref" href="P3_任务详情_v5.0_20261025.html">P3</a> 任务详情（单任务档案）。</div></div><div class="dc-row"><div class="dc-k">验收点</div><div class="dc-v">两页职责无重叠。</div></div></div></div>
+  </div>
+</div>
+<script>
+/* ================= 示例数据 ================= */
+var HISTORY = [
+  {time:'2026-10-25 00:30', query:'含发票代码的扫描件', pair:'文搜图', status:'成功', task:'TASK261025A3F9KX', recall:130},
+  {time:'2026-10-24 18:05', query:'生产线作业安全帽佩戴', pair:'文搜视频', status:'成功', task:'TASK261024M7V4YC', recall:87},
+  {time:'2026-10-24 17:50', query:'窗口办事人员操作特写', pair:'文搜视频', status:'失败', task:'TASK261024K7M2PQ', recall:0},
+  {time:'2026-10-24 14:20', query:'营业执照 法人代表字段', pair:'文搜图', status:'成功', task:'TASK261024P9W6ZS', recall:210},
+  {time:'2026-10-24 09:15', query:'红章文件 归档编号', pair:'文搜图', status:'成功', task:'TASK261024R3X8TA', recall:64},
+  {time:'2026-10-23 22:41', query:'车间设备铭牌特写', pair:'文搜视频', status:'成功', task:'TASK261023A3F9KX', recall:143}
+];
+
+var state = { kw:'', pair:'', status:'', view:'list', page:1 };
+var HIST_PAGE_SIZE = 10;
+var PAGER_GO = {};
+
+/* ================= 工具 ================= */
+var toastTimer;
+function toast(msg, type){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.className = 'toast'; }, 2600);
+}
+
+/* ================= 分页组件（历史记录 · 每页 10 条） ================= */
+function pagerNumbers(page, pages){
+  var out = [], i;
+  if(pages <= 7){
+    for(i = 1; i <= pages; i++){ out.push(i); }
+  }else{
+    out.push(1);
+    var s = Math.max(2, page - 1), e = Math.min(pages - 1, page + 1);
+    if(s > 2){ out.push('...'); }
+    for(i = s; i <= e; i++){ out.push(i); }
+    if(e < pages - 1){ out.push('...'); }
+    out.push(pages);
+  }
+  return out;
+}
+function renderPager(containerId, total, page, pageSize){
+  var box = document.getElementById(containerId);
+  if(!box){ return; }
+  pageSize = pageSize || 10;
+  var pages = Math.max(1, Math.ceil(total / pageSize));
+  if(page > pages){ page = pages; }
+  if(page < 1){ page = 1; }
+  var go = PAGER_GO[containerId] || 'goPage';
+  var html = '<span class="pager-total">共 ' + total + ' 条</span>' +
+    '<button class="pager-btn" type="button" onclick="' + go + '(' + (page - 1) + ')"' + (page <= 1 ? ' disabled' : '') + '>上一页</button>';
+  pagerNumbers(page, pages).forEach(function(p){
+    if(p === '...'){ html += '<span class="pager-gap">…</span>'; }
+    else{
+      html += '<button class="pager-num' + (p === page ? ' is-cur' : '') + '" type="button" onclick="' + go + '(' + p + ')"' +
+        (p === page ? ' aria-current="page"' : '') + '>' + p + '</button>';
+    }
+  });
+  html += '<button class="pager-btn" type="button" onclick="' + go + '(' + (page + 1) + ')"' + (page >= pages ? ' disabled' : '') + '>下一页</button>';
+  box.innerHTML = html;
+}
+function goPage(n){
+  var rows = filterHistory();
+  var pages = Math.max(1, Math.ceil(rows.length / HIST_PAGE_SIZE));
+  if(n < 1){ n = 1; }
+  if(n > pages){ n = pages; }
+  state.page = n;
+  renderList();
+}
+function filterHistory(){
+  return HISTORY.filter(function(h){
+    return (!state.kw || h.query.indexOf(state.kw) > -1)
+      && (!state.pair || h.pair === state.pair)
+      && (!state.status || h.status === state.status);
+  });
+}
+function renderList(){
+  var box = document.getElementById('histBox');
+  var empty = document.getElementById('histEmpty');
+  var err = document.getElementById('histError');
+  var pager = document.getElementById('histPager');
+  if(state.view === 'error'){
+    box.style.display = 'none'; empty.style.display = 'none'; err.style.display = 'block';
+    if(pager) pager.style.display = 'none';
+    document.getElementById('histCount').textContent = '加载失败';
+    return;
+  }
+  var rows = filterHistory();
+  document.getElementById('histCount').textContent = '共 ' + rows.length + ' 条';
+  if(rows.length === 0){
+    box.style.display = 'none'; err.style.display = 'none'; empty.style.display = 'block';
+    if(pager) pager.style.display = 'none';
+    return;
+  }
+  box.style.display = 'block'; empty.style.display = 'none'; err.style.display = 'none';
+  if(pager) pager.style.display = 'flex';
+  var pages = Math.max(1, Math.ceil(rows.length / HIST_PAGE_SIZE));
+  if(state.page > pages){ state.page = pages; }
+  if(state.page < 1){ state.page = 1; }
+  var start = (state.page - 1) * HIST_PAGE_SIZE;
+  document.getElementById('histRows').innerHTML = rows.slice(start, start + HIST_PAGE_SIZE).map(function(h){
+    var ok = (h.status === '成功');
+    return '<div class="mt-row mt-cols-h">' +
+      '<div class="c">' + h.time + '</div>' +
+      '<div class="b">' + h.query + '</div>' +
+      '<div class="c">' + h.pair + '</div>' +
+      '<div class="b">' + (h.recall || '—') + '</div>' +
+      '<div><span class="badge ' + (ok ? 'ok' : 'fail') + '">' + h.status + '</span></div>' +
+      '<div><a class="row-link" href="P3_任务详情_v5.0_20261025.html?task=' + h.task + '">' + h.task + '</a></div>' +
+      '<div>' +
+        (ok ? '<a class="row-link" href="P2_结果页_v5.0_20261025.html?task=' + h.task + '" style="margin-right:10px">查看结果</a>'
+            : '<span style="font-size:11px;color:#b3bccc;margin-right:10px" title="失败任务无结果集">查看结果</span>') +
+        '<a class="row-link" href="P1_检索台_v5.0_20261025.html?q=' + encodeURIComponent(h.query) + '">再次执行</a>' +
+      '</div></div>';
+  }).join('');
+  renderPager('histPager', rows.length, state.page, HIST_PAGE_SIZE);
+}
+
+/* 筛选 */
+document.getElementById('fbKw').addEventListener('input', function(){
+  state.kw = this.value.trim();
+  state.page = 1;
+  if(state.view === 'error') state.view = 'list';
+  renderList();
+});
+document.getElementById('fbPair').addEventListener('change', function(){
+  state.pair = this.value;
+  state.page = 1;
+  if(state.view === 'error') state.view = 'list';
+  renderList();
+});
+document.getElementById('fbStatus').addEventListener('change', function(){
+  state.status = this.value;
+  state.page = 1;
+  if(state.view === 'error') state.view = 'list';
+  renderList();
+});
+document.getElementById('btnClear').addEventListener('click', function(){
+  state.kw = ''; state.pair = ''; state.status = ''; state.view = 'list'; state.page = 1;
+  document.getElementById('fbKw').value = '';
+  document.getElementById('fbPair').value = '';
+  document.getElementById('fbStatus').value = '';
+  renderList();
+  toast('已清空筛选条件');
+});
+
+/* 错误态重试 */
+document.getElementById('btnRetry').addEventListener('click', function(){
+  state.view = 'list';
+  renderList();
+  toast('历史记录已重新载入','ok');
+});
+
+/* 演示入口：URL 传入 fail=1 触发错误态 */
+(function(){
+  var qs = new URLSearchParams(location.search);
+  if(qs.get('fail') === '1'){
+    state.view = 'error';
+  }
+})();
+
+/* ================= 启动 ================= */
+renderList();
+
+/* ===== 系统门户桥接（index.html 壳用，单页直开无副作用）sysBridge v2 ===== */
+(function(){
+  try{
+    if(window.parent && window.parent!==window){
+      window.parent.postMessage({type:'sys-page',page:'P9',name:'检索历史'},'*');
+    }
+  }catch(e){}
+})();
+
+
+
+/* ===== 研发说明抽屉（九页统一：头部胶囊入口 + 右侧 520px 抽屉） ===== */
+function openDev(){
+  var d = document.getElementById('devDrawer'), m = document.getElementById('devMask');
+  if(d) d.classList.add('open');
+  if(m) m.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeDev(){
+  var d = document.getElementById('devDrawer'), m = document.getElementById('devMask');
+  if(d) d.classList.remove('open');
+  if(m) m.classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeDev(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# 跨模态检索中心 · 算子服务
+# 用法：权重放到 ./weight（三个模型子目录，见 docs/部署说明.md 第二节），然后
+#   docker compose up -d --build
+# 验证：curl http://127.0.0.1:6300/healthz
+services:
+  cmr-operators:
+    build: .
+    image: cmr-operators:1.0
+    container_name: cmr-operators
+    ports:
+      - "6300:6300"          # 对外唯一端口
+    environment:
+      CMR_MODEL_ROOT: /weight    # 覆盖 config.yaml 的 paths.model_root，无需改文件
+    volumes:
+      - ./weight:/weight         # 模型权重（宿主机准备，不进镜像）
+      - ./runtime:/app/runtime   # 任务上传/输出/索引，落宿主机持久化
+    restart: unless-stopped

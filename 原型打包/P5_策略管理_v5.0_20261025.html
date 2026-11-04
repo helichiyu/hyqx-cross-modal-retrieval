@@ -1,0 +1,1904 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>策略管理 · 跨模态检索中心</title>
+<style>
+:root{
+  /* 清爽冷白蓝 token（与 P1 定稿基准一致） */
+  --workspace-bg:#f6f9fe;
+  --module-bg:#f3f8ff;
+  --content-card:#ffffff;
+  --content-soft:#fbfdff;
+  --flow-card:#f8fbff;
+  --content-line:#e6edf8;
+  --content-line-strong:#d9e7f8;
+  --system-blue:#4169f6;
+  --system-blue-weak:#f1f5ff;
+  --ink:#1f2937;
+  --muted:#667085;
+  --success:#34a853;
+  --warning:#f0a020;
+  --error:#e5484d;
+  --text-primary:#262626;
+  --text-secondary:#8c8c8c;
+  --radius:8px;
+  --shadow-card:0 2px 8px rgba(31,58,122,.05);
+  --shadow-pop:0 10px 22px rgba(64,80,112,.14);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--workspace-bg);
+  color:var(--text-primary);
+  font-size:14px;
+  line-height:1.5;
+  display:flex;
+}
+button{font-family:inherit;cursor:pointer}
+::selection{background:rgba(65,105,246,.16)}
+
+/* ============ 左侧全局导航（与P1同壳） ============ */
+.sidebar{
+  width:220px;flex-shrink:0;
+  background:#fff;border-right:1px solid var(--content-line);
+  display:flex;flex-direction:column;
+  height:100vh;position:sticky;top:0;
+}
+.brand{
+  padding:18px 18px 14px;
+  display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid var(--content-line);
+}
+.brand .logo{
+  width:30px;height:30px;border-radius:7px;flex-shrink:0;
+  background:linear-gradient(135deg,#4169f6,#6e8cff);
+  display:grid;place-items:center;color:#fff;font-size:15px;font-weight:700;
+}
+.brand b{font-size:14px;color:#16204a;display:block;line-height:1.25}
+.brand span{font-size:11px;color:var(--text-secondary)}
+.nav-scroll{flex:1;overflow-y:auto;padding:10px 12px}
+.nav-item{
+  display:flex;align-items:center;gap:9px;
+  padding:9px 10px;margin-bottom:2px;
+  border-radius:6px;color:#344054;font-size:13px;
+  cursor:pointer;user-select:none;
+}
+a.nav-item{text-decoration:none;color:#344054}
+.nav-item .ico{width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:#8a96ad;flex-shrink:0}
+.nav-item .ico svg{width:16px;height:16px;display:block}
+.nav-item.active .ico{color:var(--system-blue)}
+.nav-item:hover{background:var(--system-blue-weak);color:var(--system-blue)}
+.nav-item.active{
+  background:var(--system-blue-weak);color:var(--system-blue);font-weight:600;
+  box-shadow:inset 2px 0 0 var(--system-blue);
+}
+.nav-divider{height:1px;background:var(--content-line);margin:8px 10px}
+
+/* ============ 主区 ============ */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+.crumb-bar{
+  height:40px;flex-shrink:0;
+  background:#fff;border-bottom:1px solid var(--content-line);
+  display:flex;align-items:center;gap:14px;padding:0 24px;
+  position:sticky;top:0;z-index:20;
+}
+.crumb{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.crumb b{color:var(--system-blue);font-weight:600}
+.crumb .sep{color:#c4cede}
+.crumb-spacer{flex:1}
+.crumb-note{font-size:11px;color:#9aa6bd;border:1px solid #e6edf8;border-radius:10px;padding:1px 9px;background:var(--content-soft)}
+.hb-time{font-size:11px;color:#9aa6bd;font-variant-numeric:tabular-nums}
+.content{padding:20px 24px 32px;display:flex;flex-direction:column;gap:16px;max-width:1280px;width:100%;margin:0 auto}
+.card{border:1px solid #e4edf8;border-radius:var(--radius);background:#fff}
+
+/* 模块介绍（与P1同构） */
+.module-intro{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:18px 20px;
+  border:1px solid #e4edf8;
+  border-radius:10px;
+  background:#fff;
+}
+.module-intro h2{font-size:20px;font-weight:700;color:#111827;margin-bottom:7px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tag-mvp{
+  font-size:11px;font-weight:600;color:var(--system-blue);
+  background:var(--system-blue-weak);border:1px solid #d7e0ff;
+  padding:2px 8px;border-radius:10px;white-space:nowrap;
+}
+.module-intro p{color:var(--muted);line-height:1.65;max-width:760px;font-size:13px}
+.module-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.module-summary article{
+  padding:12px 14px;border:1px solid #e0eaf7;border-radius:8px;
+  background:linear-gradient(180deg,#fff 0%,#f8fbff 100%);
+  display:flex;flex-direction:column;justify-content:center;
+}
+.module-summary span{font-size:12px;color:#7a8493}
+.module-summary strong{display:block;margin-top:6px;color:#1f2a44;font-size:23px;font-weight:700;font-variant-numeric:tabular-nums}
+.module-summary em{font-style:normal;font-size:11px;color:#9aa6bd;margin-top:2px}
+.health-skel{display:inline-block;width:52px;height:16px;border-radius:4px;background:linear-gradient(90deg,#eef2f8,#f7f9fd,#eef2f8);background-size:200% 100%;animation:shimmer 1.2s infinite}
+@keyframes shimmer{to{background-position:-200% 0}}
+
+/* 分区标题 */
+.sec-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sec-head .sec-title{font-size:15px;font-weight:700;color:#1f2a44}
+.sec-head .sec-sub{font-size:12px;color:#9aa6bd}
+.sec-head::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--system-blue)}
+.sec-head .head-act{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+/* 面板容器 */
+.panel{border:1px solid #e4edf8;border-radius:var(--radius);background:#fff;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.panel-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pnum{
+  width:22px;height:22px;border-radius:6px;flex-shrink:0;
+  background:var(--system-blue-weak);color:var(--system-blue);
+  font-weight:700;font-size:12px;display:grid;place-items:center;
+  border:1px solid #d7e0ff;
+}
+.panel-head .p-title{font-size:15px;font-weight:700;color:#1f2a44}
+.panel-head .p-sub{font-size:12px;color:#9aa6bd}
+/* 策略运维：先选一条策略，再评估 / 回滚 */
+.ops-pick{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ops-pick .ed-select{width:340px;min-width:0;max-width:100%}
+.ops-meta{font-size:11.5px;color:#98a2b3;display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ops-meta b{color:#475467;font-weight:600}
+.panel-head .p-act{margin-left:auto;display:flex;gap:8px;align-items:center}
+.note-line{font-size:11.5px;color:#9aa6bd;line-height:1.6}
+
+
+/* 变更评估：先判断有无待发布变更，再决定是否展示 diff / 影响 */
+.eval-state{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #e6edf8;border-radius:8px;background:#f7f9fc;padding:11px 13px;margin:12px 0 12px}
+.eval-state .es-main{font-size:13px;font-weight:700;color:#475467}
+.eval-state .es-main b{color:var(--system-blue);font-variant-numeric:tabular-nums}
+.eval-state .es-sub{font-size:11.5px;color:#98a2b3;font-variant-numeric:tabular-nums}
+.eval-state.pending{background:#fffaf0;border-color:#f5e3bd}
+.eval-state.pending .es-main{color:#8a6116}
+.eval-state.pending .es-main b{color:#b57500}
+.ver-draft{background:#fffaf0}
+
+/* 变更评估：三项影响（场景 / 任务量 / 评测），各自标来源 */
+.eval-src{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.eval-src .src-item{border:1px solid #e6edf8;border-radius:8px;background:#f8fbff;padding:8px 11px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.eval-src .si-main{font-size:12.5px;color:#475467;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eval-src .si-main b{color:#1f2a44;font-weight:700;font-variant-numeric:tabular-nums}
+.eval-src .si-src{font-size:10.5px;color:#98a2b3}
+@media (max-width:900px){.eval-src{grid-template-columns:1fr}}
+/* 变更评估：diff + 影响下方的发布 / 放弃一行 */
+.eval-act{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid #eef2f8}
+.eval-act .btn-primary{height:32px;padding:0 18px;font-size:12.5px;box-shadow:0 2px 6px rgba(65,105,246,.22)}
+.eval-act .mini-btn{height:32px;padding:0 14px;font-size:12.5px}
+
+/* 迷你表格 */
+.mini-table{border:1px solid #eef2f8;border-radius:8px;overflow:hidden}
+.mt-row{
+  min-height:38px;padding:9px 12px;border-top:1px solid #eef2f8;
+  display:grid;grid-template-columns:var(--tc,minmax(0,1fr) 100px);gap:8px;align-items:center;
+  font-size:12px;
+}
+.mt-row:first-child{border-top:0}
+.mt-row.head{color:#7a8493;background:#f4f6fb;font-weight:700;font-size:11.5px;min-height:34px}
+.mt-row:not(.head):hover{background:#f8fbff}
+.mt-row .q{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#273244}
+.mt-row .c{color:var(--muted);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ================= 分页组件（表格下方 · 右对齐） ================= */
+.pager-bar{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:#667085}
+.pager-total{color:#8a96ad;margin-right:4px;font-variant-numeric:tabular-nums}
+.pager-btn,.pager-num{height:28px;border:1px solid #d7e0f0;background:#fff;border-radius:5px;color:#475467;font-size:12px;cursor:pointer;font-family:inherit}
+.pager-btn{padding:0 10px}
+.pager-num{min-width:28px;padding:0 6px;font-variant-numeric:tabular-nums}
+.pager-btn:hover:not(:disabled),.pager-num:hover:not(.is-cur){border-color:#4169f6;color:#4169f6}
+.pager-btn:disabled{opacity:.45;cursor:not-allowed}
+.pager-num.is-cur{background:#4169f6;border-color:#4169f6;color:#fff;font-weight:700;cursor:default}
+.pager-gap{color:#98a2b3;padding:0 2px}
+.mt-row .num{color:#1f2a44;font-weight:600;font-variant-numeric:tabular-nums}
+.badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;display:inline-block;justify-self:start;white-space:nowrap}
+.badge.ok{background:#e8f7ec;color:var(--success)}
+.badge.fail{background:#fdecec;color:var(--error)}
+.badge.run{background:#e9f0ff;color:var(--system-blue)}
+.badge.warn{background:#fdf3e1;color:#c98a12}
+.badge.pend{background:#f0f2f6;color:#667085}
+.badge.lock{background:#f4f5f8;color:#a8b0c0}
+
+/* 小按钮 */
+.mini-btn{
+  height:26px;padding:0 10px;border-radius:4px;border:1px solid #d7e0f0;
+  background:#fff;color:#475467;font-size:12px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;
+}
+.mini-btn:hover{border-color:var(--system-blue);color:var(--system-blue)}
+.mini-btn.primary{background:var(--system-blue);border-color:var(--system-blue);color:#fff}
+.mini-btn.primary:hover{background:#335be8;color:#fff}
+.mini-btn.danger{color:var(--error);border-color:#f3c4c6}
+.mini-btn.danger:hover{border-color:var(--error);color:var(--error)}
+.mini-btn:disabled{opacity:.6;cursor:default}
+.btn-primary{
+  height:34px;padding:0 22px;border:0;border-radius:6px;
+  background:var(--system-blue);color:#fff;font-size:13px;font-weight:600;
+  display:inline-flex;align-items:center;gap:7px;
+  box-shadow:0 3px 8px rgba(65,105,246,.25);transition:all .15s;
+}
+.btn-primary:hover{background:#335be8}
+.btn-ghost{
+  height:34px;padding:0 16px;border-radius:6px;border:1px solid #d7e0f0;
+  background:#fff;color:#475467;font-size:13px;
+}
+.btn-ghost:hover{border-color:var(--system-blue);color:var(--system-blue)}
+.small-primary{height:30px;padding:0 14px;border:0;border-radius:4px;background:var(--system-blue);color:#fff;font-size:12px;font-weight:600}
+.small-primary:hover{background:#335be8}
+.spinner{
+  width:13px;height:13px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;
+  border-radius:50%;animation:spin .7s linear infinite;display:inline-block;
+}
+.spinner.blue{border-color:rgba(65,105,246,.3);border-top-color:var(--system-blue)}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 参数行（向量模型 / 融合权重 / 重排开关：只留参数，不逐段确认） */
+.ed-op{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ed-pick{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:#5b6472}
+.ed-select{
+  height:32px;min-width:260px;border:1px solid #cfd8e8;border-radius:6px;background:#fff;
+  padding:0 10px;font-size:13px;color:var(--text-primary);outline:none;
+}
+.ed-select:focus{border-color:#8fa3ff;box-shadow:0 0 0 2px rgba(65,105,246,.12)}
+.ed-select:disabled{background:#f5f7fb;color:#3f4a5c;cursor:default;opacity:1}
+.ed-fixed{font-size:11.5px;color:#9aa6bd}
+.ed-input{
+  flex:1 1 auto;min-width:240px;height:32px;border:1px solid #cfd8e8;border-radius:6px;background:#fff;
+  padding:0 10px;font-size:13px;color:var(--text-primary);outline:none;font-family:inherit;
+}
+.ed-input:focus{border-color:#8fa3ff;box-shadow:0 0 0 2px rgba(65,105,246,.12)}
+.ed-switch{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:#5b6472;cursor:pointer}
+.ed-switch input{width:16px;height:16px;accent-color:var(--system-blue);cursor:pointer}
+.ed-switch b{color:#1f2a44;font-weight:600}
+
+/* 融合权重滑块（唯一可调参数，极简实现） */
+.fuse-wrap{display:flex;flex-direction:column;gap:7px;max-width:720px}
+.fslider{display:grid;grid-template-columns:44px minmax(0,1fr) 48px;gap:10px;align-items:center;font-size:12.5px;color:#5b6472}
+.fslider input[type=range]{width:100%;accent-color:var(--system-blue)}
+.fslider b{text-align:right;font-variant-numeric:tabular-nums;color:#1f2a44;font-size:12px;font-weight:600}
+.sum-line{font-size:12px;color:var(--muted)}
+.sum-line b{color:var(--success);font-variant-numeric:tabular-nums}
+.sum-line.over b{color:var(--error)}
+.ed-form .fld.ro b{display:flex;align-items:center;height:32px;font-size:13px;color:#1f2a44;font-weight:600}
+
+/* 只读行 */
+.ro-line{display:flex;gap:10px;font-size:12.5px}
+.ro-line span{color:#9aa6bd;min-width:78px;flex-shrink:0}
+.ro-line b{color:#1f2a44;font-weight:600}
+
+.sk-row{height:34px;border-radius:6px;background:linear-gradient(90deg,#eef2f8,#f7f9fd,#eef2f8);background-size:200% 100%;animation:shimmer 1.2s infinite;margin-bottom:6px}
+
+/* Tab */
+.tabbar{display:flex;gap:2px;border-bottom:1px solid var(--content-line);overflow-x:auto}
+.tabbar button{
+  border:0;background:transparent;padding:10px 16px;font-size:13px;color:var(--muted);
+  position:relative;white-space:nowrap;
+}
+.tabbar button:hover{color:var(--system-blue)}
+.tabbar button.active{color:var(--system-blue);font-weight:600}
+.tabbar button.active::after{content:"";position:absolute;left:11px;right:11px;bottom:-1px;height:2px;background:var(--system-blue);border-radius:2px}
+
+/* 横幅 */
+.err-banner{
+  display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:8px;
+  background:#fff5f5;border:1px solid #f8d7d9;color:#b3373c;font-size:12.5px;flex-wrap:wrap;
+}
+.warn-banner{
+  display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:8px;
+  background:#fff8ea;border:1px solid #f5e3bd;color:#8a6116;font-size:12.5px;flex-wrap:wrap;
+}
+.ok-banner{
+  display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:8px;
+  background:#f2fbf4;border:1px solid #cdeed6;color:#1e7a43;font-size:12.5px;flex-wrap:wrap;
+}
+.banner-act{margin-left:auto;display:flex;gap:8px}
+.warn-banner.em{animation:glow 1.4s 3}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(240,160,32,0)}50%{box-shadow:0 0 0 5px rgba(240,160,32,.25)}}
+
+/* 弹层（与P1同构） */
+.modal-mask{
+  position:fixed;inset:0;background:rgba(23,33,66,.42);z-index:130;
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+.modal-mask.show{display:flex}
+.modal-box{
+  width:480px;max-width:100%;background:#fff;border-radius:10px;
+  box-shadow:0 16px 48px rgba(20,32,70,.28);overflow:hidden;
+  animation:pop .18s ease;
+}
+@keyframes pop{from{transform:translateY(8px) scale(.98);opacity:0}to{transform:none;opacity:1}}
+.modal-head{padding:16px 20px 0;display:flex;align-items:flex-start;justify-content:space-between}
+.modal-head h3{font-size:16px;color:#1f2a44;display:flex;align-items:center;gap:8px}
+.modal-close{border:0;background:transparent;color:#b3bccc;font-size:18px;line-height:1}
+.modal-close:hover{color:#667085}
+.modal-body{padding:12px 20px 4px;font-size:13px;color:#344054;line-height:1.7}
+.modal-body .mb-tip{font-size:12px;color:var(--muted);margin-bottom:10px}
+.checkline{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;margin:5px 0}
+.checkline .ok-ico{color:var(--success);font-weight:700}
+.modal-foot{padding:12px 20px 18px;display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:8px;border-top:1px solid #f0f4fb}
+.modal-foot .modal-note{margin-right:auto;font-size:11px;color:#b3bccc}
+.modal-foot a{font-size:12.5px;color:var(--system-blue);text-decoration:underline;text-underline-offset:3px}
+
+/* ===== 最小交互补丁：一致性检查 / 生效回执 ===== */
+.act-wrap{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chk-line{display:none;font-size:11.5px;color:#1e7a43;background:#f2fbf4;border:1px solid #cdeed6;border-radius:4px;padding:1px 8px;white-space:nowrap}
+.chk-line.show{display:inline-block}
+.receipt{display:none;border:1px dashed #b7e2c4;background:#f7fdf9;border-radius:8px;padding:9px 12px;font-size:12px;color:#3d6b52;margin-top:8px}
+.receipt.show{display:block}
+.receipt .rc-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700;color:#1e7a43;margin-bottom:5px}
+.receipt .rc-id{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;background:#e8f7ec;border-radius:4px;padding:0 6px;letter-spacing:.2px;color:#1e7a43}
+.receipt .rc-line{line-height:1.75}
+.receipt .rc-line span{color:#7a9c88}
+.modal-box.wide{width:660px}
+.modal-box.wide .modal-body{max-height:58vh;overflow:auto}
+.fld{display:block;font-size:12px;color:#475467;margin:10px 0 4px}
+.fld input,.fld select{width:100%;height:32px;border:1px solid #cfd8e8;border-radius:6px;padding:0 10px;font-size:13px;background:#fff;outline:none;color:var(--text-primary)}
+
+/* 权限遮罩 */
+.placeholder-mask{
+  position:fixed;inset:0;background:rgba(23,33,66,.45);z-index:140;
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+.placeholder-mask.show{display:flex}
+.placeholder-box{
+  width:720px;max-width:100%;background:#fff;border-radius:12px;padding:28px 28px 24px;
+  box-shadow:0 20px 60px rgba(20,32,70,.3);text-align:center;
+}
+.placeholder-box .pb-ico{
+  width:54px;height:54px;border-radius:14px;background:var(--system-blue-weak);
+  display:grid;place-items:center;font-size:24px;margin:0 auto 14px;
+}
+.placeholder-box h3{font-size:17px;color:#1f2a44;margin-bottom:8px}
+.placeholder-box p{font-size:12.5px;color:var(--muted);margin-bottom:6px;line-height:1.7}
+
+/* 全局消息 */
+.toast{
+  position:fixed;top:56px;left:50%;transform:translateX(-50%) translateY(-12px);
+  z-index:200;background:#2b3245;color:#fff;font-size:13px;
+  padding:9px 18px;border-radius:7px;box-shadow:0 8px 24px rgba(20,32,70,.25);
+  opacity:0;pointer-events:none;transition:all .2s;display:flex;align-items:center;gap:7px;
+  max-width:80vw;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#c0392b}
+.toast.ok{background:#1e8e4a}
+
+/* ===== 分层结构：主 Tab + 页面级大弹窗编辑（策略列表常驻，弹窗覆盖其上） ===== */
+.main-tabbar{background:#fff;border:1px solid #e4edf8;border-radius:var(--radius);padding:0 6px;gap:4px}
+.main-tabbar button{padding:12px 22px;font-size:13.5px}
+#ptab-config,#ptab-scene,#ptab-ops{display:flex;flex-direction:column;gap:16px}
+#configListView{display:flex;flex-direction:column;gap:16px}
+
+/* 列表行：点行 / 「编辑」→ 弹出策略编辑弹窗 */
+.mt-row.clickable{cursor:pointer}
+.mt-row.clickable:hover{background:#f8fbff}
+.mt-row.sel{background:#f3f8ff;box-shadow:inset 3px 0 0 var(--system-blue)}
+.mt-row.sel .q{color:var(--system-blue);font-weight:600}
+.mt-row.sel:hover{background:#eff5ff}
+.mt-row.flash{background:#f2fbf4;transition:background .2s}
+
+/* ===== 策略编辑弹窗：页面级大弹窗（≈900px / 88vw · max-height 86vh · 内部滚动 · 底部钉住） ===== */
+.modal-mask.stg-mask{z-index:120;padding:24px 18px}
+.stg-modal{
+  width:900px;max-width:88vw;max-height:86vh;
+  display:flex;flex-direction:column;background:#fff;border-radius:12px;
+  box-shadow:0 24px 64px rgba(20,32,70,.32);overflow:hidden;
+  animation:pop .18s ease;
+}
+.stg-head{
+  flex:0 0 auto;display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;
+  padding:13px 18px;border-bottom:1px solid var(--content-line);background:#fff;
+}
+.ed-tt{font-size:15px;font-weight:700;color:#1f2a44;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.ed-tt::before{content:"";width:3px;height:15px;border-radius:2px;background:var(--system-blue)}
+.stg-head .ed-tt{flex:1 1 auto}
+.stg-close{
+  margin-left:auto;width:30px;height:30px;flex:0 0 auto;border:0;border-radius:6px;
+  background:#f2f4f8;color:#667085;font-size:18px;line-height:1;
+}
+.stg-close:hover{background:#e6eaf2;color:#1f2a44}
+.stg-body{
+  flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  padding:14px 18px 16px;display:flex;flex-direction:column;gap:12px;background:#fbfdff;
+}
+.stg-foot{
+  flex:0 0 auto;z-index:1;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:11px 18px;background:#fff;border-top:1px solid var(--content-line);
+  box-shadow:0 -6px 18px rgba(31,58,122,.06);
+}
+.stg-foot .sp{flex:1}
+.stg-foot .btn-primary{height:32px;padding:0 18px;font-size:12.5px;box-shadow:0 2px 6px rgba(65,105,246,.22)}
+.stg-foot .btn-ghost{height:32px;padding:0 14px;font-size:12.5px}
+.stg-foot .mini-btn{height:32px;padding:0 14px;font-size:12.5px}
+.ed-sec{
+  background:#fff;border:1px solid #e4edf8;border-radius:10px;
+  padding:14px 16px;display:flex;flex-direction:column;gap:11px;
+  box-shadow:var(--shadow-card);
+}
+.ed-sec-head{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.ed-sec-head .p-title{font-size:15px;font-weight:700;color:#1f2a44}
+.ed-sec-head .p-act{margin-left:auto;display:flex;gap:6px;align-items:center}
+.ed-sec.collapsed > *:not(.ed-sec-head){display:none}
+.ed-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 12px}
+.ed-form .fld{margin:6px 0 4px}
+.ed-form .fld.full{grid-column:span 2}
+.card-note{
+  font-size:12px;color:#5b6472;line-height:1.75;
+  background:#f8fbff;border:1px dashed #dfe8f7;border-radius:8px;padding:9px 12px;
+}
+.card-note .ico{color:var(--system-blue);font-weight:700;margin-right:5px}
+.card-note b{color:#1f2a44}
+.ev-subblock{display:flex;flex-direction:column;gap:8px;margin-top:2px}
+.ev-subblock .sub-title{font-size:13px;font-weight:700;color:#1f2a44;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.ev-subblock .sub-title::before{content:"";width:3px;height:12px;border-radius:2px;background:#c7d6f2}
+.ev-subblock .sub-sub{font-size:11.5px;color:#9aa6bd;font-weight:400}
+@media(max-width:1100px){
+  .ed-form{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ed-form .fld.full{grid-column:1/-1}
+}
+
+/* 场景字典（场景管理） */
+.scene-link{font-size:11.5px;color:var(--system-blue);text-decoration:none;border-bottom:1px dashed #9dbcf5;white-space:nowrap;cursor:pointer}
+.scene-link:hover{border-bottom-style:solid;color:#335be8}
+#sceneTable .mt-row .q{white-space:normal;line-height:1.45}
+#sceneTable .num{font-size:14px}
+.scene-desc{font-size:11px;color:#98a2b3;margin-top:2px;line-height:1.45;white-space:normal}
+.scene-form{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.5fr) auto;gap:10px;align-items:end;border:1px solid #e6edf8;border-radius:8px;padding:12px;background:#fbfdff}
+.scene-form .fld{margin:0}
+.scene-form-act{display:flex;gap:8px}
+.tag-preset{font-size:10px;font-weight:600;color:#8a6116;background:#fdf3e1;border:1px solid #f5e3bd;border-radius:4px;padding:0 5px;margin-left:5px;white-space:nowrap;vertical-align:1px;display:inline-block}
+.act-wrap .tag-preset{margin-left:0;align-self:center;vertical-align:middle}
+@media(max-width:900px){.scene-form{grid-template-columns:1fr}}
+
+/* ===== 研发说明入口（九页统一：头部胶囊按钮 + 右侧抽屉） ===== */
+.dev-entry{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px 0 5px;border:1px solid #d7e0f0;border-radius:999px;background:#fff;color:#667085;font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+.dev-entry:hover{border-color:#b9c9ff;background:var(--system-blue-weak);color:var(--system-blue)}
+.dev-entry:hover .de-q{background:var(--system-blue);color:#fff}
+.dev-entry:focus-visible{outline:2px solid #cdd9ff;outline-offset:1px}
+.dev-entry .de-q{width:20px;height:20px;border-radius:50%;flex:0 0 auto;background:var(--system-blue-weak);color:var(--system-blue);font-size:12px;font-weight:700;line-height:20px;text-align:center;transition:background .15s,color .15s}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;letter-spacing:.2px}
+/* 右侧抽屉：520px / 全高 / 从右滑入 + 半透明遮罩 */
+.dev-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:10000;opacity:0;pointer-events:none;transition:opacity .22s}
+.dev-mask.open{opacity:1;pointer-events:auto}
+.dev-drawer{position:fixed;top:0;right:0;width:720px;max-width:100vw;height:100vh;background:#f6f8fc;z-index:10001;display:flex;flex-direction:column;transform:translateX(102%);transition:transform .28s ease;box-shadow:-8px 0 30px rgba(15,23,42,.18)}
+.dev-drawer.open{transform:translateX(0)}
+.dev-head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:#fff;border-bottom:1px solid #e4eaf3;flex:0 0 auto}
+.dev-head h3{margin:0;font-size:15px;color:#1f2937}
+.dev-head .dh-tag{font-size:11px;font-weight:600;color:#b54708;background:#fdf3e6;border-radius:4px;padding:2px 8px}
+.dev-close{margin-left:auto;width:28px;height:28px;border:none;background:#f2f4f8;border-radius:6px;font-size:15px;line-height:1;cursor:pointer;color:#475467;flex:0 0 auto}
+.dev-close:hover{background:#e6eaf2}
+.dev-body{flex:1;min-height:0;overflow:auto;padding:16px 18px 36px}
+.dev-ov{background:#fff;border:1px solid #e4eaf3;border-radius:10px;padding:14px 18px;margin-bottom:16px}
+.dev-ov h4{margin:0 0 6px;font-size:13px;color:#1f5fd4}
+.dev-ov p{margin:0;line-height:1.75;color:#475467;font-size:12.5px}
+.ov-grid{display:grid;grid-template-columns:1fr;gap:12px}
+.dev-card{background:#fff;border:1px solid #e4eaf3;border-radius:10px;margin-bottom:14px;overflow:hidden;scroll-margin-top:14px}
+.dc-head{display:flex;align-items:center;gap:8px;padding:11px 16px;background:#fbfcfe;border-bottom:1px solid #eef2f8}
+.dc-id{font-size:11px;font-weight:700;color:#fff;background:#b54708;border-radius:4px;padding:1px 7px;flex:0 0 auto}
+.dc-name{font-size:13.5px;font-weight:700;color:#1f2937}
+.dc-body{padding:6px 16px 12px}
+.dc-row{display:flex;gap:10px;padding:7px 0;border-bottom:1px dashed #f0f3f8;font-size:12.5px;line-height:1.7}
+.dc-row:last-child{border-bottom:none}
+.dc-k{flex:0 0 78px;font-weight:700;color:#344054}
+.dc-v{flex:1;color:#475467}
+.dc-v ul{margin:0;padding-left:17px}
+.dc-v li{margin:2px 0}
+.k-in .dc-k{color:#027a48}.k-out .dc-k{color:#1f5fd4}.k-err .dc-k{color:#c0362c}.k-dep .dc-k{color:#7a5af8}
+.demo-limit{display:inline-block;font-size:10.5px;font-weight:600;color:#b54708;background:#fdf3e6;border:1px solid #f6d9b0;border-radius:4px;padding:0 6px;margin-left:6px;vertical-align:1px}
+.dev-xref{color:#1f5fd4;font-weight:700;text-decoration:none;border-bottom:1px dashed #9dbcf5;padding:0 1px;white-space:nowrap}
+.dev-xref:hover{background:#eaf1fe;border-bottom-style:solid}
+@media print{.dev-card{break-inside:avoid}.demo-limit{border:1px solid #ccc}}
+</style>
+</head>
+<body>
+
+<!-- ============ 左侧导航（九页互通） ============ -->
+<aside class="sidebar">
+    <div class="nav-scroll">
+    <a class="nav-item" href="P1_检索台_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span>检索台</a>
+    <a class="nav-item" href="P9_检索历史_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></svg></span>检索历史</a>
+    <div class="nav-divider"></div>
+    <a class="nav-item admin-nav" href="P4_库管理_v5.2_20261026.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6"/><path d="M5 12v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6"/></svg></span>库管理</a>
+    <a class="nav-item admin-nav active" href="P5_策略管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="10" cy="17" r="1.6"/></svg></span>策略管理</a>
+    <a class="nav-item admin-nav" href="P6_任务管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="12" height="16" rx="2"/><path d="M9 5V3.5h6V5"/><path d="M9 10h6M9 14h6M9 18h4"/></svg></span>任务管理</a>
+    <a class="nav-item admin-nav" href="P7_结果运营_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>结果运营</a>
+    <a class="nav-item admin-nav" href="P8_评测_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="13" width="3" height="4"/><rect x="12" y="9" width="3" height="8"/><rect x="17" y="5" width="3" height="12"/></svg></span>效果评测</a>
+  </div>
+</aside>
+
+<!-- ============ 主区 ============ -->
+<div class="main">
+
+  <div class="content">
+
+    <!-- 模块介绍 -->
+    <section class="module-intro">
+      <div>
+        <h2>策略管理</h2>
+        <p>配置检索策略（向量 / 融合 / 重排），并管理其生效、变更与回滚。</p>
+      </div>
+      <button class="dev-entry" id="devEntry" type="button" onclick="openDev()" title="研发说明"><span class="de-q" aria-hidden="true">?</span>研发说明</button>
+    </section>
+
+    <!-- 主 Tab：① 策略配置 / ② 业务场景字典 / ③ 策略运维 -->
+    <div class="tabbar main-tabbar" id="ptabBar" role="tablist" aria-label="策略管理主标签">
+      <button type="button" class="active" data-t="config" role="tab" onclick="activateTab('ptabBar','ptab-',this)">① 策略配置</button>
+      <button type="button" data-t="scene" role="tab" onclick="activateTab('ptabBar','ptab-',this)">② 业务场景字典</button>
+      <button type="button" data-t="ops" role="tab" onclick="activateTab('ptabBar','ptab-',this)">③ 策略运维</button>
+    </div>
+
+    <!-- ===== Tab1 策略配置：策略列表常驻 + 新建/编辑策略弹窗（页面级大弹窗） ===== -->
+    <div id="ptab-config">
+
+      <!-- ===== 列表视图（常驻，弹窗只覆盖其上） ===== -->
+      <div id="configListView">
+
+      <!-- 策略列表（置顶）：4 条业务演示策略 + 系统默认兜底（系统预置）/ 行内「编辑」 -->
+      <section class="panel" style="padding:14px 18px" data-mod="策略列表">
+        <div class="panel-head">
+          <div class="sec-head">
+            <span class="p-title">策略列表</span>
+            
+          </div>
+          <div class="p-act">
+            <a class="mini-btn" id="listGoP1" href="P1_检索台_v5.0_20261025.html" style="display:none">前往检索台 →</a>
+            <button class="mini-btn primary" type="button" onclick="openNewStrategy()">＋ 新建策略</button>
+          </div>
+        </div>
+        <div class="mini-table" id="strategyTable" style="--tc:118px minmax(0,1.15fr) 140px 56px 128px 118px 196px">
+          <div class="mt-row head"><div>策略ID</div><div>名称</div><div>适用场景</div><div>版本</div><div>状态</div><div>更新时间</div><div>操作</div></div>
+          <div class="mt-row clickable" onclick="editStrategy(this)" data-code="STG261025A3F9KX" data-name="作业场景检索策略" data-scene="训练数据筛选" data-ver="v3" data-status="生效中" data-model="图文对齐 · CLIP双塔 v3" data-w="50,30,10,10" data-rerank="on">
+            <div class="q mono">STG261025A3F9KX</div><div class="c">作业场景检索策略</div><div class="c">训练数据筛选</div><div class="num">v3</div><span class="badge ok" data-role="status">生效中</span><div class="c">2026-10-25 00:12</div>
+            <div class="act-wrap"><button class="mini-btn primary" type="button" onclick="event.stopPropagation();editStrategy(this)">编辑</button></div>
+          </div>
+          <div class="mt-row clickable" onclick="editStrategy(this)" data-code="STG261022P6L4MN" data-name="专业场景检索策略" data-scene="专业" data-ver="v2" data-status="生效中" data-model="图文对齐 · CLIP双塔 v3" data-w="45,35,10,10" data-rerank="on">
+            <div class="q mono">STG261022P6L4MN</div><div class="c">专业场景检索策略</div><div class="c">专业</div><div class="num">v2</div><span class="badge ok" data-role="status">生效中</span><div class="c">2026-10-22 16:40</div>
+            <div class="act-wrap"><button class="mini-btn primary" type="button" onclick="event.stopPropagation();editStrategy(this)">编辑</button></div>
+          </div>
+          <div class="mt-row clickable" onclick="editStrategy(this)" data-code="STG261020D8N3QR" data-name="票证管理检索策略" data-scene="通用" data-ver="v2" data-status="生效中" data-model="图文对齐 · CLIP双塔 v3" data-w="50,30,10,10" data-rerank="on">
+            <div class="q mono">STG261020D8N3QR</div><div class="c">票证管理检索策略</div><div class="c">通用</div><div class="num">v2</div><span class="badge ok" data-role="status">生效中</span><div class="c">2026-10-20 14:02</div>
+            <div class="act-wrap"><button class="mini-btn primary" type="button" onclick="event.stopPropagation();editStrategy(this)">编辑</button></div>
+          </div>
+          <div class="mt-row clickable" onclick="editStrategy(this)" data-code="STG261024H5T6UW" data-name="阈值收紧（评测建议生成）" data-scene="训练数据筛选" data-ver="v1" data-status="草稿" data-model="图文对齐 · CLIP双塔 v3" data-w="55,25,10,10" data-rerank="on">
+            <div class="q mono">STG261024H5T6UW</div><div class="c">阈值收紧（评测建议生成）</div><div class="c">训练数据筛选</div><div class="num">v1</div><span class="badge pend" data-role="status">草稿</span><div class="c">2026-10-24 11:20</div>
+            <div class="act-wrap"><button class="mini-btn primary" type="button" onclick="event.stopPropagation();editStrategy(this)">编辑</button></div>
+          </div>
+          <div class="mt-row clickable" onclick="editStrategy(this)" data-code="STG261018K7M2PQ" data-name="系统默认策略（兜底）" data-scene="全部场景（兜底）" data-ver="v3" data-status="生效中" data-preset="1" data-model="图文对齐 · CLIP双塔 v3" data-w="25,25,25,25" data-rerank="off">
+            <div class="q mono">STG261018K7M2PQ</div><div class="c">系统默认策略（兜底）</div><div class="c">全部场景（兜底）</div><div class="num">v3</div><span class="badge ok" data-role="status">生效中</span><div class="c">2026-10-18 09:30</div>
+            <div class="act-wrap"><button class="mini-btn primary" type="button" onclick="event.stopPropagation();editStrategy(this)">编辑</button><span class="tag-preset" data-role="preset">系统预置</span></div>
+          </div>
+        </div>
+        <div class="pager-bar" id="stgPager"></div>
+        <div class="note-line" id="listPubHint" style="display:none"></div>
+      </section>
+
+      </div><!-- /configListView -->
+
+      <!-- ===== 策略编辑弹窗（页面级大弹窗）：基本信息 / 向量 / 融合 / 重排 + 钉住底部操作 ===== -->
+      <div class="modal-mask stg-mask" id="strategyMask" onclick="if(event.target===this)closeStrategyEditor()">
+        <div class="stg-modal" role="dialog" aria-modal="true" aria-labelledby="stgTitle">
+          <div class="stg-head">
+            <span class="ed-tt" id="stgTitle">新建策略</span>
+            <span class="tag-preset" id="edPresetTag" style="display:none">系统预置</span>
+            <button class="stg-close" type="button" id="stgCloseBtn" onclick="closeStrategyEditor()" title="关闭（Esc）" aria-label="关闭策略弹窗">×</button>
+          </div>
+          <div class="stg-body" id="edBody">
+
+        <!-- 基本信息：名称 / 适用场景 / 版本 / 状态 -->
+        <section class="ed-sec" id="edBasic" data-mod="策略基本信息">
+          <div class="ed-sec-head">
+            <span class="p-title">基本信息</span>
+          </div>
+          <div class="ed-form">
+            <label class="fld">策略名称<input id="nsName" value="作业场景检索策略" placeholder="请输入策略名称"></label>
+            <label class="fld">适用场景<select id="nsScene"><option>通用</option><option>专业</option><option>作业</option><option selected>训练数据筛选</option></select></label>
+            <div class="fld ro">版本<b id="nsVer">v1</b></div>
+            <div class="fld ro">状态<b id="nsStatus">编辑中</b></div>
+          </div>
+        </section>
+
+      <!-- 向量参数：白名单模型下拉，随三段参数一起保存生效 -->
+      <section class="ed-sec" data-mod="检索特征向量参数管理">
+        <div class="ed-sec-head">
+          <span class="p-title">向量参数</span>
+        </div>
+        <div class="ed-op">
+          <label class="ed-pick">统一向量空间
+            <select id="modelSel" class="ed-select" disabled>
+              <option selected>图文对齐 · CLIP双塔 v3</option>
+            </select>
+          </label>
+          <span class="ed-fixed">统一检索固定一套向量空间，不可切换</span>
+        </div>
+      </section>
+
+      <!-- 融合参数：4 个模态权重滑块，行内校验合计 100% -->
+      <section class="ed-sec" data-mod="检索多模态融合方案管理">
+        <div class="ed-sec-head">
+          <span class="p-title">融合参数</span>
+        </div>
+        <div class="fuse-wrap">
+          <div class="fslider"><span>文本</span><input type="range" id="wTxt" min="0" max="100" value="50" oninput="onWeightChange()"><b id="wTxtV">50%</b></div>
+          <div class="fslider"><span>图像</span><input type="range" id="wImg" min="0" max="100" value="30" oninput="onWeightChange()"><b id="wImgV">30%</b></div>
+          <div class="fslider"><span>视频</span><input type="range" id="wVid" min="0" max="100" value="10" oninput="onWeightChange()"><b id="wVidV">10%</b></div>
+          <div class="fslider"><span>音频</span><input type="range" id="wAud" min="0" max="100" value="10" oninput="onWeightChange()"><b id="wAudV">10%</b></div>
+        </div>
+        <div class="sum-line" id="sumLine">权重合计 <b>100%</b> ✓</div>
+      </section>
+
+      <!-- 重排参数：一个两阶段开关，随三段参数一起保存生效 -->
+      <section class="ed-sec" data-mod="检索重排序方案管理">
+        <div class="ed-sec-head">
+          <span class="p-title">重排参数</span>
+        </div>
+        <div class="ed-op">
+          <label class="ed-switch"><input type="checkbox" id="rerankSw" checked onchange="onSchemeChange('rerank')"><span>启用重排</span><b id="rerankState">开</b></label>
+          <span class="ed-fixed" id="rerankHint">开 = 对候选结果重新排序（更准，稍慢） · 关 = 只按召回顺序返回（更快）</span>
+        </div>
+      </section>
+
+          </div><!-- /stg-body -->
+          <div class="stg-foot">
+            <span class="act-wrap" id="edFootActs"></span>
+            <span class="sp"></span>
+            <button class="btn-ghost" type="button" id="stgCancelBtn" onclick="closeStrategyEditor()">取消</button>
+            <button class="mini-btn" type="button" id="saveDraftBtn" onclick="saveDraft()">保存草稿</button>
+            <button class="btn-primary" type="button" id="pubBtn" onclick="publish()">保存并发布</button>
+          </div>
+        </div><!-- /stg-modal -->
+      </div><!-- /strategyMask -->
+
+    </div><!-- /ptab-config -->
+
+    <!-- ===== Tab2 业务场景字典（场景管理）：场景列表 + 新建场景 + 查看关联策略 ===== -->
+    <div id="ptab-scene" style="display:none">
+
+      <section class="panel" style="padding:14px 18px" data-mod="业务场景字典（场景管理）">
+        <div class="panel-head">
+          <div class="sec-head">
+            <span class="p-title">业务场景字典</span>
+            
+          </div>
+          <div class="p-act">
+            <button class="mini-btn primary" type="button" id="sceneNewBtn" onclick="openNewScene()">＋ 新建场景</button>
+          </div>
+        </div>
+        
+
+        <!-- 新建场景（小表单 · 演示态前端数组） -->
+        <div class="scene-form" id="sceneNewForm" style="display:none">
+          <label class="fld">场景名<input id="newSceneName" placeholder="例如：合同审核" autocomplete="off"></label>
+          <label class="fld">描述<input id="newSceneDesc" placeholder="一句话说明该场景的检索用途" autocomplete="off"></label>
+          <div class="scene-form-act">
+            <button class="mini-btn primary" type="button" onclick="createScene()">创建场景</button>
+            <button class="mini-btn" type="button" onclick="cancelNewScene()">取消</button>
+          </div>
+        </div>
+
+        <!-- 场景列表：由策略的「适用场景」汇总渲染 -->
+        <div class="mini-table" id="sceneTable" style="--tc:minmax(0,1.6fr) 110px 150px">
+          <div class="mt-row head"><div>业务场景</div><div>关联策略数</div><div>操作</div></div>
+          <div id="sceneRows"></div>
+        </div>
+        
+      </section>
+
+    </div><!-- /ptab-scene -->
+
+    <!-- ===== Tab3 策略运维：变更评估 / 版本回滚 两块 ===== -->
+    <div id="ptab-ops" style="display:none">
+
+    <!-- 运维 Tab 容器 -->
+    <section class="panel">
+      <div class="panel-head">
+        <span class="pnum">◈</span>
+        <span class="p-title">策略运维</span>
+        <span class="p-sub" style="color:#1f5fd4;font-weight:600">改前看影响，改坏能回滚</span>
+        <span class="p-act"><button class="mini-btn" type="button" onclick="refreshBody(this,'opsBody')">↻ 刷新</button></span>
+      </div>
+      <div class="ops-pick">
+        <label class="ed-pick">策略<select id="opsStrategySel" class="ed-select" onchange="onOpsStrategyChange()"></select></label>
+        <span class="ops-meta" id="opsStrategyMeta"></span>
+      </div>
+      <div class="tabbar" id="otabBar">
+        <button type="button" class="active" data-t="eval" onclick="activateTab('otabBar','otab-',this)">变更评估</button>
+        <button type="button" data-t="rollback" onclick="activateTab('otabBar','otab-',this)">版本回滚</button>
+      </div>
+
+      <div id="opsBody">
+        <!-- 子Tab1 变更评估：先判断有无待发布变更，有草稿才展示 diff / 影响 -->
+        <div id="otab-eval" data-mod="检索策略变更影响评估">
+          <div class="eval-state idle" id="evalState"></div>
+          <div id="evalDetail">
+            <div class="sec-head" style="margin:10px 0 8px"><span class="sec-title" style="font-size:13px" id="evalTitle">配置 diff</span><span class="sec-sub" id="evalSub"></span></div>
+            <div class="mini-table" id="evalTable" style="--tc:minmax(0,.8fr) minmax(0,1fr) minmax(0,1fr)">
+              <div class="mt-row head"><div>配置项</div><div id="evalPrevHead">上一版</div><div id="evalCurHead">草稿</div></div>
+              <div id="evalRows"></div>
+            </div>
+            <div class="eval-act" id="evalAct">
+              <button class="btn-primary" type="button" onclick="publishDraft()">发布此草稿</button>
+              <button class="mini-btn" type="button" onclick="discardDraft()">放弃草稿</button>
+            </div>
+          </div>
+          <div class="receipt" id="rcEval"></div>
+        </div>
+
+        <!-- 子Tab2 版本回滚 -->
+        <div id="otab-rollback" style="display:none" data-mod="检索策略恢复管理">
+          <div class="sec-head" style="margin:10px 0 8px"><span class="sec-title" style="font-size:13px" id="rbTitle">版本历史</span>
+            <span class="head-act"><span class="chk-line" id="chkLineRb">✓ 一致性检查通过</span><button class="mini-btn" type="button" data-fid="099" onclick="consistency('rb',this)">一致性检查</button></span>
+          </div>
+          <div class="mini-table" id="verTable" style="--tc:minmax(0,.7fr) minmax(0,1.4fr) 100px minmax(0,1fr) 110px">
+            <div class="mt-row head"><div>版本</div><div>变更摘要</div><div>发布时间</div><div>状态</div><div>操作</div></div>
+            <div id="verRows"></div>
+          </div>
+          <div class="receipt" id="rcRb"></div>
+        </div>
+
+      </div>
+    </section>
+    </div><!-- /ptab-ops -->
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- 通用确认弹层 -->
+<div class="modal-mask" id="cfMask">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="cfTitle">确认</h3>
+      <button class="modal-close" type="button" onclick="closeModal('cfMask')">×</button>
+    </div>
+    <div class="modal-body" id="cfBody"></div>
+    <div class="modal-foot">
+      <span class="modal-note" id="cfNote">操作将留痕</span>
+      <button class="mini-btn" type="button" onclick="closeModal('cfMask')">取消</button>
+      <button class="mini-btn primary" type="button" id="cfOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 场景关联策略弹层（只读） -->
+<div class="modal-mask" id="sceneMask">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <h3 id="sceneModalTitle">场景关联策略</h3>
+      <button class="modal-close" type="button" onclick="closeModal('sceneMask')">×</button>
+    </div>
+    <div class="modal-body" id="sceneModalBody"></div>
+    <div class="modal-foot">
+      <span class="modal-note">仅查看</span>
+      <button class="mini-btn" type="button" onclick="closeModal('sceneMask')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 权限遮罩（权限态） -->
+<div class="placeholder-mask" id="permMask">
+  <div class="placeholder-box">
+    <div class="pb-ico">🔒</div>
+    <h3>当前角色无管理页权限</h3>
+    <p>本页仅管理员可操作。<br>正式由登录态与库授权决定访问权限，原型不提供角色切换。</p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 研发需求说明（入口在头部卡片右上角 · 右侧抽屉） -->
+<div class="dev-mask" id="devMask" onclick="closeDev()"></div>
+<div class="dev-drawer" id="devDrawer" role="dialog" aria-modal="true" aria-label="研发需求说明">
+  <div class="dev-head">
+    <h3>研发需求说明</h3>
+    <span class="dh-tag">给研发</span>
+    <button type="button" class="dev-close" id="devClose" title="关闭（Esc）" aria-label="关闭" onclick="closeDev()">×</button>
+  </div>
+  <div class="dev-body">
+<div class="dev-ov" id="dc-note" style="background:#fffdf6;border-color:#f0e2c4"><h4 style="color:#b54708">页内说明（正文只留操作，说明收进此处）</h4><p>· 策略 = 向量 / 融合 / 重排三段参数：向量为白名单模型，融合为四模态权重（合计 100%），重排为两阶段开关。<br>· <b>保存并发布时三段参数一起生效</b>；融合合计校验只在弹窗内以行内提示呈现（≠100% 标红）。<br>· 每个参数区只留参数本身；生效入口＝弹窗底部「保存并发布」或变更评估「发布此草稿」。<br>· 向量模型下拉只列<b>产线白名单</b>内模型，白名单外向量禁入检索库（假跨模态风险防线）。<br>· 系统默认策略（兜底）作为<b>系统预置</b>行保留在策略列表：标注「系统预置」，仅管理员可编辑、其他角色只读引用；场景无专属策略时自动回落兜底。<br>· 分层结构：Tab1 策略配置 = 策略列表常驻（4 条业务演示策略 + 系统默认兜底）＋ 页面级大弹窗编辑（弹窗 ≈900px / 88vw · max-height 86vh · 内部滚动 · 底部操作区钉住，× / 取消 / 遮罩 / Esc 关闭后回到列表、列表不丢；仅 基本信息 + 向量 / 融合 / 重排 参数字段）；Tab2 业务场景字典 = 场景管理（场景列表 / 新建场景 / 查看关联策略，场景与策略的关联仍由策略「适用场景」维护）；Tab3 策略运维 = 先选一条策略（下拉，默认第一条）+ 2 个子 Tab（变更评估 / 版本回滚；变更评估有草稿才出 diff，无草稿显示「当前无待发布变更」），两块都针对这条策略，顶部一句业务价值「改前看影响，改坏能回滚」；新建 / 编辑入口在策略列表，底部「保存草稿」不生效、「保存并发布」下次检索生效。<br>· 正文只留标题 / 控件 / 状态 / 按钮，研发与逻辑说明全部收进本面板；策略状态收敛为 <b>草稿 / 编辑中 / 生效中</b> 三态；编号 STG 保留、版本只用 v1/v2/v3；系统预置行仅保留行尾小徽标。</p></div>
+<div class="dev-ov" id="dc-opsnote" style="background:#f2fbf4;border-color:#cdeed6"><h4 style="color:#1e7a43">策略运维定位（保证改策略不翻车）</h4><p>· <b>定位</b>：先选一条策略（下拉，默认第一条），再看两块——①变更评估（前提＝该策略存在草稿 / 待发布版本：有草稿才对比上一版，展示配置 diff；无草稿显示「当前无待发布变更（已生效 vX）」并隐藏 diff）②版本回滚（发布后版本历史 + 一键回滚，回写版本 / 状态 / 配置并出核验回执）；顶部只留一句「改前看影响，改坏能回滚」。<br>· <b>变更评估闭环</b>：有草稿时 diff + 影响下方 1 行「发布此草稿 / 放弃草稿」——发布＝草稿转生效版（沿用草稿版本号）＋写版本历史＋清空待发布＋列表回「生效中」＋发布回执；放弃＝二次确认后丢弃草稿、状态回「当前无待发布变更（已生效 vX）」；状态条小字标注「草稿来自：编辑策略 → 保存草稿」。<br>· <b>场景绑定</b>：由策略编辑弹窗的「适用场景」字段维护，保存并发布后对该场景下次检索生效。</p></div>
+<div class="dev-ov" id="dc-modalnote" style="background:#fffdf6;border-color:#f0e2c4"><h4 style="color:#b54708">新建 / 编辑弹窗口径（说明性文字统一收进此处）</h4><p>· 弹窗正文只保留「业务字段 + 控件 + 按钮 + 状态」，口径以本段为准。<br>· <b>底部按钮语义</b>：「保存草稿」＝写入策略表、状态停留「草稿 / 编辑中」，<b>不发布、不影响检索</b>；「保存并发布」＝发布到「适用场景」绑定场景，<b>该场景下次检索即生效</b>；「取消 / × / 遮罩 / Esc」＝关闭回列表，未保存的新建空行丢弃，列表不重绘、不丢。<br>· <b>基本信息</b>：策略名称（必填，保存 / 发布前校验「请填写策略名称」）+ 适用场景（发布生效的绑定键，场景字典在 Tab2 维护）+ 版本 / 状态（只读回显，状态三态：草稿 / 编辑中 / 生效中）。<br>· <b>向量参数</b>：下拉<b>只列产线白名单</b>内模型（来源对齐产线 R2），白名单外向量禁入检索库——白名单是假跨模态风险防线。<br>· <b>融合参数</b>：四模态（文本 / 图像 / 视频 / 音频）权重合计须为 <b>100%</b>；行内「权重合计 100% ✓ / （需调整至 100%）」是<b>校验显示</b>而非说明句，≠100% 时数字标红（.sum-line.over）。<br>· <b>重排参数</b>：一个开关即「启用重排」＝粗排召回 topN → 精排模型重排；关＝仅用粗排结果。<br>· <b>生效口径</b>：三段参数在底部一次性写入——「保存草稿」只存不生效，「保存并发布」与变更评估「发布此草稿」是两处生效入口。<br>· <b>只读与状态</b>：系统预置（兜底）策略仅管理员可编辑，其他角色整窗控件与「保存草稿 / 保存并发布」禁用（仅保留禁用态 tooltip）；弹窗头只挂状态徽标（草稿 / 编辑中 / 生效中）与「系统预置」小标。<br>· <b>演示口径</b>：演示值只存在于字段默认值（名称「作业场景检索策略」、权重 50/30/10/10、模型「图文对齐 · CLIP双塔 v3」），正式实现由接口回填。下拉项名里的「（白名单）」是模型枚举名（同时作为 data-model 存储值）。</p></div>
+<div class="dev-card" id="dc-ov" style="scroll-margin-top:14px"><div class="dc-head"><span class="dc-id" style="background:#1f5fd4">总览</span><span class="dc-name">页面定位 / 闭环 / 模块清单 / 编号与演示性质</span></div><div class="dc-body"><div class="ov-grid"><div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>本页定位【设计】</h4><p>检索中心的「大脑」：三段式管理检索策略——①向量 ②融合 ③重排，每段只留参数本身（② 融合保留四模态权重滑块），加默认策略兜底；策略经评测（P8）验证后保存并发布，对 <a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a> 下次检索即生效。页面类型＝配置/编辑页（规范2.3），编辑弹窗底部主操作唯一＝保存并发布。</p></div><div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>平台全景闭环【研发】</h4><p><a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a> 结果运营反馈 / <a class="dev-xref" href="P8_评测_v5.0_20261025.html">P8</a> 评测建议 → 本页配三段参数（F5–F7）→ F9 保存并发布 → <a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a> 下次检索生效 → <a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">P6</a> 调度 → <a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a> 结果 → 回到 <a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a>/<a class="dev-xref" href="P8_评测_v5.0_20261025.html">P8</a>；<a class="dev-xref" href="P4_库管理_v5.2_20261026.html">P4</a> 新库投产由库管理页自行校验，本页默认策略行直接编辑兜底参数（F8）。</p></div><div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>三级模块清单【设计】</h4><p>A 档×4：向量 / 融合 / 重排 / 默认策略；B 档×2：变更评估·版本回滚（先选一条策略；场景绑定并入策略编辑「适用场景」）。功能点 F1–F3、F5–F12 与之对应（运维两块聚合到 F11，权限归 F12）。</p></div><div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>编号规范与演示性质【研发】</h4><p>策略 ID 按《平台相关ID生成规范-1026》32.1：内部主键雪花 19 位不外暴；业务编号=STG+yyMMdd+6 位安全码（等宽可复制）；语义编码=小写下划线、发布不可改。版本号 v1/v2/v3 保留。<br>本页 <b>库/任务/策略编号已按 canonical 统一为 KB / TASK / STG；评测、反馈为历史前缀，正式实现按 canonical 归并为 EVL / FBK</b>。<br>所有校验结果均为页内写死演示，不请求真实引擎，不构成交付承诺。</p></div></div></div></div>
+<div class="dev-card" id="dc-f1"><div class="dc-head"><span class="dc-id">F1</span><span class="dc-name">策略列表与编辑弹窗载入</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">策略的统一入口：列出全部策略，点行 / 「编辑」把该策略的三段参数（向量/融合/重排）载入<b>页面级大弹窗编辑</b>。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v"><ul><li>进入本页即展示列表（策略列表置于 Tab1 最上），无需前置操作</li><li>仅管理员可编辑/发布；访客整页只读并弹出无权限遮罩（见 F12 权限）</li></ul></div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>策略表 7 列：策略ID（业务编号）/名称/适用场景/版本/状态/更新时间/操作（「编辑」）</li><li>业务编号按《平台相关ID生成规范》32.1：STG+yyMMdd+6 位安全码，等宽字体展示；演示 4 条业务策略：作业 <span class='mono'>STG261025A3F9KX</span>、专业 <span class='mono'>STG261022P6L4MN</span>、票证 <span class='mono'>STG261020D8N3QR</span>、阈值收紧草稿 <span class='mono'>STG261024H5T6UW</span>，另有系统预置 <span class='mono'>STG261018K7M2PQ</span></li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v"><ul><li>点「编辑」或行任意处载入：弹出编辑弹窗并载入参数字段；系统默认策略为系统预置行（仅管理员可编辑，其他角色只读引用）</li><li>策略状态仅三态：草稿 / 编辑中 / 生效中</li><li>列表行由「新建策略」保存后产生</li></ul></div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>被选策略的配置快照载入编辑弹窗（F5–F7）</li><li>编辑弹窗头部显示「当前：名称 · 业务编号 · 版本」</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>系统预置策略仅管理员可编辑；其他角色只读引用</li><li>访客点编辑类按钮被无权限遮罩拦截</li><li>列表为空（暂无策略）时给「＋新建策略」主引导（正式态，演示为 4 条静态数据）</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v"><ul><li>默认=列表加载态（演示直接渲染）/载入成功 toast/只读态（其他角色/访客）/空态</li></ul></div></div><div class="dc-row "><div class="dc-k">上下游依赖</div><div class="dc-v"><ul><li>上游=策略配置库（正式由后端返回）</li><li>下游=F2 新建 / F5–F8 编辑校验发布；场景列与 F3 场景字典一致</li></ul></div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">4 条业务策略 + 系统预置策略业务编号均为 STG+6 位安全码、等宽显示；编辑业务策略与系统预置策略均可载入；行操作含「编辑」；上下文条编号与版本正确；其他角色只读。</div></div></div></div><div class="dev-card" id="dc-f2"><div class="dc-head"><span class="dc-id">F2</span><span class="dc-name">新建策略草稿</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">创建一条空白策略草稿：点「＋ 新建策略」弹出<b>页面级大弹窗（空白策略）</b>，配置后「保存草稿」在列表新增 STG 草稿行。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v"><ul><li>策略列表右上「＋ 新建策略」按钮；新建时默认适用场景「通用」，可在弹窗内切换；仅管理员可用</li></ul></div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v">点击；弹窗内填名称 / 选场景，其余取默认值（三段参数默认、融合权重 50/30/10/10）。</div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v"><ul><li>点击即弹出空白编辑弹窗（标题「新建策略」，状态「草稿」），默认：CLIP双塔 v3、融合权重 50/30/10/10、启用重排开，名称为空、版本 v1</li><li>保存草稿 → 关闭弹窗回列表、顶部新增草稿行（草稿，不影响检索）；保存并发布 → 关闭弹窗回列表、新增生效行（v1·生效中）并写适用场景</li><li>关闭弹窗丢弃未保存空草稿，列表不产生空行</li></ul></div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>草稿行/生效行出现在策略列表顶部并高亮；正式实现落库并返回新策略业务编号（STG+日期+安全码）与语义编码</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>未填名称时保存草稿/保存并发布被拦截并 toast</li><li>未发布前不改动任何适用场景</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">编辑弹窗默认值；保存草稿 toast 未发布；保存并发布走二次确认。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v"><ul><li>上游=F1 列表；下游=F5–F9 配置、发布</li></ul></div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">点击弹出空白编辑弹窗且为默认值（权重 50/30/10/10）；保存后返回列表、行正确；草稿不改变适用场景。</div></div></div></div><div class="dev-card" id="dc-f3"><div class="dc-head"><span class="dc-id">F3</span><span class="dc-name">业务场景字典（场景管理）</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v"><ul><li>场景管理：列出业务场景名与关联策略数，支持新建场景、查看该场景下关联策略（名称 / 编号 / 版本 / 状态）；场景与策略的关联在「策略配置 → 编辑策略 → 适用场景」维护</li><li>场景可单独新建（演示态前端数组，场景名 + 描述）；新建后可在策略编辑的「适用场景」中选择</li></ul><br>· <b>F-CR-103 检查检索场景停用影响范围</b>：由「场景字典『查看关联策略』」动作承载。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v"><ul><li>主 Tab「② 业务场景字典」；内置通用 / 专业 / 作业 / 训练数据筛选四场景，可继续新建</li></ul></div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>场景行：业务场景名（含描述）/ 关联策略数 / 操作（「查看关联策略」）</li><li>数据来源：遍历策略列表的「适用场景」汇总，一个场景可关联多条策略；演示：通用=票证策略、专业=专业策略、训练数据筛选=作业策略+阈值收紧、作业=0（兜底）</li><li>新建场景表单：场景名 + 描述 → 加入场景列表并同步到策略编辑弹窗「适用场景」下拉</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v"><ul><li>场景与策略的关联在「策略配置 → 编辑策略 → 适用场景」维护；本 Tab 只管场景本身并查看关联策略</li><li>「查看关联策略」只读弹层列出该场景下策略名称 / 编号 / 版本 / 状态；0 条时提示由系统默认策略（兜底）承接</li><li>「＋新建场景」小表单（场景名 + 描述），演示态写前端数组并同步「适用场景」下拉；重名校验</li><li>保存草稿 / 发布后调用 renderSceneTable 重算关联策略数</li></ul></div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>场景清单与关联策略数（随策略「适用场景」变化）</li><li>新场景同步到策略编辑弹窗「适用场景」下拉，供策略发布时绑定</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>场景名为空 / 重名时拦截并 toast</li><li>删除策略或改绑后，场景关联数需重算（renderSceneTable）</li><li>新场景为演示态前端数组，刷新后重置；正式由后端字典持久化</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">场景数 ≥ 4；新场景带「自定义」标记；关联数 0 时显示兜底提示。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v"><ul><li>上游=策略列表「适用场景」</li><li>下游=<a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a> 场景下拉、策略编辑「适用场景」选项</li></ul></div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">3 个主 Tab 可切；场景行展示名称 / 关联策略数 /「查看关联策略」；新建场景（场景名+描述）加入列表并同步下拉；查看关联策略只读列出名称/编号/版本/状态；场景关联数随策略「适用场景」变化。</div></div></div></div><div class="dev-card" id="dc-f5"><div class="dc-head"><span class="dc-id">F5</span><span class="dc-name">向量模型选择</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">在策略内从<b>产线白名单</b>选择向量模型，随三段参数一起保存生效。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v"><ul><li>编辑弹窗「向量参数」；仅管理员可编辑，系统预置策略也仅管理员可编辑</li></ul></div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>模型下拉 4 项白名单：图文对齐 · CLIP双塔 v3（默认）/ 视频关键帧 · CLIP双塔 v2 / 文本语义 · 语义向量引擎 v2 / 音频特征 · 音频引擎 A1</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v"><ul><li>onSchemeChange('model')：切换即标脏，草稿徽标改「编辑中」</li><li>不写回执、不单独落版本；随底部「保存草稿 / 保存并发布」一次性写入</li></ul></div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>模型写入策略 data-model</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>下拉只列白名单内模型（假跨模态风险防线）</li><li>只读角色下拉禁用；演示不校验真实向量维度</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v"><ul><li>默认 CLIP双塔 v3 / 编辑中 / 只读禁用</li></ul></div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v"><ul><li>上游=产线模型白名单、P4 库向量版本（<a class="dev-xref" href="P4_库管理_v5.2_20261026.html">P4</a>）</li><li>下游=F9 发布</li></ul></div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">下拉只含 4 个白名单模型；保存并发布后模型随策略生效。</div></div></div></div><div class="dev-card" id="dc-f6"><div class="dc-head"><span class="dc-id">F6</span><span class="dc-name">融合权重配置</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">配置文本 / 图像 / 视频 / 音频四路融合权重（合计 100%）。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v"><ul><li>编辑弹窗「融合方案」；仅管理员可编辑，系统预置策略也仅管理员可编辑</li></ul></div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>4 个滑块：文本（默认 50）/ 图像（30）/ 视频（10）/ 音频（10），范围 0–100，右侧实时显示百分比</li><li>合计行「权重合计 100% ✓」，≠100% 时数字标红并提示「需调整至 100%」</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v"><ul><li>拖动即时 syncFuseWeights：刷新四路百分比与合计，合计 100% 绿勾 / 否则标红提示</li><li>onWeightChange：标脏，草稿徽标改「编辑中」</li><li>不写回执、不单独落版本；随底部「保存草稿 / 保存并发布」一次性写入</li></ul></div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>四模态权重写入策略 data-w</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>只读角色滑块禁用</li><li>合计≠100% 仅提示不硬阻止；演示不落库</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v"><ul><li>默认 50/30/10/10；拖动实时；合计 100% 绿 / ≠100% 红</li></ul></div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v"><ul><li>上游=产线模态能力（音频随产线开放）</li><li>下游=F9 发布</li></ul></div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">4 个滑块可调且合计实时；≠100% 标红、=100% 打勾；保存并发布后权重随策略生效。</div></div></div></div><div class="dev-card" id="dc-f7"><div class="dc-head"><span class="dc-id">F7</span><span class="dc-name">重排开关</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">用「启用重排」开关配置重排段。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v"><ul><li>编辑弹窗「重排方案」；仅管理员可编辑，系统预置策略也仅管理员可编辑</li></ul></div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>开关：启用重排 = 开（默认）/ 关，旁显「开 / 关」状态字</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v"><ul><li>切换：syncRerankLabel 即时更新状态字并标脏</li><li>不写回执、不单独落版本；随底部「保存草稿 / 保存并发布」一次性写入</li></ul></div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>重排开关（on / off）写入策略 data-rerank</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>只读角色开关禁用</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v"><ul><li>默认开 / 关闭 / 只读禁用</li></ul></div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v"><ul><li>上游=F5–F6 的向量与融合参数</li><li>下游=<a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a> 最终排序、F9 发布</li></ul></div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">开关是唯一控制且状态字联动；保存并发布后开关随策略生效。</div></div></div></div><div class="dev-card" id="dc-f8"><div class="dc-head"><span class="dc-id">F8</span><span class="dc-name">系统默认策略（系统预置兜底）</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v"><ul><li>系统默认策略作为<b>系统预置</b>行保留在策略列表，仅管理员可编辑，其他角色只读引用</li><li>场景无专属策略时自动回落此策略，保证检索永远可用；参数随「保存并发布」更新</li></ul><br>· <b>F-CR-084 登记跨模态检索默认策略接入申请</b>：由「系统预置行 + 适用场景兜底」动作承载。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v"><ul><li>策略列表最后一行「系统默认策略（兜底）」，名称后带「系统预置」标记</li><li>与普通策略同一编辑弹窗（仅参数字段）</li></ul></div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>点击行内「编辑」→ 载入兜底参数</li><li>向量 / 融合 / 重排 三段参数 + 适用场景（全部场景（兜底））</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v"><ul><li>admin 可编辑并「保存草稿 / 保存并发布」；其他角色只读引用（正式由登录态控制）</li><li>保存并发布后更新兜底参数，未绑定专属策略的场景即时回落</li><li>兜底可用性由场景字典关联数与运维绑定矩阵体现</li></ul></div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>系统默认策略新版本（v3）与兜底参数</li><li>策略列表「系统预置」行回写，场景数量 / 兜底提示同步</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>非管理员编辑被只读拦截</li><li>场景未绑定专属策略时始终可回落默认策略</li><li>演示参数为前端数组，不请求真实引擎</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v"><ul><li>系统预置标记；admin 可编辑 / 其他只读；保存草稿、已发布两种状态</li></ul></div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v"><ul><li>上游=策略列表 / 场景字典；下游=<a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a> 检索（未绑定场景回落）、策略运维绑定矩阵</li></ul></div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">默认策略行标注「系统预置」；编辑弹窗只含基本信息与向量 / 融合 / 重排三段参数字段；admin 可保存草稿 / 发布，其他角色只读；未绑定场景回落提示正确。</div></div></div></div><div class="dev-card" id="dc-f9"><div class="dc-head"><span class="dc-id">F9</span><span class="dc-name">保存并发布</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v"><ul><li>把编辑弹窗内已配好的三段参数（向量 / 融合 / 重排）一次性发布到该策略「适用场景」绑定的场景，对 <a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a> 下次检索生效</li></ul></div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v"><ul><li>策略编辑弹窗底部钉住区「保存并发布」（唯一主操作）；变更评估「发布此草稿」为第二处生效入口</li><li>发布前置：候选策略在 <a class="dev-xref" href="P8_评测_v5.0_20261025.html">P8</a> 用评测集验证通过</li></ul></div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>策略名称、适用场景、三段参数（向量模型 / 融合权重 / 重排开关）</li><li><a class="dev-xref" href="P8_评测_v5.0_20261025.html">P8</a> 评测结论（S1 验收线）作为发布依据</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v"><ul><li>融合权重合计须为 100%，≠100% 时弹窗内行内提示标红、发布被拦截；系统预置（兜底）策略仅管理员可发布，其他角色只读</li><li>「保存并发布」（编辑弹窗底部钉住区）：通用确认弹层（cfMask）二次确认，列出向量/融合/重排、适用场景切换、下次检索生效、发布生成新版本且上一版可回滚；确认后返回列表</li></ul></div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>确认后：场景关联数重算、「训练数据筛选」绑定切到该策略、版本沿用当前版本、徽标变「生效中」</li><li>发布即写入版本历史，版本号按 v1 / v2 / v3 递增</li><li>返回列表、行更新为「生效中」，并在策略列表生成「前往 <a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a> →」链接与发布提示条</li><li>系统默认策略仍为全场景兜底；历史版本可在 F11 回滚</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>策略名称未填：toast「请先填写策略名称」，发布中断</li><li>融合权重 ≠100%：发布拦截并标红合计行</li><li>非管理员发布：按钮禁用并提示只读</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v"><ul><li>草稿 → 编辑中 → 生效中；发布后回列表；未发布不影响检索</li></ul></div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v"><ul><li>上游=<a class="dev-xref" href="P8_评测_v5.0_20261025.html">P8</a> 评测结论（S1 验收线）、<a class="dev-xref" href="P4_库管理_v5.2_20261026.html">P4</a> 向量版本</li><li>下游=<a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a>（下次检索生效）、<a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">P6</a>（策略版本留痕）、F11 变更评估 / 版本回滚</li></ul></div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">「保存并发布」二次确认列出三段参数与场景切换；确认后绑定 / 徽标 / 返回列表 / 列表提示联动正确；列表行操作仅「编辑」。</div></div></div></div><div class="dev-card" id="dc-f10"><div class="dc-head"><span class="dc-id">F10</span><span class="dc-name">反馈建议采纳（P7 来件）</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">承接 <a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a> 结果运营的空结果归因，一键采纳为策略调整建议，进入变更评估 diff</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">运维区「变更评估」子 Tab 的待处理横幅（p7Pending）。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li><a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a> 反馈单 FB-0417：低质票据混入归因，建议提高图像权重并开启启用重排</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v"><ul><li>adoptP7：横幅转绿「✓ 已采纳反馈归因建议：图像权重提高并开启启用重排（FB-0417），已写入草稿」，按钮置灰</li><li>采纳只产生改动建议并写入变更 diff，不直接发布，需经评测（P8）验证后再发布</li></ul></div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>变更 diff 新增条目；待处理横幅转已采纳；引导重新评测</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>采纳后未发布前，改动不生效</li><li>同一建议重复采纳：按钮置灰防重</li><li>演示为静态横幅，正式对接 <a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a> 单据状态回写</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">待处理（黄条）→ 已采纳（绿条、按钮置灰）。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v"><ul><li>上游=<a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a>（反馈 FB 单）；下游=F6 融合权重改动、F9 发布</li></ul></div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">采纳按钮把横幅转绿且文案含单号；按钮置灰；改动提示需发布而非直接生效。</div></div></div></div><div class="dev-card" id="dc-f11"><div class="dc-head"><span class="dc-id">F11</span><span class="dc-name">策略运维：变更评估 / 版本回滚</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">运维对象＝下拉选中的一条策略（默认第一条）。只保留两块：①变更评估（前提＝该策略存在草稿 / 待发布版本：有草稿才对比上一版，展示配置 diff；无草稿显示「当前无待发布变更（已生效 vX）」并隐藏 diff）②版本回滚（发布后版本历史 + 一键回滚，回写版本 / 状态 / 配置并出核验回执）。有草稿时 diff + 影响下方一行「发布此草稿 / 放弃草稿」：发布即草稿转生效版并出回执，放弃需二次确认后回到无变更。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v"><ul><li>「策略运维」区先选策略（下拉，默认第一条），再切 2 个子 Tab，默认「变更评估」；变更评估的前置＝该策略有草稿 / 待发布版本，无草稿只显示状态句、不出现 diff；管理员可操作，访客只读</li></ul></div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>选中策略的待发布草稿 vs 上一版（生效版）的配置 diff（向量 / 融合权重 / 重排 三段差异）+ <a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a> 待处理 FB-0417</li><li>版本历史：按选中策略返回各版本（草稿待发布 / v3 / v2 / v1），非当前版本且非草稿提供回滚入口</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v"><ul><li>选中策略后 activateTab 切换 2 个子 Tab（变更评估 / 版本回滚）</li><li>变更评估先判断前提：有草稿才渲染草稿 vs 上一版的 diff、影响场景、日均任务、关联评测，无草稿只显示「当前无待发布变更（已生效 vX）」并隐藏 diff；评估结果只展示；有草稿时下方一行「发布此草稿 / 放弃草稿」——发布沿用草稿版本写入版本历史并出回执，放弃二次确认后回到无变更；采纳 <a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a> 建议走 F10</li><li>doRollback：二次确认，回写版本 / 状态 / 配置，适用场景同步回退，未发布草稿随之放弃，生成核验条与回执；回滚后可再次发布恢复</li></ul></div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>评估结果＝diff / 影响场景 / 日均任务 / 关联评测的只读展示</li><li>发布草稿后的发布回执：生效版本 / 配置摘要 / 生效时间；放弃草稿后状态回「当前无待发布变更（已生效 vX）」</li><li>回滚后版本表状态回写，适用场景同步到目标版本</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>无待发布草稿时不出现 diff / 影响区域，避免「没改也评估」；回滚须同步适用场景与配置，不能只改版本号</li><li>回滚入口只对非当前版本且非草稿的版本开放</li><li>演示为静态数据与 toast，正式由配置中心存储并保留审计台账</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v"><ul><li>有草稿 / 无草稿两种评估态；子 Tab 切换；二次确认弹层；回滚核验条与回执</li></ul></div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v"><ul><li>上游=<a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a> 反馈；下游=F3 场景字典、<a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a> 场景策略、审计台账</li></ul></div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">下拉默认第一条策略、切换后两块同步；仅 2 个子 Tab 可切；有草稿的作业策略显示「待发布变更：v3 → v4（草稿）」与 diff / 影响场景 / 日均任务 / 关联评测，以及「发布此草稿 / 放弃草稿」；专业策略显示「当前无待发布变更（已生效 v2）」；回滚二次确认、回写版本与适用场景、生成回执。</div></div></div></div><div class="dev-card" id="dc-f12"><div class="dc-head"><span class="dc-id">F12</span><span class="dc-name">角色权限态</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v"><ul><li>控制本页角色权限：仅管理员可编辑 / 发布，访客整页只读</li></ul></div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v"><ul><li>固定权限遮罩 permMask；正式由登录态与库授权决定，原型默认管理员</li></ul></div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>角色：admin / guest</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v"><ul><li>访客：permMask 无权限遮罩展示「当前角色无管理页权限」，全部编辑 / 发布类入口不可用，列表只读</li><li>管理员：恢复全部操作</li></ul></div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>权限态决定全页可操作性</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>访客任何写操作都被遮罩拦截（正式需后端 RBAC 二次校验）</li><li>演示为前端模拟角色，正式以登录态权限为准</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v"><ul><li>管理员可操作 / 访客只读遮罩</li></ul></div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v"><ul><li>权限对接平台统一身份 / RBAC</li></ul></div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">访客遮罩覆盖全页写操作；管理员编辑 / 发布 / 回滚全部可用。</div></div></div></div>
+  </div>
+</div>
+<script>
+/* ================= 工具 ================= */
+var toastTimer;
+function toast(msg,type){
+  var t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast show'+(type?' '+type:'');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){t.className='toast'},2600);
+}
+function pad(n){return String(n).length<2?'0'+String(n):String(n)}
+
+/* ================= 系统角色 / 权限态 ================= */
+var state={role:'admin'};
+
+
+
+/* ================= Tab 切换 ================= */
+function activateTab(barId,prefix,btn){
+  var bar=document.getElementById(barId);
+  var btns=bar.querySelectorAll('button');
+  for(var i=0;i<btns.length;i++){btns[i].classList.remove('active');}
+  btn.classList.add('active');
+  var panes=document.querySelectorAll('[id^="'+prefix+'"]');
+  for(var j=0;j<panes.length;j++){
+    panes[j].style.display=(panes[j].id===prefix+btn.dataset.t)?'':'none';
+  }
+  /* 切到场景字典时按最新策略数据重算关联关系 */
+  if(barId==='ptabBar'&&btn.dataset.t==='scene'){renderSceneTable();}
+}
+
+/* ================= 三段参数（向量模型 / 融合权重 / 重排开关） ================= */
+var SCHEME_DEFAULT={
+  model:'图文对齐 · CLIP双塔 v3',
+  w:[50,30,10,10],
+  rerank:'on'
+};
+var WEIGHT_IDS=['wTxt','wImg','wVid','wAud'];
+var WEIGHT_LABELS=['文本','图像','视频','音频'];
+function readWeights(){
+  var out=[];
+  for(var i=0;i<WEIGHT_IDS.length;i++){
+    var el=document.getElementById(WEIGHT_IDS[i]);
+    out.push(el?(parseInt(el.value,10)||0):0);
+  }
+  return out;
+}
+function applyWeights(arr){
+  arr=arr||SCHEME_DEFAULT.w;
+  for(var i=0;i<WEIGHT_IDS.length;i++){
+    var el=document.getElementById(WEIGHT_IDS[i]);
+    if(el){el.value=arr[i];}
+  }
+  syncFuseWeights();
+}
+function weightsSum(arr){return arr[0]+arr[1]+arr[2]+arr[3];}
+function weightsText(arr){
+  var t=[];
+  for(var i=0;i<arr.length;i++){t.push(WEIGHT_LABELS[i]+' '+arr[i]+'%');}
+  return t.join(' / ');
+}
+function syncFuseWeights(){
+  var arr=readWeights(),sum=weightsSum(arr);
+  for(var i=0;i<WEIGHT_IDS.length;i++){
+    var out=document.getElementById(WEIGHT_IDS[i]+'V');
+    if(out){out.textContent=arr[i]+'%';}
+  }
+  var line=document.getElementById('sumLine');
+  if(line){
+    line.innerHTML='权重合计 <b>'+sum+'%</b>'+(sum===100?' ✓':'（需调整至 100%）');
+    line.className='sum-line'+(sum===100?'':' over');
+  }
+  return sum;
+}
+function onWeightChange(){
+  syncFuseWeights();
+}
+function onSchemeChange(kind){
+  if(kind==='rerank'){syncRerankLabel();}
+}
+function readScheme(){
+  var m=document.getElementById('modelSel'),
+      r=document.getElementById('rerankSw');
+  return {
+    model:m?m.value:SCHEME_DEFAULT.model,
+    w:readWeights(),
+    rerank:(r&&r.checked)?'on':'off'
+  };
+}
+function applyScheme(s){
+  s=s||{};
+  var m=document.getElementById('modelSel');if(m){m.value=s.model||SCHEME_DEFAULT.model;}
+  applyWeights(s.w||SCHEME_DEFAULT.w);
+  var r=document.getElementById('rerankSw');if(r){r.checked=(s.rerank!=='off');}
+  syncRerankLabel();
+}
+function syncRerankLabel(){
+  var r=document.getElementById('rerankSw'),out=document.getElementById('rerankState');
+  if(out){out.textContent=(r&&r.checked)?'开':'关';}
+}
+
+/* ================= 保存并发布（出口：策略生效 → 绑定场景 → P1 下次检索） ================= */
+function publish(){
+  if(ED.ro){toast('当前策略只读','err');return;}
+  if(!EDM.open){return;}
+  var nameEl=document.getElementById('nsName');
+  var name=nameEl?nameEl.value.trim():'';
+  if(!name){toast('请填写策略名称','err');if(nameEl){nameEl.focus();}return;}
+  var sceneEl=document.getElementById('nsScene');
+  var scene=sceneEl?sceneEl.value:'通用';
+  var sc=readScheme();
+  var prevRow=findStrategyRow(ED.code);
+  var pend=OPS_PENDING[ED.code]||null;
+  var changed=!!prevRow&&!sameScheme(cfgOfRow(prevRow),sc);
+  var nextVer=(pend&&pend.to)?pend.to:(changed?bumpVer(ED.ver||'v1'):(ED.ver||'v1'));
+  var bump=!!(pend||changed);
+  var fromVer=ED.ver||'v1';
+  var isPreset=!!(ED&&ED.preset);
+  var verTxt=escHtml((((pend&&pend.from)||changed)?fromVer+' → ':'')+nextVer);
+  var paramLine='<div class="checkline"><span class="ok-ico">›</span>向量 / 融合 / 重排：'+escHtml(sc.model)+' · '+escHtml(weightsText(sc.w))+'（合计 '+weightsSum(sc.w)+'%） · '+(sc.rerank==='on'?'启用重排':'不启用重排')+'</div>';
+  var bodyHtml=isPreset
+    ? '将 <b>'+escHtml(name)+'</b>（'+verTxt+'）保存为系统默认策略（兜底）的新参数：'+
+      paramLine+
+      '<div class="checkline"><span class="ok-ico">›</span>保存并发布后<b>下次检索即生效</b></div>'+
+      '<div class="checkline"><span class="ok-ico">›</span>发布后生成新版本，上一版在版本回滚中可恢复</div>'
+    : '将 <b>'+escHtml(name)+'</b>（'+verTxt+'）保存并发布到「'+escHtml(scene)+'」场景：'+
+      paramLine+
+      '<div class="checkline"><span class="ok-ico">›</span>适用场景：「'+escHtml(scene)+'」场景的生效策略切换为该策略</div>'+
+      '<div class="checkline"><span class="ok-ico">›</span>保存并发布后<b>下次检索即生效</b></div>'+
+      '<div class="checkline"><span class="ok-ico">›</span>发布后生成新版本，上一版在版本回滚中可恢复</div>';
+  openConfirm({
+    title:'保存并发布 · '+name,
+    body:bodyHtml,
+    okText:'保存并发布',
+    note:isPreset?'系统预置':'操作将留痕',
+    onOk:function(){
+      ED.name=name;
+      var row=ensureStrategyRow(name,scene);
+      updateStrategyRow(name,scene);
+      ED.ver=nextVer;
+      markRowStatus('生效中','ok',ED.ver);
+      setEditorStatus('生效中');
+      if(bump){
+        delete OPS_PENDING[ED.code];
+        OPS_CFG[ED.code+'|'+nextVer]=sc;
+        addOpsVersion(ED.code,nextVer,rowSchemeText(row),todayStr().slice(0,10));
+      }
+      if(isPreset){
+        var h=document.getElementById('listPubHint');
+        if(h){
+          h.style.display='';
+          h.innerHTML='✓ '+todayStr()+' 系统默认策略（兜底）已保存并发布：<b style="color:#1f2a44">'+escHtml(name)+'</b> '+escHtml(ED.ver);
+        }
+        var go=document.getElementById('listGoP1');if(go){go.style.display='';}
+      }else{
+        setPubHint(name,scene,ED.ver);
+      }
+      renderSceneTable();
+      syncOpsOptions();
+      closeStrategyEditor();
+      flashRow(row);
+      toast('已发布','ok');
+    }
+  });
+}
+/* 发布后回写：列表发布提示；场景关联由 renderSceneTable 统一重算 */
+function setPubHint(name,scene,ver){
+  var h=document.getElementById('listPubHint');
+  if(h){
+    h.style.display='';
+    h.innerHTML='✓ '+todayStr()+' 已保存并发布：<b style="color:#1f2a44">'+escHtml(name)+'</b> '+escHtml(ver)+' → 场景「'+escHtml(scene)+'」 · 下次检索生效';
+  }
+  var go=document.getElementById('listGoP1');
+  if(go){go.style.display='';}
+}
+
+/* ================= 策略运维：先选一条策略，再做变更评估 / 版本回滚 ================= */
+var OPS={code:'',name:'',cur:'v1',status:'',scene:''};
+/* 场景 → 影响口径：任务量来自任务管理，评测来自评测 */
+var SCENE_IMPACT={
+  '作业':{tasks:36,evl:'作业场景评测集'},
+  '通用':{tasks:12,evl:'通用场景评测集'},
+  '专业':{tasks:8,evl:'专业场景评测集'},
+  '训练数据筛选':{tasks:20,evl:'训练数据筛选场景评测集'}
+};
+function impactOfScene(scene){
+  return SCENE_IMPACT[scene]||{tasks:120,evl:'全场景回归评测集'};
+}
+var OPS_CFG={
+  'STG261025A3F9KX|v3':{model:'图文对齐 · CLIP双塔 v3',w:[50,30,10,10],rerank:'on'},
+  'STG261025A3F9KX|v2':{model:'图文对齐 · CLIP双塔 v3',w:[40,30,20,10],rerank:'off'},
+  'STG261025A3F9KX|v1':{model:'图文对齐 · CLIP双塔 v3',w:[25,25,25,25],rerank:'off'},
+  'STG261022P6L4MN|v2':{model:'图文对齐 · CLIP双塔 v3',w:[45,35,10,10],rerank:'on'},
+  'STG261022P6L4MN|v1':{model:'图文对齐 · CLIP双塔 v3',w:[30,40,15,15],rerank:'off'},
+  'STG261020D8N3QR|v2':{model:'图文对齐 · CLIP双塔 v3',w:[50,30,10,10],rerank:'on'},
+  'STG261020D8N3QR|v1':{model:'图文对齐 · CLIP双塔 v3',w:[40,30,15,15],rerank:'off'},
+  'STG261024H5T6UW|v1':{model:'图文对齐 · CLIP双塔 v3',w:[55,25,10,10],rerank:'on'},
+  'STG261018K7M2PQ|v3':{model:'图文对齐 · CLIP双塔 v3',w:[25,25,25,25],rerank:'off'},
+  'STG261018K7M2PQ|v2':{model:'图文对齐 · CLIP双塔 v2',w:[25,25,25,25],rerank:'off'},
+  'STG261018K7M2PQ|v1':{model:'图文对齐 · CLIP双塔 v2',w:[25,25,25,25],rerank:'off'}
+};
+var OPS_VER={
+  'STG261025A3F9KX':[
+    {v:'v3',sum:'CLIP双塔 v3 · 融合50/30/10/10 · 启用重排',date:'2026-10-22'},
+    {v:'v2',sum:'CLIP双塔 v3 · 融合40/30/20/10 · 不启用重排',date:'2026-10-15'},
+    {v:'v1',sum:'初版 · 融合25/25/25/25 · 不启用重排',date:'2026-09-30'}
+  ],
+  'STG261022P6L4MN':[
+    {v:'v2',sum:'CLIP双塔 v3 · 融合45/35/10/10 · 启用重排',date:'2026-10-22'},
+    {v:'v1',sum:'初版 · 融合30/40/15/15 · 不启用重排',date:'2026-09-28'}
+  ],
+  'STG261020D8N3QR':[
+    {v:'v2',sum:'CLIP双塔 v3 · 融合50/30/10/10 · 启用重排',date:'2026-10-20'},
+    {v:'v1',sum:'初版 · 融合40/30/15/15 · 不启用重排',date:'2026-09-26'}
+  ],
+  'STG261024H5T6UW':[
+    {v:'v1',sum:'草稿 · CLIP双塔 v3 · 融合55/25/10/10 · 启用重排',date:'2026-10-24'}
+  ],
+  'STG261018K7M2PQ':[
+    {v:'v3',sum:'CLIP双塔 v3 · 融合25/25/25/25 · 不启用重排',date:'2026-10-18'},
+    {v:'v2',sum:'CLIP双塔 v2 · 融合25/25/25/25 · 不启用重排',date:'2026-09-20'},
+    {v:'v1',sum:'初版 · 融合均分 · 不启用重排',date:'2026-08-30'}
+  ]
+};
+/* 待发布草稿：有草稿才产生变更评估；发布 / 回滚后清除 */
+var OPS_PENDING={
+  'STG261025A3F9KX':{
+    from:'v3',to:'v4',at:'2026-10-27 17:20',
+    cfg:{model:'图文对齐 · CLIP双塔 v3',w:[45,30,15,10],rerank:'on'}
+  },
+  'STG261024H5T6UW':{
+    from:null,to:'v1',at:'2026-10-24 11:20',
+    cfg:{model:'图文对齐 · CLIP双塔 v3',w:[55,25,10,10],rerank:'on'}
+  }
+};
+function bumpVer(v){
+  var n=parseInt(String(v||'').replace(/[^0-9]/g,''),10);
+  return 'v'+((isNaN(n)?0:n)+1);
+}
+function cfgOfRow(row){
+  if(!row){return null;}
+  return {
+    model:row.getAttribute('data-model')||'—',
+    w:rowWeights(row),
+    rerank:row.getAttribute('data-rerank')==='on'?'on':'off'
+  };
+}
+function sameScheme(a,b){
+  if(!a||!b){return false;}
+  return a.model===b.model&&a.rerank===b.rerank&&(a.w||[]).join(',')===(b.w||[]).join(',');
+}
+function cfgSummary(c){
+  if(!c){return '—';}
+  var m=String(c.model||'').split(' · ').pop().replace('（白名单）','');
+  return m+' · 融合'+(c.w||[]).join('/')+' · '+(c.rerank==='on'?'启用重排':'不启用重排');
+}
+function addOpsVersion(code,ver,sum,date){
+  if(!code||!ver){return;}
+  var list=OPS_VER[code]=OPS_VER[code]||[];
+  for(var i=0;i<list.length;i++){
+    if(list[i].v===ver){list[i].sum=sum;list[i].date=date;return;}
+  }
+  list.unshift({v:ver,sum:sum,date:date});
+}
+function weightText(w){return '文本 '+w[0]+'% / 图像 '+w[1]+'% / 视频 '+w[2]+'% / 音频 '+w[3]+'%';}
+function rowWeights(row){
+  var w=(row.getAttribute('data-w')||SCHEME_DEFAULT.w.join(',')).split(',');
+  var out=[];
+  for(var i=0;i<4;i++){out.push(parseInt(w[i],10)||0);}
+  return out;
+}
+function rowSchemeText(row){
+  var m=(row.getAttribute('data-model')||'').split(' · ').pop().replace('（白名单）','');
+  var w=rowWeights(row);
+  var r=row.getAttribute('data-rerank')==='on'?'启用重排':'不启用重排';
+  return m+' · 融合'+w.join('/')+' · '+r;
+}
+function opsCurrentRow(){return OPS.code?findStrategyRow(OPS.code):null;}
+function applyOpsVersion(ver){
+  var cfg=OPS_CFG[OPS.code+'|'+ver];
+  var row=opsCurrentRow();
+  if(!cfg||!row){return;}
+  row.setAttribute('data-model',cfg.model);
+  row.setAttribute('data-w',cfg.w.join(','));
+  row.setAttribute('data-rerank',cfg.rerank);
+}
+function syncOpsOptions(){
+  var sel=document.getElementById('opsStrategySel');
+  if(!sel){return;}
+  var rows=getStrategyRows();
+  var keep=sel.value||'';
+  var h='';
+  for(var i=0;i<rows.length;i++){
+    var code=rows[i].getAttribute('data-code')||'';
+    var name=rows[i].getAttribute('data-name')||'未命名策略';
+    h+='<option value="'+escAttr(code)+'">'+escHtml(name)+'</option>';
+  }
+  sel.innerHTML=h;
+  var found=false;
+  for(var j=0;j<sel.options.length;j++){
+    if(sel.options[j].value===keep){found=true;sel.selectedIndex=j;break;}
+  }
+  if(!found&&sel.options.length){sel.selectedIndex=0;}
+  onOpsStrategyChange();
+}
+function onOpsStrategyChange(){
+  var sel=document.getElementById('opsStrategySel');
+  if(!sel){return;}
+  var row=findStrategyRow(sel.value);
+  if(!row){return;}
+  OPS={
+    code:sel.value,
+    name:row.getAttribute('data-name')||'未命名策略',
+    cur:row.getAttribute('data-ver')||'v1',
+    status:row.getAttribute('data-status')||'',
+    scene:row.getAttribute('data-scene')||'通用'
+  };
+  clearOpsReceipts();
+  renderOpsMeta();
+  renderEval();
+  renderRollback();
+}
+function clearOpsReceipts(){
+  var el=document.getElementById('rcRb');
+  if(el){el.classList.remove('show');el.innerHTML='';}
+  var ev=document.getElementById('rcEval');
+  if(ev){ev.classList.remove('show');ev.innerHTML='';}
+  var line=document.getElementById('chkLineRb');
+  if(line){line.classList.remove('show');line.textContent='✓ 一致性检查通过';}
+}
+function renderOpsMeta(){
+  var el=document.getElementById('opsStrategyMeta');
+  if(!el){return;}
+  var st=OPS.status||'—';
+  var cls=st==='生效中'?'ok':(st==='编辑中'?'run':'pend');
+  el.innerHTML='<b class="mono">'+escHtml(OPS.code)+'</b><span>'+escHtml(OPS.cur)+'</span><span class="badge '+cls+'">'+escHtml(st)+'</span><span>'+escHtml(OPS.scene)+'</span>';
+}
+function renderEval(){
+  var row=opsCurrentRow();
+  if(!row){return;}
+  var pend=OPS_PENDING[OPS.code];
+  var stateEl=document.getElementById('evalState');
+  var detail=document.getElementById('evalDetail');
+  if(!pend){
+    if(stateEl){
+      stateEl.className='eval-state idle';
+      stateEl.innerHTML='<span class="badge pend">无变更</span>'+
+        '<span class="es-main">当前无待发布变更（已生效 '+escHtml(OPS.cur)+'）</span>';
+    }
+    if(detail){detail.style.display='none';}
+    return;
+  }
+  if(detail){detail.style.display='';}
+  var from=pend.from||'',to=pend.to||OPS.cur;
+  if(stateEl){
+    stateEl.className='eval-state pending';
+    stateEl.innerHTML='<span class="badge warn">草稿待发布</span>'+
+      '<span class="es-main">待发布变更：<b>'+escHtml(from||'新建')+' → '+escHtml(to)+'（草稿）</b></span>'+
+      '<span class="es-sub">草稿来自：编辑策略 → 保存草稿</span>'+
+      (pend.at?'<span class="es-sub">草稿保存于 '+escHtml(pend.at)+'</span>':'');
+  }
+  var base=pend.base||(from?OPS_CFG[OPS.code+'|'+from]:null);
+  var cur=pend.cfg||cfgOfRow(row);
+  var title=document.getElementById('evalTitle'),sub=document.getElementById('evalSub');
+  if(title){title.textContent='配置 diff';}
+  if(sub){sub.textContent=(from?'上一版 '+from+' → 草稿 '+to:'首版草稿 '+to);}
+  var ph=document.getElementById('evalPrevHead'),ch=document.getElementById('evalCurHead');
+  if(ph){ph.textContent=from?'上一版 '+from:'上一版';}
+  if(ch){ch.textContent='草稿 '+to;}
+  var rows=[
+    ['向量参数',base?base.model:'—',cur.model],
+    ['融合权重',base?weightText(base.w):'—',weightText(cur.w)],
+    ['重排方案',base?(base.rerank==='on'?'启用重排':'不启用重排'):'—',(cur.rerank==='on'?'启用重排':'不启用重排')]
+  ];
+  var h='';
+  for(var j=0;j<rows.length;j++){
+    var changed=rows[j][1]!==rows[j][2];
+    h+='<div class="mt-row"><div class="q">'+rows[j][0]+'</div><div class="c">'+escHtml(rows[j][1])+'</div><div class="c"'+(changed?' style="color:var(--system-blue)"':'')+'>'+escHtml(rows[j][2])+'</div></div>';
+  }
+  var host=document.getElementById('evalRows');
+  if(host){host.innerHTML=h;}
+}
+function renderRollback(){
+  var row=opsCurrentRow();
+  if(!row){return;}
+  var title=document.getElementById('rbTitle');
+  if(title){title.textContent='版本历史 · '+OPS.name;}
+  var list=OPS_VER[OPS.code];
+  if(!list){list=[{v:OPS.cur,sum:rowSchemeText(row),date:todayStr().slice(0,10)}];}
+  var pend=OPS_PENDING[OPS.code];
+  var curLabel=OPS.status==='草稿'?'当前草稿':(OPS.status==='编辑中'?'当前编辑中':'当前生效');
+  var curCls=OPS.status==='草稿'?'pend':(OPS.status==='编辑中'?'run':'ok');
+  var h='';
+  /* 未发布草稿单独列在版本历史顶部，不可回滚 */
+  if(pend&&pend.to){
+    var dup=false;
+    for(var k=0;k<list.length;k++){if(list[k].v===pend.to){dup=true;break;}}
+    if(!dup){
+      h+='<div class="mt-row ver-draft" data-ver="'+escAttr(pend.to)+'"><div class="q">'+escHtml(pend.to)+'</div>'+
+        '<div class="c">'+escHtml(cfgSummary(pend.cfg))+'</div>'+
+        '<div class="c">'+escHtml(String(pend.at||'').slice(0,10))+'</div>'+
+        '<span class="badge warn" data-role="verst">草稿待发布</span>'+
+        '<div><button class="mini-btn" type="button" disabled title="草稿待发布">—</button></div></div>';
+    }
+  }
+  for(var i=0;i<list.length;i++){
+    var it=list[i],isCur=(it.v===OPS.cur);
+    var sum=isCur?rowSchemeText(row):it.sum;
+    var op=isCur
+      ? '<button class="mini-btn" type="button" disabled>—</button>'
+      : '<button class="mini-btn danger" type="button" onclick="doRollback(\''+escAttr(it.v)+'\')">回滚到此</button>';
+    h+='<div class="mt-row" data-ver="'+escAttr(it.v)+'"><div class="q">'+escHtml(it.v)+'</div><div class="c">'+escHtml(sum)+'</div><div class="c">'+escHtml(it.date)+'</div><span class="badge '+(isCur?curCls:'pend')+'" data-role="verst">'+(isCur?curLabel:'历史版本')+'</span><div>'+op+'</div></div>';
+  }
+  var host=document.getElementById('verRows');
+  if(host){host.innerHTML=h;}
+}
+function doRollback(ver){
+  if(!OPS.code){return;}
+  if(ver===OPS.cur){toast('无需回滚');return;}
+  var from=OPS.cur;
+  var pend=OPS_PENDING[OPS.code];
+  openConfirm({
+    title:'版本回滚 · '+OPS.name,
+    body:'将 <b>'+escHtml(OPS.name)+'</b> 从 '+from+' 回滚至 <b>'+escHtml(ver)+'</b>。<br>回写版本 / 状态 / 配置，「'+escHtml(OPS.scene)+'」场景的适用策略同步回退。'+
+      (pend&&pend.to?'<div class="checkline"><span class="ok-ico">›</span>未发布草稿 '+escHtml(pend.to)+' 随之放弃</div>':''),
+    okText:'回滚',
+    note:'回滚后可再次发布恢复',
+    onOk:function(){
+      delete OPS_PENDING[OPS.code];
+      OPS.cur=ver;
+      OPS.status='生效中';
+      var row=findStrategyRow(OPS.code);
+      if(row){
+        row.setAttribute('data-ver',ver);
+        row.setAttribute('data-status','生效中');
+        var num=row.querySelector('.num');
+        if(num){num.textContent=ver;}
+        var badge=row.querySelector('[data-role="status"]');
+        if(badge){badge.className='badge ok';badge.textContent='生效中';}
+        var cells=row.querySelectorAll('.c');
+        if(cells[2]){cells[2].textContent=todayStr();}
+      }
+      applyOpsVersion(ver);
+      renderOpsMeta();
+      renderEval();
+      renderRollback();
+      var id=rcId('RB');
+      showReceipt('rcRb','回滚核验条',id,[
+        ['生效版本',ver+'（'+nowStr()+' 回滚生效）'],
+        ['生效配置',escHtml(cfgSummary(OPS_CFG[OPS.code+'|'+ver]))],
+        ['适用场景','「'+escHtml(OPS.scene)+'」→ '+escHtml(OPS.name)+' '+ver+'（适用场景已回写）'],
+        ['缓存刷新','检索节点 4/4 · 向量缓存已刷新'],
+        ['回执号',id]
+      ]);
+      var line=document.getElementById('chkLineRb');
+      if(line){line.textContent='✓ 回滚核验通过 · '+nowStr();line.classList.add('show');}
+      toast('已回滚','ok');
+    }
+  });
+}
+
+/* ================= 变更评估：发布此草稿 / 放弃草稿（闭环） ================= */
+/* 发布此草稿：草稿转生效版 → 回写列表行 / 版本历史 / 配置，清空待发布，出发布回执 */
+function publishDraft(){
+  if(!OPS.code){return;}
+  var pend=OPS_PENDING[OPS.code];
+  if(!pend){toast('当前无待发布草稿');return;}
+  var row=opsCurrentRow();
+  if(!row){return;}
+  var ver=pend.to||bumpVer(OPS.cur);
+  var cfg=pend.cfg||cfgOfRow(row);
+  var scene=row.getAttribute('data-scene')||OPS.scene;
+  row.setAttribute('data-ver',ver);
+  row.setAttribute('data-status','生效中');
+  row.removeAttribute('data-pending');
+  row.setAttribute('data-model',cfg.model);
+  row.setAttribute('data-w',(cfg.w||[]).join(','));
+  row.setAttribute('data-rerank',cfg.rerank);
+  var num=row.querySelector('.num');
+  if(num){num.textContent=ver;}
+  var badge=row.querySelector('[data-role="status"]');
+  if(badge){badge.className='badge ok';badge.textContent='生效中';}
+  var cells=row.querySelectorAll('.c');
+  if(cells[2]){cells[2].textContent=todayStr();}
+  OPS_CFG[OPS.code+'|'+ver]=cfg;
+  addOpsVersion(OPS.code,ver,rowSchemeText(row),todayStr().slice(0,10));
+  delete OPS_PENDING[OPS.code];
+  OPS.cur=ver;
+  OPS.status='生效中';
+  OPS.scene=scene;
+  renderOpsMeta();
+  renderEval();
+  renderRollback();
+  flashRow(row);
+  var id=rcId('PUB');
+  showReceipt('rcEval','发布回执',id,[
+    ['生效版本',escHtml(ver)+'（'+nowStr()+' 发布生效）'],
+    ['配置摘要',escHtml(cfgSummary(cfg))],
+    ['生效时间',escHtml(todayStr())],
+    ['回执号',id]
+  ]);
+  toast('已发布','ok');
+}
+/* 放弃草稿：二次确认后丢弃待发布，列表行回「生效中」，状态回无变更 */
+function discardDraft(){
+  if(!OPS.code){return;}
+  var pend=OPS_PENDING[OPS.code];
+  if(!pend){toast('当前无待发布草稿');return;}
+  var to=pend.to||OPS.cur;
+  var from=pend.from;
+  openConfirm({
+    title:'放弃草稿 · '+OPS.name,
+    body:'将丢弃 <b>'+escHtml(OPS.name)+'</b> 的待发布草稿 <b>'+escHtml(to)+'</b>'+
+      (from?'（对比 '+escHtml(from)+'）':'')+'，草稿配置不写入生效版。<br>'+
+      '放弃后状态回到「当前无待发布变更（已生效 '+escHtml(OPS.cur)+'）」。',
+    okText:'放弃草稿',
+    note:'放弃后不可恢复',
+    onOk:function(){
+      delete OPS_PENDING[OPS.code];
+      var row=opsCurrentRow();
+      if(row){
+        row.removeAttribute('data-pending');
+        row.setAttribute('data-status','生效中');
+        var badge=row.querySelector('[data-role="status"]');
+        if(badge){badge.className='badge ok';badge.textContent='生效中';}
+      }
+      OPS.status='生效中';
+      var ev=document.getElementById('rcEval');
+      if(ev){ev.classList.remove('show');ev.innerHTML='';}
+      renderOpsMeta();
+      renderEval();
+      renderRollback();
+      toast('已放弃','ok');
+    }
+  });
+}
+
+/* ================= 一致性检查（099 版本回滚） ================= */
+var CONSIST={
+  rb:{label:'版本回滚'}
+};
+var CHK_LINE={rb:'chkLineRb'};
+function nowStr(){var d=new Date();return pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes());}
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function consistency(key,el){
+  var c=CONSIST[key];
+  if(!c||!el){return;}
+  var label=el.textContent;
+  el.disabled=true;el.innerHTML='<span class="spinner blue"></span> 检查中';
+  setTimeout(function(){
+    el.disabled=false;el.textContent=label;
+    toast('检查通过','ok');
+    var line=document.getElementById(CHK_LINE[key]);
+    if(line){line.textContent='✓ 一致性检查通过 · '+nowStr();line.classList.add('show');}
+  },600);
+}
+
+/* ================= 回执（099 回滚） ================= */
+var RC_SEQ=0;
+function rcId(prefix){RC_SEQ++;return prefix+'261027'+('000'+(1000+RC_SEQ)).slice(-4);}
+function showReceipt(hostId,title,id,lines){
+  var host=document.getElementById(hostId);
+  if(!host){return;}
+  host.classList.add('show');
+  var h='<div class="rc-head">✓ '+title+'<span class="rc-id">'+id+'</span></div>';
+  for(var i=0;i<lines.length;i++){h+='<div class="rc-line"><span>'+lines[i][0]+'：</span>'+lines[i][1]+'</div>';}
+  host.innerHTML=h;
+}
+
+/* ================= ② 业务场景字典（场景管理 · 演示态前端数组） ================= */
+var FALLBACK_SCENE='全部场景（兜底）';
+var SCENES=[
+  {name:'通用',desc:'通用票据 / 文档检索场景',builtin:true},
+  {name:'专业',desc:'专业领域检索场景',builtin:true},
+  {name:'作业',desc:'作业任务检索场景',builtin:true},
+  {name:'训练数据筛选',desc:'训练数据筛选检索场景',builtin:true}
+];
+function escAttr(s){return escHtml(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function sceneByName(name){
+  for(var i=0;i<SCENES.length;i++){if(SCENES[i].name===name){return SCENES[i];}}
+  return null;
+}
+/* ================= 分页组件（策略列表 · 每页 10 条） ================= */
+var stgPage = 1;
+var STG_PAGE_SIZE = 10;
+var PAGER_GO = {};
+function pagerNumbers(page, pages){
+  var out = [], i;
+  if(pages <= 7){
+    for(i = 1; i <= pages; i++){ out.push(i); }
+  }else{
+    out.push(1);
+    var s = Math.max(2, page - 1), e = Math.min(pages - 1, page + 1);
+    if(s > 2){ out.push('...'); }
+    for(i = s; i <= e; i++){ out.push(i); }
+    if(e < pages - 1){ out.push('...'); }
+    out.push(pages);
+  }
+  return out;
+}
+function renderPager(containerId, total, page, pageSize){
+  var box = document.getElementById(containerId);
+  if(!box){ return; }
+  pageSize = pageSize || 10;
+  var pages = Math.max(1, Math.ceil(total / pageSize));
+  if(page > pages){ page = pages; }
+  if(page < 1){ page = 1; }
+  var go = PAGER_GO[containerId] || 'goPage';
+  var html = '<span class="pager-total">共 ' + total + ' 条</span>' +
+    '<button class="pager-btn" type="button" onclick="' + go + '(' + (page - 1) + ')"' + (page <= 1 ? ' disabled' : '') + '>上一页</button>';
+  pagerNumbers(page, pages).forEach(function(p){
+    if(p === '...'){ html += '<span class="pager-gap">…</span>'; }
+    else{
+      html += '<button class="pager-num' + (p === page ? ' is-cur' : '') + '" type="button" onclick="' + go + '(' + p + ')"' +
+        (p === page ? ' aria-current="page"' : '') + '>' + p + '</button>';
+    }
+  });
+  html += '<button class="pager-btn" type="button" onclick="' + go + '(' + (page + 1) + ')"' + (page >= pages ? ' disabled' : '') + '>下一页</button>';
+  box.innerHTML = html;
+}
+function renderStrategyPager(){
+  var rows = getStrategyRows();
+  var total = rows.length;
+  var pages = Math.max(1, Math.ceil(total / STG_PAGE_SIZE));
+  if(stgPage > pages){ stgPage = pages; }
+  if(stgPage < 1){ stgPage = 1; }
+  var start = (stgPage - 1) * STG_PAGE_SIZE;
+  for(var i = 0; i < rows.length; i++){
+    rows[i].style.display = (i >= start && i < start + STG_PAGE_SIZE) ? '' : 'none';
+  }
+  renderPager('stgPager', total, stgPage, STG_PAGE_SIZE);
+}
+function goPage(n){
+  var pages = Math.max(1, Math.ceil(getStrategyRows().length / STG_PAGE_SIZE));
+  if(n < 1){ n = 1; }
+  if(n > pages){ n = pages; }
+  stgPage = n;
+  renderStrategyPager();
+}
+
+function getStrategyRows(){return document.querySelectorAll('#strategyTable .mt-row[data-code]');}
+function rowScenes(row){
+  return String(row.getAttribute('data-scene')||'').split(/[、,]/).map(function(x){return x.trim();}).filter(Boolean);
+}
+function sceneStrategyList(name){
+  var rows=getStrategyRows(),out=[];
+  for(var i=0;i<rows.length;i++){
+    if(rowScenes(rows[i]).indexOf(name)>-1){out.push(rows[i]);}
+  }
+  return out;
+}
+function statusBadgeCls(el){
+  var c=el?(' '+el.className+' '):'';
+  if(c.indexOf(' ok ')>-1){return 'ok';}
+  if(c.indexOf(' run ')>-1){return 'run';}
+  if(c.indexOf(' fail ')>-1){return 'fail';}
+  if(c.indexOf(' warn ')>-1){return 'warn';}
+  return 'pend';
+}
+function renderSceneTable(){
+  var host=document.getElementById('sceneRows');
+  if(!host){return;}
+  var rows=getStrategyRows(),h='';
+  for(var i=0;i<SCENES.length;i++){
+    var sc=SCENES[i],n=0;
+    for(var j=0;j<rows.length;j++){
+      if(rowScenes(rows[j]).indexOf(sc.name)>-1){n++;}
+    }
+    h+='<div class="mt-row" data-scene="'+escAttr(sc.name)+'" data-builtin="'+(sc.builtin?'1':'0')+'">'+
+      '<div class="q">'+escHtml(sc.name)+(sc.builtin?'':'<span class="tag-preset" style="color:#1f5fd4;background:#f1f5ff;border-color:#d7e0ff">自定义</span>')+
+        '<div class="scene-desc">'+escHtml(sc.desc||'—')+'</div></div>'+
+      '<div class="num">'+n+'</div>'+
+      '<div><a class="scene-link" href="javascript:void(0)" onclick="viewSceneStrategies(this)">查看关联策略</a></div>'+
+      '</div>';
+  }
+  host.innerHTML=h;
+}
+function syncSceneOptions(prefer){
+  var s=document.getElementById('nsScene');
+  if(!s){return;}
+  var cur=(prefer===undefined||prefer===null)?s.value:prefer;
+  var h='';
+  for(var i=0;i<SCENES.length;i++){h+='<option>'+escHtml(SCENES[i].name)+'</option>';}
+  if(cur===FALLBACK_SCENE){h+='<option>'+escHtml(FALLBACK_SCENE)+'</option>';}
+  s.innerHTML=h;
+  for(var j=0;j<s.options.length;j++){if(s.options[j].text===cur){s.value=cur;break;}}
+}
+function ensureSceneOption(name){
+  var s=document.getElementById('nsScene');
+  if(!s||!name){return;}
+  for(var i=0;i<s.options.length;i++){if(s.options[i].text===name){return;}}
+  var o=document.createElement('option');o.textContent=name;s.appendChild(o);
+}
+function openNewScene(){
+  var f=document.getElementById('sceneNewForm');
+  if(!f){return;}
+  f.style.display='grid';
+  var n=document.getElementById('newSceneName'),d=document.getElementById('newSceneDesc');
+  if(n){n.value='';n.focus();}
+  if(d){d.value='';}
+}
+function cancelNewScene(){
+  var f=document.getElementById('sceneNewForm');
+  if(f){f.style.display='none';}
+  var n=document.getElementById('newSceneName'),d=document.getElementById('newSceneDesc');
+  if(n){n.value='';}
+  if(d){d.value='';}
+}
+function createScene(){
+  var n=document.getElementById('newSceneName'),d=document.getElementById('newSceneDesc');
+  var name=n?n.value.trim():'';
+  var desc=d?d.value.trim():'';
+  if(!name){toast('请填写场景名','err');if(n){n.focus();}return;}
+  if(name===FALLBACK_SCENE||sceneByName(name)){toast('场景名已存在','err');if(n){n.focus();}return;}
+  SCENES.push({name:name,desc:desc||'自定义场景',builtin:false});
+  syncSceneOptions();
+  renderSceneTable();
+  cancelNewScene();
+  toast('已创建','ok');
+}
+function viewSceneStrategies(link){
+  var row=link&&link.closest?link.closest('.mt-row'):null;
+  if(!row){return;}
+  var scene=row.getAttribute('data-scene')||'';
+  var meta=sceneByName(scene),list=sceneStrategyList(scene);
+  var title=document.getElementById('sceneModalTitle'),body=document.getElementById('sceneModalBody');
+  if(title){title.textContent='场景关联策略 · '+scene;}
+  var h='<div class="mb-tip">'+(meta&&meta.desc?escHtml(meta.desc)+' · ':'')+'关联策略 <b>'+list.length+'</b> 条</div>';
+  if(list.length){
+    h+='<div class="mini-table" style="--tc:minmax(0,1.3fr) 132px 56px 86px"><div class="mt-row head"><div>策略名称</div><div>编号</div><div>版本</div><div>状态</div></div>';
+    for(var i=0;i<list.length;i++){
+      var r=list[i],st=r.querySelector('[data-role="status"]');
+      h+='<div class="mt-row"><div class="q">'+escHtml(r.getAttribute('data-name')||'未命名策略')+'</div>'+
+        '<div class="c mono">'+escHtml(r.getAttribute('data-code')||'')+'</div>'+
+        '<div class="num">'+escHtml(r.getAttribute('data-ver')||'')+'</div>'+
+        '<span class="badge '+statusBadgeCls(st)+'">'+escHtml(st?st.textContent:'—')+'</span></div>';
+    }
+    h+='</div>';
+  }else{
+    h+='<p class="note-line">该场景暂无关联策略。</p>';
+  }
+  if(body){body.innerHTML=h;}
+  document.getElementById('sceneMask').classList.add('show');
+}
+
+/* ================= 面板刷新（加载态骨架） ================= */
+function refreshBody(btn,bodyId){
+  var body=document.getElementById(bodyId);
+  if(!body||body.dataset.loading==='1'){return;}
+  body.dataset.loading='1';
+  var html=body.innerHTML;
+  body.innerHTML='<div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div>';
+  setTimeout(function(){
+    body.innerHTML=html;
+    body.dataset.loading='0';
+    toast('已刷新','ok');
+  },700);
+}
+
+/* ================= 通用确认弹层 ================= */
+var cfCallback=null;
+function openConfirm(opts){
+  document.getElementById('cfTitle').textContent=opts.title||'确认';
+  document.getElementById('cfBody').innerHTML=opts.body||'';
+  document.getElementById('cfNote').textContent=opts.note||'操作将留痕';
+  var ok=document.getElementById('cfOk');
+  ok.textContent=opts.okText||'确定';
+  cfCallback=opts.onOk||null;
+  document.getElementById('cfMask').classList.add('show');
+}
+document.getElementById('cfOk').addEventListener('click',function(){
+  closeModal('cfMask');
+  if(typeof cfCallback==='function'){cfCallback();}
+});
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+
+/* ================= 策略编辑弹窗（页面级大弹窗）：新建 / 编辑 → 保存草稿 / 保存并发布 ================= */
+/* 弹窗未打开时 ED 为占位；打开时写入当前策略上下文 */
+var EDM={open:false};
+var ED={mode:'idle',code:'',name:'',ver:'v1',ro:false,preset:false};
+
+function genCode(){
+  var SAFE='23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  var code='STG261027';
+  for(var i=0;i<6;i++){code+=SAFE[Math.floor(Math.random()*SAFE.length)];}
+  return code;
+}
+function todayStr(){
+  var d=new Date();
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes());
+}
+function findStrategyRow(code){
+  if(!code){return null;}
+  var rows=document.querySelectorAll('#strategyTable .mt-row[data-code]');
+  for(var i=0;i<rows.length;i++){
+    if(rows[i].getAttribute('data-code')===code){return rows[i];}
+  }
+  return null;
+}
+function setEditorMeta(name,code,ver){
+  var nv=document.getElementById('nsVer');
+  if(nv){nv.textContent=ver||'v1';}
+}
+/* 系统预置标记 */
+function setPresetTag(on){
+  var tag=document.getElementById('edPresetTag');
+  if(tag){tag.style.display=on?'inline-block':'none';}
+}
+/* 基本信息里的「状态」字段（数据展示，不再有头部徽章） */
+function setEditorStatus(text){
+  var s=document.getElementById('nsStatus');
+  if(s){s.textContent=text||'—';}
+}
+function resetFooter(ro){
+  var pb=document.getElementById('pubBtn');
+  if(pb){
+    pb.disabled=!!ro;
+    pb.textContent='保存并发布';
+    pb.title=ro?'只读策略不可发布':'';
+  }
+  var sd=document.getElementById('saveDraftBtn');
+  if(sd){sd.disabled=!!ro;sd.title=ro?'只读策略不可保存':'';}
+  var acts=document.getElementById('edFootActs');
+  if(acts){acts.innerHTML='';}
+}
+function setRo(ro){
+  var ids=['nsName','nsScene','modelSel','wTxt','wImg','wVid','wAud','rerankSw'];
+  for(var i=0;i<ids.length;i++){
+    var el=document.getElementById(ids[i]);
+    if(el){el.disabled=!!ro;}
+  }
+}
+/* ---------- 编辑弹窗开关（页面级大弹窗：列表常驻，弹窗覆盖其上） ---------- */
+function openStrategyEditor(mode,title){
+  EDM.open=true;
+  var mask=document.getElementById('strategyMask');
+  if(mask){mask.classList.add('show');}
+  var tt=document.getElementById('stgTitle');
+  if(tt){tt.textContent=title||(mode==='new'?'新建策略':'编辑策略');}
+  var body=document.getElementById('edBody');
+  if(body){body.scrollTop=0;}
+  setTimeout(function(){var n=document.getElementById('nsName');if(n&&!n.disabled){n.focus();}},180);
+}
+function closeStrategyEditor(){
+  var mask=document.getElementById('strategyMask');
+  if(mask){mask.classList.remove('show');}
+  EDM.open=false;
+  /* 焦点归还页面，避免停留在已隐藏的弹窗控件上 */
+  if(mask&&document.activeElement&&mask.contains(document.activeElement)){document.activeElement.blur();}
+  /* 清理「全部场景（兜底）」临时选项，回到常规场景下拉 */
+  syncSceneOptions('通用');
+  /* 关闭时丢弃“未保存”的新建空行，避免列表堆积（列表本身不隐藏、不重绘） */
+  var pend=document.querySelectorAll('#strategyTable .mt-row[data-pending="1"]');
+  for(var i=0;i<pend.length;i++){
+    if(pend[i].parentNode){pend[i].parentNode.removeChild(pend[i]);}
+  }
+  renderStrategyPager();
+}
+function flashRow(row){
+  if(!row){return;}
+  row.classList.add('flash');
+  setTimeout(function(){row.classList.remove('flash');},1700);
+}
+/* ---------- 列表行写入 ---------- */
+function createStrategyRow(code,opts){
+  opts=opts||{};
+  var table=document.getElementById('strategyTable');
+  if(!table){return null;}
+  var name=opts.name||'';
+  var scene=opts.scene||'通用';
+  var ver=opts.ver||'v1';
+  var status=opts.status||'草稿';
+  var row=document.createElement('div');
+  row.className='mt-row clickable';
+  row.setAttribute('data-code',code);
+  row.setAttribute('data-name',name);
+  row.setAttribute('data-scene',scene);
+  row.setAttribute('data-ver',ver);
+  row.setAttribute('data-status',status);
+  var sc=(opts.scheme)||readScheme();
+  row.setAttribute('data-model',sc.model);
+  row.setAttribute('data-w',(sc.w||SCHEME_DEFAULT.w).join(','));
+  row.setAttribute('data-rerank',sc.rerank);
+  if(opts.pending){row.setAttribute('data-pending','1');}
+  if(opts.preset){row.setAttribute('data-preset','1');}
+  row.innerHTML='<div class="q mono">'+escHtml(code)+'</div>'+
+    '<div class="c">'+escHtml(name||'未命名策略')+'</div>'+
+    '<div class="c">'+escHtml(scene)+'</div>'+
+    '<div class="num">'+escHtml(ver)+'</div>'+
+    '<span class="badge '+(opts.badge||'pend')+'" data-role="status">'+escHtml(status)+'</span>'+
+    '<div class="c">'+todayStr()+'</div>'+
+    '<div class="act-wrap"><button class="mini-btn primary" type="button" onclick="event.stopPropagation();editStrategy(this)">编辑</button>'+(opts.preset?'<span class="tag-preset" data-role="preset">系统预置</span>':'')+'</div>';
+  row.addEventListener('click',function(){editStrategy(row);});
+  var head=table.querySelector('.mt-row.head');
+  if(head&&head.nextSibling){table.insertBefore(row,head.nextSibling);}else{table.appendChild(row);}
+  flashRow(row);
+  renderStrategyPager();
+  return row;
+}
+function resetEditorDefaults(scene){
+  var n=document.getElementById('nsName'),
+      s=document.getElementById('nsScene');
+  if(n){n.value='';}
+  if(s){
+    var want=scene||'通用',found=false;
+    for(var i=0;i<s.options.length;i++){if(s.options[i].text===want){found=true;break;}}
+    s.value=found?want:'通用';
+  }
+  applyScheme({model:SCHEME_DEFAULT.model,w:SCHEME_DEFAULT.w,rerank:'on'});
+}
+/* 新建：打开页面级大弹窗（空白策略，默认三段参数 + 权重 50/30/10/10），保存后列表才新增行 */
+function openNewStrategy(scene){
+  var code=genCode();
+  ED={mode:'new',code:code,name:'',ver:'v1',ro:false,preset:false};
+  resetEditorDefaults(scene);
+  setEditorMeta('新建策略（未命名）',code,'v1');
+  setEditorStatus('草稿');
+  resetFooter(false);
+  setRo(false);
+  setPresetTag(false);
+  openStrategyEditor('new','新建策略');
+}
+/* 编辑：点列表行或行内「编辑」→ 弹窗载入该策略配置 */
+function editStrategy(el){
+  var row=el&&el.closest?el.closest('.mt-row'):null;
+  if(!row||!row.getAttribute('data-code')){return;}
+  var code=row.getAttribute('data-code')||'';
+  var name=row.getAttribute('data-name')||'';
+  var scene=row.getAttribute('data-scene')||'通用';
+  var ver=row.getAttribute('data-ver')||'v1';
+  var status=row.getAttribute('data-status')||'生效中';
+  if(code===ED.code&&EDM.open){
+    openStrategyEditor('edit','编辑策略');
+    return;
+  }
+  var preset=(row.getAttribute('data-preset')==='1');
+  ED={mode:'edit',code:code,name:name,ver:ver,ro:false,preset:preset};
+  var n=document.getElementById('nsName');
+  if(n){n.value=name;}
+  ensureSceneOption(scene);
+  var s=document.getElementById('nsScene');
+  if(s){
+    var found=false;
+    for(var i=0;i<s.options.length;i++){if(s.options[i].text===scene){found=true;break;}}
+    s.value=found?scene:'通用';
+  }
+  var pendCfg=(OPS_PENDING[code]&&OPS_PENDING[code].cfg)||null;
+  applyScheme(pendCfg||{
+    model:row.getAttribute('data-model')||SCHEME_DEFAULT.model,
+    w:(row.getAttribute('data-w')||SCHEME_DEFAULT.w.join(',')).split(',').map(function(x){return parseInt(x,10)||0;}),
+    rerank:row.getAttribute('data-rerank')||'on'
+  });
+  setEditorMeta(name||'未命名策略',code,ver);
+  setEditorStatus(pendCfg?'草稿':status);
+  resetFooter(false);
+  setRo(false);
+  setPresetTag(preset);
+  openStrategyEditor('edit','编辑策略');
+}
+function ensureStrategyRow(name,scene){
+  var row=findStrategyRow(ED.code);
+  if(row){updateStrategyRow(name,scene);return row;}
+  return createStrategyRow(ED.code,{name:name,scene:scene,ver:ED.ver||'v1',status:'草稿',badge:'pend'});
+}
+function updateStrategyRow(name,scene){
+  var row=findStrategyRow(ED.code);
+  if(!row){return;}
+  row.setAttribute('data-name',name);
+  row.setAttribute('data-scene',scene);
+  var sc=readScheme();
+  row.setAttribute('data-model',sc.model);
+  row.setAttribute('data-w',sc.w.join(','));
+  row.setAttribute('data-rerank',sc.rerank);
+  var cs=row.querySelectorAll('.c');
+  if(cs[0]){cs[0].textContent=name;}
+  if(row.getAttribute('data-preset')==='1'&&!row.querySelector('[data-role="preset"]')){
+    var presetAct=row.querySelector('.act-wrap');
+    if(presetAct){presetAct.innerHTML+='<span class="tag-preset" data-role="preset">系统预置</span>';}
+  }
+  if(cs[1]){cs[1].textContent=scene;}
+}
+/* 草稿只回写名称 / 场景：生效配置留在行上，由发布时整体回写 */
+function updateStrategyMeta(name,scene){
+  var row=findStrategyRow(ED.code);
+  if(!row){return;}
+  row.setAttribute('data-name',name);
+  row.setAttribute('data-scene',scene);
+  var cs=row.querySelectorAll('.c');
+  if(cs[0]){cs[0].textContent=name;}
+  if(cs[1]){cs[1].textContent=scene;}
+}
+function markRowStatus(status,badgeCls,ver){
+  var row=findStrategyRow(ED.code);
+  if(!row){return;}
+  row.setAttribute('data-status',status);
+  row.removeAttribute('data-pending');
+  if(ver){
+    row.setAttribute('data-ver',ver);
+    var num=row.querySelector('.num');
+    if(num){num.textContent=ver;}
+  }
+  var b=row.querySelector('[data-role="status"]');
+  if(b){b.className='badge '+(badgeCls||'pend');b.textContent=status;}
+  var cs=row.querySelectorAll('.c');
+  if(cs[2]){cs[2].textContent=todayStr();}
+}
+/* 保存草稿：列表写草稿行 → 关闭弹窗回列表（不发布、不影响检索） */
+function saveDraft(){
+  if(ED.ro){toast('当前策略只读','err');return;}
+  if(!EDM.open){return;}
+  var nameEl=document.getElementById('nsName');
+  var name=nameEl?nameEl.value.trim():'';
+  if(!name){toast('请填写策略名称','err');if(nameEl){nameEl.focus();}return;}
+  var sceneEl=document.getElementById('nsScene');
+  var scene=sceneEl?sceneEl.value:'通用';
+  var existed=findStrategyRow(ED.code);
+  var prevStatus=existed?(existed.getAttribute('data-status')||''):'';
+  var isNew=!existed;
+  var baseCfg=existed?cfgOfRow(existed):null;
+  var prevVer=existed?(existed.getAttribute('data-ver')||ED.ver):'';
+  ED.name=name;
+  var oldPend=OPS_PENDING[ED.code];
+  var schemeNow=readScheme();
+  var effBase=oldPend&&oldPend.base?oldPend.base:baseCfg;
+  var firstDraft=!!(oldPend&&!oldPend.from);
+  var to=oldPend?oldPend.to:(isNew?(ED.ver||'v1'):bumpVer(prevVer||ED.ver));
+  /* 草稿不改生效配置：只回写名称 / 场景，新策略才落行 */
+  var row=isNew
+    ?createStrategyRow(ED.code,{name:name,scene:scene,ver:ED.ver||'v1',status:'草稿',badge:'pend'})
+    :existed;
+  if(!isNew){updateStrategyMeta(name,scene);}
+  /* 保存草稿＝产生待发布版本；配置与生效版一致则不产生变更 */
+  if(isNew||firstDraft||(effBase&&!sameScheme(effBase,schemeNow))){
+    OPS_PENDING[ED.code]={
+      from:oldPend?oldPend.from:(isNew?null:prevVer),
+      to:to,
+      base:oldPend?oldPend.base:baseCfg,
+      cfg:schemeNow,
+      at:todayStr()
+    };
+  }else{
+    delete OPS_PENDING[ED.code];
+  }
+  var pendNow=OPS_PENDING[ED.code];
+  var statusNow=(isNew||!prevStatus||prevStatus==='草稿')?'草稿':(pendNow?'编辑中':'生效中');
+  markRowStatus(statusNow,statusNow==='生效中'?'ok':'pend',ED.ver);
+  ED.mode='edit';
+  setEditorMeta(name,ED.code,ED.ver);
+  setEditorStatus(statusNow);
+  renderSceneTable();
+  syncOpsOptions();
+  closeStrategyEditor();
+  flashRow(row);
+  toast('已保存草稿','ok');
+}
+
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape'){return;}
+  var cf=document.getElementById('cfMask');
+  if(cf&&cf.classList.contains('show')){closeModal('cfMask');return;}
+  var scm=document.getElementById('sceneMask');
+  if(scm&&scm.classList.contains('show')){closeModal('sceneMask');return;}
+  if(EDM.open){closeStrategyEditor();return;}
+});
+
+/* ===== 初始化：场景下拉 / 场景字典列表（演示态前端数组） ===== */
+syncSceneOptions();
+renderSceneTable();
+syncOpsOptions();
+renderStrategyPager();
+
+/* ===== 系统门户桥接（index.html 壳用，单页直开无副作用）sysBridge v2 ===== */
+(function(){
+  try{
+    if(window.parent && window.parent!==window){
+      window.parent.postMessage({type:'sys-page',page:'P5',name:'策略管理'},'*');
+    }
+  }catch(e){}
+})();
+
+
+
+/* ===== 研发说明抽屉（九页统一：头部胶囊入口 + 右侧 520px 抽屉） ===== */
+function openDev(){
+  var d = document.getElementById('devDrawer'), m = document.getElementById('devMask');
+  if(d) d.classList.add('open');
+  if(m) m.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeDev(){
+  var d = document.getElementById('devDrawer'), m = document.getElementById('devMask');
+  if(d) d.classList.remove('open');
+  if(m) m.classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeDev(); });
+</script>
+</body>
+</html>
