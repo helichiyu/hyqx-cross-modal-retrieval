@@ -53,6 +53,7 @@
 ```bash
 python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt
 .venv/Scripts/python scripts/make_samples.py
+.venv/Scripts/python scripts/build_cmr_testset.py   # 可选：重建四模态回归测试集（需 pyarrow）
 .venv/Scripts/python scripts/download_models.py
 .venv/Scripts/python -m uvicorn router.main:app --host 127.0.0.1 --port 6300
 .venv/Scripts/python scripts/e2e_m1.py

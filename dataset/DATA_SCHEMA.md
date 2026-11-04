@@ -53,3 +53,28 @@ dataset/sample/
 - 文本/图像/视频帧：Chinese-CLIP ViT-B/16，512 维
 - 音频：CLAP htsat-fused，512 维
 - 两通道各自独立向量空间，融合在 408m_retrieval 按策略权重加权
+
+## 5. 四模态回归测试集 `cmr_testset/`
+
+`sample/` 只用于链路冒烟；需要真实语义和指标回归时使用 `dataset/cmr_testset/`：
+100 张图 + 50 条音频 + 10 段合成视频 + 1 个文本（约 13MB，可入库）。
+
+| 路径 | 内容 |
+| --- | --- |
+| `cmr_testset/images/` | 100 张 jpg，来自 Flickr30K-CN |
+| `cmr_testset/audio/` | 50 条 5s、16kHz 单声道 wav，ESC-50 动物类 |
+| `cmr_testset/videos/` | 10 段 2s mp4，由前 10 张图合成，用于覆盖视频抽帧 |
+| `cmr_testset/text/notes.txt` | 说明文本 |
+| `cmr_testset/metadata.json` | 401 声明的 count/modalities |
+| `cmr_testset_eval/eval_image.jsonl` | 100 条中文查询 → 图像 |
+| `cmr_testset_eval/eval_audio.jsonl` | 50 条英文查询 → 音频 |
+| `cmr_testset_eval/eval_video.jsonl` | 10 条中文查询 → 视频 |
+| `cmr_testset_eval/eval_all.jsonl` | 合并 160 条，供 409 使用 |
+
+- 评测集放在数据集目录**之外**，避免 403 把 `*.jsonl` 当文本解析。
+- 完整版（1000 图 / 200 音频）与本地重建：
+  ```bash
+  python -m pip install pyarrow
+  python scripts/build_cmr_testset.py --images 1000 --audio 200
+  ```
+- 来源与许可见 [cmr_testset_ATTRIBUTION.md](cmr_testset_ATTRIBUTION.md)；仅限内部测试，对外交付前需确认授权。

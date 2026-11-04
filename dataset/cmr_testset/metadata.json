@@ -1,0 +1,14 @@
+{
+  "name": "cmr-testset-flickr30kcn-esc50",
+  "version": "v1",
+  "count": 161,
+  "modalities": [
+    "text",
+    "image",
+    "audio",
+    "video"
+  ],
+  "scenes": [
+    "cross-modal-retrieval-test"
+  ]
+}
