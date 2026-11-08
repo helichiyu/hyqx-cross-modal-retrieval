@@ -7,7 +7,7 @@ export interface ApiEnvelope<T> {
 }
 
 export interface PageResult<T> {
-  list: T[]
+  records: T[]
   total: number
   pageNum: number
   pageSize: number
@@ -138,6 +138,7 @@ export interface TaskLogVO {
   step: string
   status: string
   message: string | null
+  operatorOutputJson: string | null
   createTime: string | null
 }
 

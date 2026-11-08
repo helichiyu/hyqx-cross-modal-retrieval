@@ -1,111 +1,158 @@
 <template>
-  <el-container class="portal">
-    <el-aside width="220px" class="aside">
-      <div class="logo">
-        <el-icon :size="22"><Search /></el-icon>
-        <span>跨模态检索中心</span>
-      </div>
-      <el-menu
-        :default-active="$route.path"
-        router
-        background-color="#001529"
-        text-color="#a6adb4"
-        active-text-color="#ffffff"
-      >
-        <el-menu-item v-for="item in menus" :key="item.path" :index="item.path">
-          <el-icon><component :is="item.icon" /></el-icon>
-          <span>{{ item.title }}</span>
-        </el-menu-item>
-      </el-menu>
-    </el-aside>
-    <el-container>
-      <el-header class="header">
-        <div class="header-title">{{ $route.meta.title }}</div>
+  <div class="workspace">
+    <aside class="sidebar">
+      <nav class="nav-scroll">
+        <template v-for="(group, groupIndex) in navGroups" :key="groupIndex">
+          <div v-if="group.title" class="nav-group-title">{{ group.title }}</div>
+          <RouterLink
+            v-for="item in group.items"
+            :key="item.path"
+            :to="item.path"
+            :title="item.title"
+            class="nav-item"
+            :class="{ active: isActive(item.path) }"
+          >
+            <span class="ico"><el-icon><component :is="item.icon" /></el-icon></span>
+            <span>{{ item.title }}</span>
+          </RouterLink>
+          <div v-if="group.divider" class="nav-divider" />
+        </template>
+      </nav>
+    </aside>
 
-        <span class="user-chip">
-          <el-icon><User /></el-icon>
-          {{ auth.user?.nickname || auth.user?.username }}
-          <el-tag size="small" effect="plain">{{ roleLabel }}</el-tag>
-        </span>
-      </el-header>
-      <el-main class="main">
-        <router-view />
-      </el-main>
-    </el-container>
-  </el-container>
+    <main class="main">
+      <router-view />
+    </main>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
-import { routes } from '../router'
 
-const auth = useAuthStore()
 const route = useRoute()
-const ROLE_LABELS: Record<string, string> = {
-  admin: '管理员',
-  operator: '运营',
-  user: '检索用户',
+
+const navGroups = [
+  {
+    title: '',
+    divider: true,
+    items: [
+      { path: '/search', title: '检索台', icon: 'Search' },
+      { path: '/history', title: '检索历史', icon: 'Clock' },
+    ],
+  },
+  {
+    title: '',
+    divider: false,
+    items: [
+      { path: '/library', title: '库管理', icon: 'FolderOpened' },
+      { path: '/strategies', title: '策略管理', icon: 'SetUp' },
+      { path: '/tasks', title: '任务管理', icon: 'List' },
+      { path: '/operation', title: '结果运营', icon: 'Service' },
+      { path: '/evaluation', title: '效果评测', icon: 'DataAnalysis' },
+    ],
+  },
+]
+
+function isActive(path: string) {
+  return route.path === path || route.path.startsWith(`${path}/`)
 }
-
-const roleLabel = computed(() => ROLE_LABELS[auth.role] ?? auth.role)
-
-// 按当前角色权限过滤菜单（与路由守卫同一套 permission 码）
-const menus = computed(() => {
-  const main = routes.find((r) => r.path === '/')
-  return (main?.children ?? [])
-    .filter((c) => !c.meta?.hidden)
-    .filter((c) => !c.meta?.permission || auth.permissions.has(c.meta.permission as string))
-    .map((c) => ({
-      path: '/' + c.path,
-      title: c.meta?.title as string,
-      icon: c.meta?.icon as string,
-    }))
-})
-
 </script>
 
 <style scoped>
-.portal {
-  height: 100%;
-}
-.aside {
-  background: #001529;
-}
-.logo {
+.workspace {
+  min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #fff;
-  font-size: 15px;
-  font-weight: 600;
-  height: 56px;
-  padding: 0 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 100vh;
+  background: var(--workspace-bg);
 }
-.aside :deep(.el-menu) {
-  border-right: none;
-}
-.header {
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   background: #fff;
-  border-bottom: 1px solid #e4e7ed;
+  border-right: 1px solid var(--content-line);
 }
-.header-title {
-  font-size: 16px;
-  font-weight: 600;
+
+.nav-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 12px;
 }
-.user-chip {
+
+.nav-group-title {
+  margin: 8px 10px 6px;
+  color: #98a2b3;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.nav-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  cursor: pointer;
+  gap: 9px;
+  min-height: 36px;
+  padding: 0 10px;
+  margin-bottom: 2px;
+  border-radius: 6px;
+  color: #344054;
   font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.16s ease, color 0.16s ease;
 }
+
+.nav-item:hover {
+  background: var(--system-blue-weak);
+  color: var(--system-blue);
+}
+
+.nav-item.active {
+  background: var(--system-blue-weak);
+  color: var(--system-blue);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--system-blue);
+}
+
+.ico {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a96ad;
+  flex-shrink: 0;
+}
+
+.nav-item:hover .ico,
+.nav-item.active .ico {
+  color: var(--system-blue);
+}
+
+.nav-divider {
+  height: 1px;
+  margin: 8px 10px;
+  background: var(--content-line);
+}
+
 .main {
-  padding: 0;
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .workspace { flex-direction: column; }
+  .sidebar { position: relative; width: 100%; height: auto; border-right: 0; border-bottom: 1px solid var(--content-line); }
+  .nav-scroll { display: flex; align-items: center; gap: 4px; overflow-x: auto; padding: 8px 10px; }
+  .nav-item { flex: 0 0 auto; min-height: 34px; }
+  .nav-divider { width: 1px; height: 22px; margin: 0 5px; flex: 0 0 1px; }
+  .main { height: auto; min-height: 0; overflow: visible; }
 }
 </style>

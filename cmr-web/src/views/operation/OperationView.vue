@@ -1,384 +1,547 @@
 <template>
-  <div class="page-card">
-    <el-card>
-      <el-tabs v-model="tab">
-        <!-- 反馈单 -->
-        <el-tab-pane label="结果反馈" name="feedback">
-          <div class="toolbar">
-            <el-select v-model="fbTypeFilter" placeholder="类型" clearable style="width: 150px">
-              <el-option v-for="d in fbTypeDict" :key="d.alias" :label="d.label" :value="d.alias" />
-            </el-select>
-            <el-select v-model="fbStatusFilter" placeholder="状态" clearable style="width: 130px">
-              <el-option v-for="d in fbStatusDict" :key="d.alias" :label="d.label" :value="d.alias" />
-            </el-select>
-            <el-button type="primary" @click="loadFeedbacks">查询</el-button>
+  <div class="p7-root">
+    <div class="main"><div class="content">
+      <section class="module-intro"><div><h2>结果运营</h2><p>把检索结果不准的地方反馈回去，把运营推荐词用于检索台联想。</p></div><button class="dev-entry" type="button" @click="openDev"><span class="de-q" aria-hidden="true">?</span>研发说明</button></section>
+      <div class="flow">
+        <section class="panel flow-block">
+          <div class="blk-head">
+            <div class="blk-title"><h3>反馈</h3><span class="sec-sub">登记 → 处理 → 闭环</span></div>
+            <div class="panel-act">
+              <select v-model="fbTypeFilter" class="p7-select" @change="loadFeedbacks(1)"><option value="">全部类型</option><option v-for="item in fbTypeDict" :key="item.alias" :value="item.alias">{{ item.label }}</option></select>
+              <select v-model="fbStatusFilter" class="p7-select" @change="loadFeedbacks(1)"><option value="">全部状态</option><option v-for="item in fbStatusDict" :key="item.alias" :value="item.alias">{{ item.label }}</option></select>
+              <button class="btn-primary" type="button" @click="openRegister">登记反馈</button>
+            </div>
           </div>
-          <el-table :data="feedbacks" v-loading="fbLoading" border stripe>
-            <el-table-column label="反馈编号" width="180">
-              <template #default="{ row }"><BizNoTag :value="row.bizNo" /></template>
-            </el-table-column>
-            <el-table-column label="关联检索" width="180">
-              <template #default="{ row }"><BizNoTag :value="row.searchBizNo" /></template>
-            </el-table-column>
-            <el-table-column label="类型" width="110">
-              <template #default="{ row }">{{ dictLabel(fbTypeDict, row.type) }}</template>
-            </el-table-column>
-            <el-table-column prop="description" label="说明" min-width="180" show-overflow-tooltip />
-            <el-table-column label="状态" width="90">
-              <template #default="{ row }">
-                <StatusTag :value="row.status" :dict="fbStatusDict" />
-              </template>
-            </el-table-column>
-            <el-table-column label="去向" width="100">
-              <template #default="{ row }">{{ dictLabel(fbTargetDict, row.target) }}</template>
-            </el-table-column>
-            <el-table-column label="登记时间" width="160">
-              <template #default="{ row }">{{ fmtTime(row.createTime) }}</template>
-            </el-table-column>
-            <el-table-column label="操作" width="150" fixed="right">
-              <template #default="{ row }">
-                <el-button
-                  v-if="row.status === 'pending'"
-                  link
-                  type="primary"
-                  @click="openProcess(row)"
-                >
-                  开始处理
-                </el-button>
-                <el-button
-                  v-if="row.status !== 'closed'"
-                  link
-                  type="success"
-                  @click="openClose(row)"
-                >
-                  闭环
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-pagination
-            v-model:current-page="fbPage"
-            :page-size="10"
-            :total="fbTotal"
-            layout="total, prev, pager, next"
-            style="margin-top: 12px; justify-content: flex-end"
-            @change="loadFeedbacks"
-          />
-        </el-tab-pane>
+          <div class="cov-sum"><span><b>{{ fbTotal }}</b> 条反馈单</span><span><b>{{ pendingCount }}</b> 条待处理</span><span><b>{{ processingCount }}</b> 条处理中</span><span><b>{{ closedCount }}</b> 条已闭环</span></div>
+          <div class="dtable fb-table"><table class="dt"><thead><tr><th>反馈单</th><th>类型</th><th>去向</th><th>状态</th><th>操作</th></tr></thead><tbody>
+            <tr v-if="fbLoading"><td colspan="5" class="table-empty">加载中…</td></tr>
+            <tr v-else-if="!feedbacks.length"><td colspan="5" class="table-empty">暂无反馈单</td></tr>
+            <tr v-for="row in feedbacks" v-else :key="row.id">
+              <td class="tid">{{ row.bizNo }}<div class="fb-note">{{ row.searchBizNo || '—' }} · {{ row.description || '无补充说明' }}</div></td>
+              <td>{{ dictLabel(fbTypeDict,row.type) }}</td><td>{{ dictLabel(fbTargetDict,row.target) }}</td>
+              <td><span class="badge" :class="feedbackStatusClass(row.status)">{{ dictLabel(fbStatusDict,row.status) }}</span></td>
+              <td><button v-if="row.status==='pending'" class="btn-ghost btn-xs" type="button" @click="openProcess(row)">开始处理</button><button v-if="row.status!=='closed'" class="btn-ghost btn-xs" type="button" @click="openClose(row)">闭环</button><button v-if="row.status==='closed'" class="btn-ghost btn-xs" type="button" disabled>已闭环</button></td>
+            </tr>
+          </tbody></table></div>
+          <div class="pager-bar"><span class="pager-total">共 {{ fbTotal }} 条</span><button class="pager-btn" type="button" :disabled="fbPage<=1" @click="loadFeedbacks(fbPage-1)">上一页</button><button class="pager-num is-cur" type="button">{{ fbPage }}</button><span class="pager-gap">/</span><span class="pager-total">{{ fbPageCount }}</span><button class="pager-btn" type="button" :disabled="fbPage>=fbPageCount" @click="loadFeedbacks(fbPage+1)">下一页</button></div>
+        </section>
 
-        <!-- 推荐词 -->
-        <el-tab-pane label="推荐词" name="words">
-          <div class="toolbar">
-            <el-input
-              v-model="wordKeyword"
-              placeholder="词搜索"
-              clearable
-              style="width: 200px"
-              @keyup.enter="loadWords"
-            />
-            <el-button type="primary" @click="loadWords">查询</el-button>
-            <div class="grow" />
-            <el-button type="primary" :icon="'Plus'" @click="openWord()">新增推荐词</el-button>
+        <section class="panel flow-block">
+          <div class="blk-head"><div class="blk-title"><h3>运营推荐词</h3><span class="sec-sub">运营维护，推送到检索台联想</span></div><div class="panel-act"><button class="btn-ghost" type="button" @click="openWord()">＋ 添加推荐词</button></div></div>
+          <div class="cov-sum"><span>开关即时生效</span><span>开 = 进入检索联想</span><span>关 = 停推不进入</span></div>
+          <div class="dtable rec-table"><table class="dt"><thead><tr><th class="col-rank">序号</th><th>推荐词</th><th>场景</th><th>状态</th><th class="col-sw">开关</th><th class="col-act">操作</th></tr></thead><tbody>
+            <tr v-if="wordLoading"><td colspan="6" class="rec-empty">加载中…</td></tr>
+            <tr v-else-if="!words.length"><td colspan="6" class="rec-empty">暂无推荐词</td></tr>
+            <tr v-for="(row,index) in words" v-else :key="row.id">
+              <td class="mono">{{ index+1 }}</td><td class="tid">{{ row.word }}</td><td>{{ sceneLabel(row.scene) }}</td>
+              <td><span class="rec-state" :class="row.enabled?'on':'off'">{{ row.enabled?'生效·进入联想':'停推·不进入联想' }}</span></td>
+              <td><button class="switch" :class="{on:row.enabled}" type="button" role="switch" :aria-checked="row.enabled" @click="toggleWord(row)"><span class="knob"></span></button></td>
+              <td><button class="rec-del" type="button" @click="removeWordRow(row)">删除</button><button class="rec-del" type="button" @click="openWord(row)">编辑</button></td>
+            </tr>
+          </tbody></table></div>
+        </section>
+      </div>
+    </div></div>
+    <div class="toast" :class="{show:toastVisible,ok:toastType==='ok',err:toastType==='err'}">{{ toastMessage }}</div>
+
+    <!-- 登记反馈 -->
+    <div class="modal-mask" :class="{show:registerVisible}" @click.self="registerVisible=false">
+      <div class="modal-box" style="width:680px">
+        <div class="modal-head"><h3>登记反馈</h3><button class="modal-close" type="button" @click="registerVisible=false">×</button></div>
+        <div class="modal-body">
+          <div class="mb-tip">先从检索历史选择一条记录，再填写反馈类型与说明。</div>
+          <input v-model="historyKeyword" class="hist-search" type="search" placeholder="搜索查询内容" @input="filterHistories">
+          <div class="pick-list">
+            <label v-for="row in filteredHistories" :key="row.id" class="pick-row" :class="{ 'is-pick': selectedHistory?.id===row.id }">
+              <input v-model="selectedHistoryId" class="pick-ck" type="radio" :value="row.id">
+              <span class="pick-main"><span class="pick-q">{{ row.queryText || '（文件语义检索）' }}</span><span class="pick-sub">{{ row.createTime }} · 结果 {{ row.itemCount ?? 0 }} 条 · {{ row.bizNo }}</span></span>
+            </label>
+            <div v-if="!filteredHistories.length" class="pick-empty">没有匹配的检索记录</div>
           </div>
-          <el-table :data="words" v-loading="wordLoading" border stripe>
-            <el-table-column label="编号" width="180">
-              <template #default="{ row }"><BizNoTag :value="row.bizNo" /></template>
-            </el-table-column>
-            <el-table-column prop="word" label="词" min-width="140" />
-            <el-table-column label="场景" width="120">
-              <template #default="{ row }">{{ sceneLabel(row.scene) }}</template>
-            </el-table-column>
-            <el-table-column label="启用" width="90" align="center">
-              <template #default="{ row }">
-                <el-switch
-                  :model-value="row.enabled"
-                  @change="(v: string | number | boolean) => toggleWord(row, v)"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column prop="sort" label="排序" width="80" align="center" />
-            <el-table-column label="操作" width="130" fixed="right">
-              <template #default="{ row }">
-                <el-button link type="primary" @click="openWord(row)">编辑</el-button>
-                <el-button link type="danger" @click="removeWordRow(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-tab-pane>
-      </el-tabs>
-    </el-card>
+          <div v-if="selectedHistory" class="pick-chosen">已选择 <b>{{ selectedHistory.queryText || selectedHistory.bizNo }}</b></div>
+          <div class="fb-step">反馈内容</div>
+          <div class="p7-form-grid">
+            <label class="fld">反馈类型<select v-model="registerForm.type"><option v-for="item in fbTypeDict" :key="item.alias" :value="item.alias">{{ item.label }}</option></select></label>
+            <label class="fld">说明<textarea v-model="registerForm.description" rows="3" placeholder="说明问题、期望结果或来源差异"></textarea></label>
+          </div>
+        </div>
+        <div class="modal-foot"><button class="btn-ghost" type="button" @click="registerVisible=false">取消</button><button class="btn-primary" type="button" :disabled="registerSubmitting" @click="submitRegister">{{ registerSubmitting?'提交中…':'提交登记' }}</button></div>
+      </div>
+    </div>
 
-    <!-- 开始处理 -->
-    <el-dialog v-model="processVisible" title="开始处理反馈" width="460px">
-      <el-form label-width="90px">
-        <el-form-item label="处理去向">
-          <el-select v-model="processTarget" style="width: 100%">
-            <el-option label="策略调优" value="strategy" />
-            <el-option label="数据源补充" value="datasource" />
-            <el-option label="数据回填" value="backfill" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="processVisible = false">取消</el-button>
-        <el-button type="primary" :loading="processing" @click="submitProcess">确认处理中</el-button>
-      </template>
-    </el-dialog>
+    <!-- 处理反馈 -->
+    <div class="modal-mask" :class="{show:processVisible}" @click.self="processVisible=false">
+      <div class="modal-box" style="width:460px"><div class="modal-head"><h3>开始处理反馈</h3><button class="modal-close" type="button" @click="processVisible=false">×</button></div>
+        <div class="modal-body"><div class="mb-tip">选择处理去向后进入处理中。</div><label class="fld">处理去向<select v-model="processTarget"><option value="strategy">策略调优</option><option value="datasource">数据源补充</option><option value="backfill">数据回填</option></select></label></div>
+        <div class="modal-foot"><button class="btn-ghost" type="button" @click="processVisible=false">取消</button><button class="btn-primary" type="button" :disabled="processing" @click="submitProcess">确认处理中</button></div>
+      </div>
+    </div>
 
     <!-- 闭环 -->
-    <el-dialog v-model="closeVisible" title="反馈闭环" width="460px">
-      <el-input
-        v-model="closeNote"
-        type="textarea"
-        :rows="3"
-        placeholder="处理结果说明（如：已调整安防场景权重 v3 / 已补充 xx 数据集）"
-      />
-      <template #footer>
-        <el-button @click="closeVisible = false">取消</el-button>
-        <el-button type="primary" :loading="closing" @click="submitClose">闭环（终态）</el-button>
-      </template>
-    </el-dialog>
+    <div class="modal-mask" :class="{show:closeVisible}" @click.self="closeVisible=false">
+      <div class="modal-box" style="width:500px"><div class="modal-head"><h3>反馈闭环</h3><button class="modal-close" type="button" @click="closeVisible=false">×</button></div>
+        <div class="modal-body"><div class="mb-tip">闭环后进入终态，不能再次修改。</div><label class="fld">处理结果说明<textarea v-model="closeNote" rows="3" placeholder="如：已调整安防场景权重 v3 / 已补充 xx 数据集"></textarea></label></div>
+        <div class="modal-foot"><button class="btn-ghost" type="button" @click="closeVisible=false">取消</button><button class="btn-primary" type="button" :disabled="closing" @click="submitClose">闭环（终态）</button></div>
+      </div>
+    </div>
 
-    <!-- 推荐词编辑 -->
-    <el-dialog v-model="wordVisible" :title="wordForm.id ? '编辑推荐词' : '新增推荐词'" width="440px">
-      <el-form label-width="80px">
-        <el-form-item label="词" required>
-          <el-input v-model="wordForm.word" />
-        </el-form-item>
-        <el-form-item label="场景">
-          <el-select v-model="wordForm.scene" style="width: 100%">
-            <el-option label="全部场景" value="all" />
-            <el-option v-for="d in scenes" :key="d.alias" :label="d.label" :value="d.alias" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="启用">
-          <el-switch v-model="wordForm.enabled" />
-        </el-form-item>
-        <el-form-item label="排序">
-          <el-input-number v-model="wordForm.sort" :min="0" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="wordVisible = false">取消</el-button>
-        <el-button type="primary" :loading="wordSubmitting" @click="submitWord">保存</el-button>
-      </template>
-    </el-dialog>
+    <!-- 推荐词 -->
+    <div class="modal-mask" :class="{show:wordVisible}" @click.self="wordVisible=false">
+      <div class="modal-box" style="width:460px"><div class="modal-head"><h3>{{ wordForm.id?'编辑推荐词':'添加推荐词' }}</h3><button class="modal-close" type="button" @click="wordVisible=false">×</button></div>
+        <div class="modal-body p7-form-grid"><label class="fld">推荐词<input v-model.trim="wordForm.word" maxlength="60"></label><label class="fld">场景<select v-model="wordForm.scene"><option value="all">全部场景</option><option v-for="item in scenes" :key="item.alias" :value="item.alias">{{ item.label }}</option></select></label><label class="fld">排序<input v-model.number="wordForm.sort" type="number" min="0"></label><label class="ed-switch"><input v-model="wordForm.enabled" type="checkbox"><span>启用</span><b>{{ wordForm.enabled?'开':'关' }}</b></label></div>
+        <div class="modal-foot"><button class="btn-ghost" type="button" @click="wordVisible=false">取消</button><button class="btn-primary" type="button" :disabled="wordSubmitting" @click="submitWord">保存</button></div>
+      </div>
+    </div>
+    <div class="dev-mask" :class="{ open: devOpen }" @click="closeDev"></div>
+    <div class="dev-drawer" :class="{ open: devOpen }" role="dialog" aria-modal="true" aria-label="研发需求说明">
+      <div class="dev-head">
+        <h3>研发需求说明</h3>
+        <span class="dh-tag">给研发</span>
+        <button type="button" class="dev-close" id="devClose" title="关闭（Esc）" aria-label="关闭" @click="closeDev">×</button>
+      </div>
+      <div class="dev-body dev-stack">
+      <div class="panel-head">
+        <div class="sec-head">
+          <span class="sec-title">研发说明 · 模块收敛与覆盖</span>
+          <span class="sec-sub">14 个三级模块 → 2 个核心业务块</span>
+        </div>
+        <span class="badge gray">研发视角</span>
+      </div>
+      <p class="research-lead">
+        页面正文只保留 2 个业务块与主操作（反馈：登记反馈；运营推荐词：添加推荐词与逐词开关），<b>模块编号与 F-CR 编号只在本说明中出现</b>。
+        数据流、输入输出、价值句、来源句、块底口径与页面总结统一在本说明的「数据口径」段，正文只留控件、列表、状态与数据数字。
+      </p>
+      <div class="cover-note">
+        <div class="cn-title">数据口径 · 逐条归档</div>
+        <ul>
+          <li><b>页面数据流</b>：输入 = 反馈：检索历史 query（运营从分页列表选一条登记）+ 用户上报 + 零结果统计；运营推荐词：运营手动维护的词表（添加 / 删除 / 开关）。输出 = 反馈 → 策略调整 / 数据修正；运营推荐词 → 检索台联想。</li>
+          <li><b>页面总结</b>：运营从检索历史选 query 登记结果问题、形成反馈单后处理（反馈）→ 运营维护推荐词、直达检索台联想（运营推荐词）。</li>
+          <li><b>反馈 · 口径</b>：运营从检索历史选 query 登记「结果有问题」，形成反馈单，处理后改策略 / 改数据。登记时先在弹窗的检索历史分页列表里选一条 query（每页 10 条，可按 query 搜索，页码与上一页 / 下一页切换），该条带时间 / 结果数，再填反馈类型（结果不准 / 排序差 / 来源标错 / 零结果）+ 说明，来源标注「检索历史 · query」。</li>
+          <li><b>反馈 · 来源</b>：登记时记录来源（检索历史 / 用户上报 / 零结果），列表不单列「来源」列；系统统计仅作运营后台参考。</li>
+          <li><b>反馈 · 价值与输入输出</b>：反馈单 → 运营处理 → 改策略 / 改数据 → 下次结果变好。输入 = 检索历史 query + 用户上报 + 零结果统计 → 输出 = 策略调整 / 数据修正。</li>
+          <li><b>反馈 · 块底口径</b>：反馈单进入「待处理」，行内「处理」一次完成决定、执行单与核验；零结果 / 无点击 / 复搜的系统统计仅作运营后台参考。处理完即改策略或改数据，下一轮结果变好。</li>
+          <li><b>反馈 · 数据数字</b>：系统统计仅作运营后台参考。</li>
+          <li><b>运营推荐词 · 口径</b>：来源 = 运营手动维护（添加 / 删除 / 开关）；近 7 天搜索次数仅作参考；发布 = 每个推荐词的开关即时生效：开 = 生效进入联想，关 = 停推不进入。</li>
+          <li><b>运营推荐词 · 数据口径</b>：词表来自运营维护；近 7 天搜索次数仅作参考。</li>
+        </ul>
+      </div>
+      <p class="research-lead">
+        <b>数据口径补充</b>：反馈按「检索历史选 query → 登记 → 处理 → 改策略 / 改数据」一条链路承载，检索历史在弹窗内分页呈现（每页 10 条 + 搜索）。
+      </p>
+      <div class="cov-sum">
+        <span><b>2 块</b> 覆盖 5 个模块</span>
+        <span><b>导出</b>仅入口，由接口对接下游</span>
+        <span>登记反馈 从检索历史分页选一条 query，一次完成</span>
+      </div>
+      <div class="dtable">
+        <table class="dt cov-tb">
+          <thead><tr><th>模块</th><th>F-CR 范围</th><th>覆盖方式</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="tid">结果展示 / 导出</td>
+              <td class="mono">F-CR-162~164</td>
+              <td><span class="cov-tag on">导出：仅入口</span><span class="cov-desc">结果按条目卡片展示；导出保留入口，由接口对接下游</span></td>
+            </tr>
+            <tr>
+              <td class="tid">反馈登记归类</td>
+              <td class="mono">F-CR-176~179</td>
+              <td><span class="cov-tag on">由「反馈」块覆盖</span><span class="cov-desc">主按钮「登记反馈」：从检索历史分页列表选一条 query，再登记反馈类型与说明，一次完成归类与去向登记</span></td>
+            </tr>
+            <tr>
+              <td class="tid">运营反馈处理跟踪</td>
+              <td class="mono">F-CR-180~183</td>
+              <td><span class="cov-tag on">由「反馈」块覆盖</span><span class="cov-desc">行内「处理」一次完成处理决定、执行单与核验</span></td>
+            </tr>
+            <tr>
+              <td class="tid">零结果运营治理</td>
+              <td class="mono">F-CR-199~202</td>
+              <td><span class="cov-tag on">由「反馈」块覆盖</span><span class="cov-desc">系统统计仅作运营后台参考；运营从检索历史分页列表选到零结果 query 后登记「零结果」，与用户上报走同一「登记 / 处理」路径</span></td>
+            </tr>
+            <tr>
+              <td class="tid">热词运营方案管理</td>
+              <td class="mono">F-CR-203~205</td>
+              <td><span class="cov-tag on">由「运营推荐词」块覆盖</span><span class="cov-desc">推荐词列表 + 逐词开关：开关即改即生效，添加 / 删除由运营维护</span></td>
+            </tr>
+            <tr>
+              <td class="tid">运营改进跟踪</td>
+              <td class="mono">F-CR-213~216</td>
+              <td><span class="cov-tag on">由「反馈」块覆盖</span><span class="cov-desc">随行内「处理」登记整改问题</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="cover-note">
+        <div class="cn-title">运营推荐词 ↔ COSMIC 检索热词运营方案管理（1 条映射）</div>
+        <ul>
+          <li><b>确认方案生效状态</b> → 开关（开 = 生效进入联想 / 关 = 停推）</li>
+        </ul>
+      </div>
+      <div class="cover-note">
+        <div class="cn-title">过程覆盖说明（正文不出现模块编号与 F-CR）</div>
+        <ul>
+          <li><b>反馈选 query</b>：弹窗内检索历史分页呈现，每页 10 条、可按 query 搜索、页码与上一页 / 下一页切换；单选一条后展开表单，提交生成反馈单，来源标注「检索历史 · query」。</li>
+          <li><b>反馈口径</b>：主路径是运营从检索历史选一条 query 登记「结果有问题」（反馈类型 + 说明），来源标注「检索历史 · query」；系统统计仅作运营后台参考。</li>
+        </ul>
+      </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import {
-  closeFeedback,
-  createWord,
-  pageFeedbacks,
-  pageWords,
-  processFeedback,
-  removeWord,
-  updateWord,
-} from '../../api'
-import type { DictItem, FeedbackVO, WordVO } from '../../api/types'
-import BizNoTag from '../../components/BizNoTag.vue'
-import StatusTag from '../../components/StatusTag.vue'
-import { useDictStore } from '../../stores/dict'
-import { fmtTime } from '../../utils/format'
-
-const dictStore = useDictStore()
-
-const tab = ref('feedback')
-
-const dictLabel = (dict: DictItem[], alias?: string | null) =>
-  dict.find((d) => d.alias === alias)?.label ?? (alias || '-')
-
-// ---- 反馈 ----
-const feedbacks = ref<FeedbackVO[]>([])
-const fbLoading = ref(false)
-const fbTotal = ref(0)
-const fbPage = ref(1)
-const fbTypeFilter = ref('')
-const fbStatusFilter = ref('')
-const fbTypeDict = ref<DictItem[]>([])
-const fbStatusDict = ref<DictItem[]>([])
-const fbTargetDict = ref<DictItem[]>([])
-
-const processVisible = ref(false)
-const processing = ref(false)
-const processRow = ref<FeedbackVO | null>(null)
-const processTarget = ref('strategy')
-
-const closeVisible = ref(false)
-const closing = ref(false)
-const closeRow = ref<FeedbackVO | null>(null)
-const closeNote = ref('')
-
-async function loadFeedbacks() {
-  fbLoading.value = true
-  try {
-    const page = await pageFeedbacks({
-      pageNum: fbPage.value,
-      type: fbTypeFilter.value,
-      status: fbStatusFilter.value,
-    })
-    feedbacks.value = page.list
-    fbTotal.value = page.total
-  } catch (e) {
-    ElMessage.error((e as Error).message)
-  } finally {
-    fbLoading.value = false
-  }
-}
-
-function openProcess(row: FeedbackVO) {
-  processRow.value = row
-  processTarget.value = 'strategy'
-  processVisible.value = true
-}
-
-async function submitProcess() {
-  if (!processRow.value) {
-    return
-  }
-  processing.value = true
-  try {
-    await processFeedback(processRow.value.id, processTarget.value)
-    ElMessage.success('已进入处理中')
-    processVisible.value = false
-    await loadFeedbacks()
-  } catch (e) {
-    ElMessage.error((e as Error).message)
-  } finally {
-    processing.value = false
-  }
-}
-
-function openClose(row: FeedbackVO) {
-  closeRow.value = row
-  closeNote.value = ''
-  closeVisible.value = true
-}
-
-async function submitClose() {
-  if (!closeRow.value) {
-    return
-  }
-  closing.value = true
-  try {
-    await closeFeedback(closeRow.value.id, closeNote.value || undefined)
-    ElMessage.success('已闭环（终态）')
-    closeVisible.value = false
-    await loadFeedbacks()
-  } catch (e) {
-    ElMessage.error((e as Error).message)
-  } finally {
-    closing.value = false
-  }
-}
-
-// ---- 推荐词 ----
-const words = ref<WordVO[]>([])
-const wordLoading = ref(false)
-const wordKeyword = ref('')
-const scenes = ref<DictItem[]>([])
-
-const wordVisible = ref(false)
-const wordSubmitting = ref(false)
-const wordForm = reactive({
-  id: 0,
-  word: '',
-  scene: 'all',
-  enabled: true,
-  sort: 0,
-})
-
-const sceneLabel = (alias?: string | null) =>
-  alias === 'all' ? '全部场景' : (scenes.value.find((d) => d.alias === alias)?.label ?? alias ?? '-')
-
-async function loadWords() {
-  wordLoading.value = true
-  try {
-    const page = await pageWords({ keyword: wordKeyword.value })
-    words.value = page.list
-  } catch (e) {
-    ElMessage.error((e as Error).message)
-  } finally {
-    wordLoading.value = false
-  }
-}
-
-function openWord(row?: WordVO) {
-  wordForm.id = row?.id ?? 0
-  wordForm.word = row?.word ?? ''
-  wordForm.scene = row?.scene ?? 'all'
-  wordForm.enabled = row?.enabled ?? true
-  wordForm.sort = row?.sort ?? 0
-  wordVisible.value = true
-}
-
-async function submitWord() {
-  if (!wordForm.word.trim()) {
-    ElMessage.warning('请填写推荐词')
-    return
-  }
-  wordSubmitting.value = true
-  try {
-    const body = {
-      word: wordForm.word.trim(),
-      scene: wordForm.scene,
-      enabled: wordForm.enabled,
-      sort: wordForm.sort,
-    }
-    if (wordForm.id) {
-      await updateWord(wordForm.id, body)
-    } else {
-      await createWord(body)
-    }
-    ElMessage.success('已保存（联想即时生效）')
-    wordVisible.value = false
-    await loadWords()
-  } catch (e) {
-    ElMessage.error((e as Error).message)
-  } finally {
-    wordSubmitting.value = false
-  }
-}
-
-async function toggleWord(row: WordVO, v: string | number | boolean) {
-  try {
-    await updateWord(row.id, {
-      word: row.word,
-      scene: row.scene,
-      enabled: Boolean(v),
-      sort: row.sort,
-    })
-    row.enabled = Boolean(v)
-    ElMessage.success(v ? '已启用' : '已停用')
-  } catch (e) {
-    ElMessage.error((e as Error).message)
-  }
-}
-
-async function removeWordRow(row: WordVO) {
-  try {
-    await ElMessageBox.confirm(`删除推荐词「${row.word}」？`, '删除', { type: 'warning' })
-  } catch {
-    return
-  }
-  try {
-    await removeWord(row.id)
-    ElMessage.success('已删除')
-    await loadWords()
-  } catch (e) {
-    ElMessage.error((e as Error).message)
-  }
-}
-
-onMounted(async () => {
-  fbTypeDict.value = await dictStore.ensure('cmr_feedback_type')
-  fbStatusDict.value = await dictStore.ensure('cmr_feedback_status')
-  fbTargetDict.value = await dictStore.ensure('cmr_feedback_target')
-  scenes.value = await dictStore.ensure('cmr_scene')
-  await loadFeedbacks()
-  await loadWords()
-})
+import {computed,onMounted,reactive,ref} from 'vue'
+import{closeFeedback,createFeedback,createWord,pageFeedbacks,pageHistory,pageWords,processFeedback,removeWord,updateWord}from'../../api'
+import type{DictItem,FeedbackVO,HistoryVO,WordVO}from'../../api/types'
+import{useDictStore}from'../../stores/dict'
+const dictStore=useDictStore()
+const feedbacks=ref<FeedbackVO[]>([]);const fbLoading=ref(false);const fbTotal=ref(0);const fbPage=ref(1);const fbPageSize=10
+const fbTypeFilter=ref('');const fbStatusFilter=ref('');const fbTypeDict=ref<DictItem[]>([]);const fbStatusDict=ref<DictItem[]>([]);const fbTargetDict=ref<DictItem[]>([])
+const words=ref<WordVO[]>([]);const wordLoading=ref(false);const scenes=ref<DictItem[]>([])
+const histories=ref<HistoryVO[]>([]);const historyKeyword=ref('');const selectedHistoryId=ref<number|null>(null);const selectedHistory=computed(()=>histories.value.find(x=>x.id===selectedHistoryId.value)||null);const filteredHistories=computed(()=>{const k=historyKeyword.value.trim().toLowerCase();return histories.value.filter(x=>!k||(x.queryText||'').toLowerCase().includes(k)||x.bizNo.toLowerCase().includes(k))})
+const registerVisible=ref(false);const registerSubmitting=ref(false);const registerForm=reactive({type:'inaccurate',description:''})
+const processVisible=ref(false);const processing=ref(false);const processRow=ref<FeedbackVO|null>(null);const processTarget=ref('strategy')
+const closeVisible=ref(false);const closing=ref(false);const closeRow=ref<FeedbackVO|null>(null);const closeNote=ref('')
+const wordVisible=ref(false);const wordSubmitting=ref(false);const wordForm=reactive({id:0,word:'',scene:'all',enabled:true,sort:0})
+const devOpen=ref(false);const toastVisible=ref(false);const toastMessage=ref('');const toastType=ref<'info'|'ok'|'err'>('info');let toastTimer:ReturnType<typeof setTimeout>|undefined
+const fbPageCount=computed(()=>Math.max(1,Math.ceil(fbTotal.value/fbPageSize)));const pendingCount=computed(()=>feedbacks.value.filter(x=>x.status==='pending').length);const processingCount=computed(()=>feedbacks.value.filter(x=>x.status==='processing').length);const closedCount=computed(()=>feedbacks.value.filter(x=>x.status==='closed').length)
+onMounted(async()=>{[fbTypeDict.value,fbStatusDict.value,fbTargetDict.value,scenes.value]=await Promise.all([dictStore.ensure('cmr_feedback_type'),dictStore.ensure('cmr_feedback_status'),dictStore.ensure('cmr_feedback_target'),dictStore.ensure('cmr_scene')]);await Promise.all([loadFeedbacks(1),loadWords()])})
+function dictLabel(dict:DictItem[],alias?:string|null){return dict.find(x=>x.alias===alias)?.label||alias||'—'}
+function sceneLabel(alias:string){return alias==='all'?'全部场景':scenes.value.find(x=>x.alias===alias)?.label||alias}
+function feedbackStatusClass(status:string){return({pending:'wait',processing:'run',closed:'ok'}as Record<string,string>)[status]||'gray'}
+async function loadFeedbacks(page:number){fbPage.value=page;fbLoading.value=true;try{const data=await pageFeedbacks({pageNum:page,pageSize:fbPageSize,type:fbTypeFilter.value,status:fbStatusFilter.value});feedbacks.value=data.records;fbTotal.value=data.total}catch(e){showToast((e as Error).message,'err')}finally{fbLoading.value=false}}
+async function openRegister(){registerVisible.value=true;selectedHistoryId.value=null;registerForm.description='';historyKeyword.value='';try{const data=await pageHistory({pageNum:1,pageSize:50});histories.value=data.records}catch(e){showToast((e as Error).message,'err')}}
+function filterHistories(){/* computed handles filtering */}
+async function submitRegister(){if(!selectedHistoryId.value){showToast('请先选择一条检索历史','err');return}registerSubmitting.value=true;try{await createFeedback({searchId:selectedHistoryId.value,type:registerForm.type,description:registerForm.description});registerVisible.value=false;showToast('反馈已登记','ok');await loadFeedbacks(1)}catch(e){showToast((e as Error).message,'err')}finally{registerSubmitting.value=false}}
+function openProcess(row:FeedbackVO){processRow.value=row;processTarget.value='strategy';processVisible.value=true}
+async function submitProcess(){if(!processRow.value)return;processing.value=true;try{await processFeedback(processRow.value.id,processTarget.value);processVisible.value=false;showToast('已进入处理中','ok');await loadFeedbacks(fbPage.value)}catch(e){showToast((e as Error).message,'err')}finally{processing.value=false}}
+function openClose(row:FeedbackVO){closeRow.value=row;closeNote.value='';closeVisible.value=true}
+async function submitClose(){if(!closeRow.value)return;closing.value=true;try{await closeFeedback(closeRow.value.id,closeNote.value||undefined);closeVisible.value=false;showToast('反馈已闭环','ok');await loadFeedbacks(fbPage.value)}catch(e){showToast((e as Error).message,'err')}finally{closing.value=false}}
+async function loadWords(){wordLoading.value=true;try{const data=await pageWords({pageNum:1,pageSize:100});words.value=data.records}catch(e){showToast((e as Error).message,'err')}finally{wordLoading.value=false}}
+function openWord(row?:WordVO){wordForm.id=row?.id||0;wordForm.word=row?.word||'';wordForm.scene=row?.scene||'all';wordForm.enabled=row?.enabled??true;wordForm.sort=row?.sort||0;wordVisible.value=true}
+async function submitWord(){if(!wordForm.word.trim()){showToast('请填写推荐词','err');return}wordSubmitting.value=true;try{const body={word:wordForm.word.trim(),scene:wordForm.scene,enabled:wordForm.enabled,sort:wordForm.sort};if(wordForm.id)await updateWord(wordForm.id,body);else await createWord(body);wordVisible.value=false;showToast('推荐词已保存','ok');await loadWords()}catch(e){showToast((e as Error).message,'err')}finally{wordSubmitting.value=false}}
+async function toggleWord(row:WordVO){try{await updateWord(row.id,{word:row.word,scene:row.scene,enabled:!row.enabled,sort:row.sort});row.enabled=!row.enabled;showToast(row.enabled?'已启用':'已停用','ok')}catch(e){showToast((e as Error).message,'err')}}
+async function removeWordRow(row:WordVO){try{await removeWord(row.id);showToast('推荐词已删除','ok');await loadWords()}catch(e){showToast((e as Error).message,'err')}}
+function showToast(message:string,type:'info'|'ok'|'err'='info'){toastMessage.value=message;toastType.value=type;toastVisible.value=true;clearTimeout(toastTimer);toastTimer=setTimeout(()=>toastVisible.value=false,2600)}
+function openDev(){devOpen.value=true}function closeDev(){devOpen.value=false}
 </script>
+
+<style scoped>
+.p7-select{height:30px;border:1px solid #d9e7f8;border-radius:6px;padding:0 9px;background:#fff;color:#344054}
+.table-empty{text-align:center;color:#9aa6bd;padding:20px!important}
+.p7-form-grid{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.p7-form-grid textarea{width:100%;resize:vertical;border:1px solid #cfd8e8;border-radius:6px;padding:8px;font:inherit;color:#273244}
+:root{
+  /* 清爽冷白蓝 token（与检索台基准一致） */
+  --workspace-bg:#f6f9fe;
+  --module-bg:#f3f8ff;
+  --content-card:#ffffff;
+  --content-soft:#fbfdff;
+  --flow-card:#f8fbff;
+  --content-line:#e6edf8;
+  --content-line-strong:#d9e7f8;
+  --system-blue:#4169f6;
+  --system-blue-weak:#f1f5ff;
+  --ink:#1f2937;
+  --muted:#667085;
+  --success:#34a853;
+  --warning:#f0a020;
+  --error:#e5484d;
+  --text-primary:#262626;
+  --text-secondary:#8c8c8c;
+  --radius:8px;
+  --shadow-card:0 2px 8px rgba(31,58,122,.05);
+  --shadow-pop:0 10px 22px rgba(64,80,112,.14);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--workspace-bg);
+  color:var(--text-primary);
+  font-size:14px;
+  line-height:1.5;
+  display:flex;
+}
+button{font-family:inherit;cursor:pointer}
+button[disabled]{cursor:default}
+a{color:inherit;text-decoration:none}
+::selection{background:rgba(65,105,246,.16)}
+[hidden]{display:none !important}
+
+/* ============ 左侧全局导航（壳层，未改） ============ */
+.sidebar{
+  width:220px;flex-shrink:0;
+  background:#fff;border-right:1px solid var(--content-line);
+  display:flex;flex-direction:column;
+  height:100vh;position:sticky;top:0;
+}
+.nav-scroll{flex:1;overflow-y:auto;padding:10px 12px}
+.nav-item{
+  display:flex;align-items:center;gap:9px;
+  padding:9px 10px;margin-bottom:2px;
+  border-radius:6px;color:#344054;font-size:13px;
+  cursor:pointer;user-select:none;
+}
+.nav-item .ico{width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:#8a96ad;flex-shrink:0}
+.nav-item .ico svg{width:16px;height:16px;display:block}
+.nav-item.active .ico{color:var(--system-blue)}
+.nav-item:hover{background:var(--system-blue-weak);color:var(--system-blue)}
+.nav-item.active{
+  background:var(--system-blue-weak);color:var(--system-blue);font-weight:600;
+  box-shadow:inset 2px 0 0 var(--system-blue);
+}
+.nav-divider{height:1px;background:var(--content-line);margin:8px 10px}
+
+/* ============ 主区 ============ */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+.content{padding:20px 24px 32px;display:flex;flex-direction:column;gap:14px;max-width:1280px;width:100%;margin:0 auto}
+
+/* 页面定位 */
+.module-intro{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:18px 20px;
+  border:1px solid #e4edf8;
+  border-radius:10px;
+  background:#fff;
+}
+.module-intro h2{font-size:20px;font-weight:700;color:#111827}
+/* ===== 研发说明入口（九页统一：头部胶囊按钮 + 右侧抽屉） ===== */
+.dev-entry{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px 0 5px;border:1px solid #d7e0f0;border-radius:999px;background:#fff;color:#667085;font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+.dev-entry:hover{border-color:#b9c9ff;background:var(--system-blue-weak);color:var(--system-blue)}
+.dev-entry:hover .de-q{background:var(--system-blue);color:#fff}
+.dev-entry:focus-visible{outline:2px solid #cdd9ff;outline-offset:1px}
+.dev-entry .de-q{width:20px;height:20px;border-radius:50%;flex:0 0 auto;background:var(--system-blue-weak);color:var(--system-blue);font-size:12px;font-weight:700;line-height:20px;text-align:center;transition:background .15s,color .15s}
+/* 右侧抽屉：520px / 全高 / 从右滑入 + 半透明遮罩 */
+.dev-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:10000;opacity:0;pointer-events:none;transition:opacity .22s}
+.dev-mask.open{opacity:1;pointer-events:auto}
+.dev-drawer{position:fixed;top:0;right:0;width:720px;max-width:100vw;height:100vh;background:#f6f8fc;z-index:10001;display:flex;flex-direction:column;transform:translateX(102%);transition:transform .28s ease;box-shadow:-8px 0 30px rgba(15,23,42,.18)}
+.dev-drawer.open{transform:translateX(0)}
+.dev-head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:#fff;border-bottom:1px solid #e4eaf3;flex:0 0 auto}
+.dev-head h3{margin:0;font-size:15px;color:#1f2937}
+.dev-head .dh-tag{font-size:11px;font-weight:600;color:#b54708;background:#fdf3e6;border-radius:4px;padding:2px 8px}
+.dev-close{margin-left:auto;width:28px;height:28px;border:none;background:#f2f4f8;border-radius:6px;font-size:15px;line-height:1;cursor:pointer;color:#475467;flex:0 0 auto}
+.dev-close:hover{background:#e6eaf2}
+.dev-body{flex:1;min-height:0;overflow:auto;padding:16px 18px 36px}
+.dev-stack{display:flex;flex-direction:column;gap:12px}
+.dev-drawer .dtable{overflow-x:auto}
+
+/* ============ 面板 ============ */
+.panel{padding:16px 18px;border:1px solid #e4edf8;border-radius:var(--radius);background:#fff;display:flex;flex-direction:column;gap:12px}
+.panel-head{display:flex;align-items:flex-start;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.sec-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sec-head .sec-title{font-size:15px;font-weight:700;color:#1f2a44}
+.sec-head .sec-sub{font-size:12px;color:#9aa6bd}
+.sec-head::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--system-blue)}
+.panel-act{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* 按钮体系 */
+.btn-primary{
+  height:34px;padding:0 20px;border:0;border-radius:6px;
+  background:var(--system-blue);color:#fff;font-size:13px;font-weight:600;
+  display:inline-flex;align-items:center;gap:7px;
+  box-shadow:0 3px 8px rgba(65,105,246,.25);transition:all .15s;
+}
+.btn-primary:hover{background:#335be8;box-shadow:0 4px 12px rgba(65,105,246,.32)}
+.btn-primary[disabled]{opacity:.5;box-shadow:none;background:#a8b6f7;cursor:default}
+.btn-ghost{
+  height:32px;padding:0 16px;border-radius:6px;border:1px solid #d7e0f0;
+  background:#fff;color:#475467;font-size:12.5px;display:inline-flex;align-items:center;gap:6px;
+}
+.btn-ghost:hover{border-color:var(--system-blue);color:var(--system-blue)}
+.btn-ghost[disabled]{opacity:.55;border-color:#e6edf8;color:#9aa6bd;background:#fafbfd}
+.btn-xs{height:27px;padding:0 12px;font-size:12px}
+
+/* 徽章 */
+.badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;display:inline-block;white-space:nowrap}
+.badge.ok{background:#e8f7ec;color:var(--success)}
+.badge.fail{background:#fdecec;color:var(--error)}
+.badge.run{background:#e9f0ff;color:var(--system-blue)}
+.badge.wait{background:#fff8e1;color:#c99a12}
+.badge.gray{background:#f0f2f7;color:#8c98ad}
+
+/* ============ 业务块 ============ */
+.flow{display:flex;flex-direction:column;gap:16px}
+.flow-block{padding:18px 20px;gap:14px}
+.blk-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.blk-title{display:flex;align-items:center;gap:12px;min-width:0}
+.blk-title h3{font-size:16px;font-weight:700;color:#1f2a44;line-height:1.4}
+.blk-title .sec-sub{font-size:12px;color:#9aa6bd;font-weight:400;white-space:nowrap}
+
+.fb-note{font-size:11px;color:#8c98ad;font-weight:400;margin-top:2px;line-height:1.5;white-space:normal}
+.fb-table{overflow-x:auto}
+
+/* 登记反馈：检索历史选择（分页） */
+.fb-step{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#475467;margin:6px 0 7px}
+.fb-step::before{content:"";width:3px;height:12px;border-radius:2px;background:var(--system-blue)}
+.hist-search{
+  width:100%;height:32px;border:1px solid #cfd8e8;border-radius:6px;padding:0 10px;
+  font-size:12.5px;color:#273244;background:#fff;outline:none;margin-bottom:8px;
+}
+.hist-search:focus{border-color:#8fa3ff;box-shadow:0 0 0 2px rgba(65,105,246,.12)}
+.pick-list{display:flex;flex-direction:column;border:1px solid #e6edf8;border-radius:8px;overflow:hidden;max-height:332px;overflow-y:auto}
+.pick-row{display:flex;align-items:flex-start;gap:9px;padding:9px 12px;border-bottom:1px solid #eef2f8;background:#fff;cursor:pointer;min-width:0}
+.pick-row:last-child{border-bottom:0}
+.pick-row:hover{background:#f8fbff}
+.pick-row.is-pick{background:#f4f8ff}
+.pick-ck{width:14px;height:14px;margin:2px 0 0;accent-color:var(--system-blue);flex-shrink:0;cursor:pointer}
+.pick-main{min-width:0;flex:1 1 auto}
+.pick-q{display:block;font-size:12.5px;font-weight:600;color:#273244;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick-sub{display:block;font-size:11px;color:#9aa6bd;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick-sub .zero{color:#c99a12;font-weight:700}
+.pick-empty{padding:22px 12px;text-align:center;font-size:12px;color:#9aa6bd;background:#fff}
+.pager{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:9px}
+.pg-num{
+  min-width:27px;height:27px;padding:0 6px;border:1px solid #d7e0f0;border-radius:6px;
+  background:#fff;color:#475467;font-size:12px;font-variant-numeric:tabular-nums;
+}
+.pg-num:hover{border-color:var(--system-blue);color:var(--system-blue)}
+.pg-num.is-cur{background:var(--system-blue);border-color:var(--system-blue);color:#fff;font-weight:700}
+.pg-info{font-size:11.5px;color:#8c98ad;white-space:nowrap;font-variant-numeric:tabular-nums;margin-left:2px}
+.fb-form-wrap{margin-top:14px;padding-top:12px;border-top:1px solid #f0f4fb}
+.pick-chosen{font-size:12px;color:#667085;background:#f8fafd;border:1px solid #eef2f8;border-radius:6px;padding:7px 10px;margin-bottom:10px;line-height:1.6}
+.pick-chosen b{color:#273244}
+
+/* 表格 */
+.dtable{width:100%;border:1px solid #eef2f8;border-radius:8px;overflow:hidden}
+table.dt{width:100%;border-collapse:collapse;font-size:12.5px}
+table.dt th{
+  background:#f4f6fb;color:#7a8493;font-weight:600;font-size:11.5px;text-align:left;
+  padding:9px 12px;border-bottom:1px solid #e6edf8;white-space:nowrap;
+}
+table.dt td{padding:9px 12px;border-bottom:1px solid #eef2f8;color:#344054;vertical-align:middle}
+table.dt tbody tr:last-child td{border-bottom:0}
+table.dt tbody tr:hover td{background:#f8fbff}
+table.dt td.mono{font-variant-numeric:tabular-nums;color:#475467}
+table.dt td.tid{font-weight:600;color:#273244;white-space:nowrap}
+
+/* ================= 分页组件（表格下方 · 右对齐） ================= */
+.pager-bar{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:#667085}
+.pager-total{color:#8a96ad;margin-right:4px;font-variant-numeric:tabular-nums}
+.pager-btn,.pager-num{height:28px;border:1px solid #d7e0f0;background:#fff;border-radius:5px;color:#475467;font-size:12px;cursor:pointer;font-family:inherit}
+.pager-btn{padding:0 10px}
+.pager-num{min-width:28px;padding:0 6px;font-variant-numeric:tabular-nums}
+.pager-btn:hover:not(:disabled),.pager-num:hover:not(.is-cur){border-color:#4169f6;color:#4169f6}
+.pager-btn:disabled{opacity:.45;cursor:not-allowed}
+.pager-num.is-cur{background:#4169f6;border-color:#4169f6;color:#fff;font-weight:700;cursor:default}
+.pager-gap{color:#98a2b3;padding:0 2px}
+
+/* 运营推荐词 */
+.rec-table .col-rank{width:58px}
+.rec-table .col-sw{width:66px}
+.rec-table .col-act{width:74px}
+.rec-table th .th-sub{font-size:10.5px;color:#b3bccc;font-weight:400;margin-left:4px}
+.rec-table td.rec-cnt{font-size:11px;color:#9aa6bd;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rec-state{font-size:12px;font-weight:600;white-space:nowrap}
+.rec-state.on{color:#1e8e4a}
+.rec-state.off{color:#98a2b3}
+.rec-del{border:0;background:none;padding:0;font-size:12px;color:#98a2b3;cursor:pointer}
+.rec-del:hover{color:#e5484d;text-decoration:underline}
+.rec-empty{text-align:center;color:#9aa6bd;padding:20px}
+
+/* 开关 */
+.switch{
+  width:34px;height:18px;border-radius:9px;border:0;padding:0;flex-shrink:0;
+  background:#d9e0ec;position:relative;transition:background .15s;
+}
+.switch .knob{
+  position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 2px rgba(20,32,70,.2);transition:left .15s;
+}
+.switch.on{background:var(--system-blue)}
+.switch.on .knob{left:18px}
+.switch:focus-visible{outline:2px solid #cdd9ff;outline-offset:2px}
+
+/* 说明与留痕 */
+.rule-note{
+  font-size:11.5px;color:#7a8493;border-left:3px solid var(--content-line-strong);
+  padding:4px 10px;background:var(--content-soft);border-radius:0 6px 6px 0;
+}
+
+/* 研发说明 */
+.research-lead{font-size:12px;color:#667085;line-height:1.8}
+.research-lead b{color:#344054}
+.cov-sum{
+  display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:#667085;
+  background:#fff;border:1px solid #eef2f8;border-radius:7px;padding:8px 12px;
+}
+.cov-sum b{color:#344054;font-weight:700}
+.cov-tb td{vertical-align:top;line-height:1.7}
+.cov-tb td:first-child{white-space:nowrap}
+.cov-tag{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:4px;margin-right:6px}
+.cov-tag.on{background:#e9f0ff;color:var(--system-blue)}
+.cov-tag.off{background:#f0f2f7;color:#8c98ad}
+.cov-desc{font-size:11.5px;color:#667085}
+.cover-note{border:1px dashed #d9e4f5;background:#fff;border-radius:8px;padding:10px 12px}
+.cover-note .cn-title{font-size:11.5px;font-weight:700;color:#475467;margin-bottom:6px}
+.cover-note ul{margin:0;padding-left:16px}
+.cover-note li{font-size:11.5px;color:#667085;line-height:1.8;margin:0}
+.cover-note li b{color:#344054;font-weight:700}
+
+/* 弹窗 */
+.modal-mask{
+  position:fixed;inset:0;background:rgba(23,33,66,.42);z-index:100;
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+.modal-mask.show{display:flex}
+.modal-box{
+  width:720px;max-width:100%;background:#fff;border-radius:10px;
+  box-shadow:0 16px 48px rgba(20,32,70,.28);overflow:hidden;animation:pop .18s ease;
+}
+@keyframes pop{from{transform:translateY(8px) scale(.98);opacity:0}to{transform:none;opacity:1}}
+.modal-head{padding:16px 20px 0;display:flex;align-items:flex-start;justify-content:space-between}
+.modal-head h3{font-size:16px;color:#1f2a44}
+.modal-close{border:0;background:transparent;color:#b3bccc;font-size:18px;line-height:1}
+.modal-close:hover{color:#667085}
+.modal-body{padding:12px 20px 4px;font-size:13px;color:#475467;max-height:min(66vh,600px);overflow:auto}
+.modal-body .mb-tip{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.7}
+.modal-body .mb-src{
+  display:block;width:fit-content;max-width:100%;
+  font-size:11.5px;color:#8c98ad;line-height:1.6;
+  background:#f8fafd;border:1px solid #eef2f8;border-radius:5px;
+  padding:2px 8px;margin-bottom:7px;
+}
+.modal-body .mb-src b{color:#475467;font-weight:600}
+.modal-foot{padding:14px 20px 18px;display:flex;justify-content:flex-end;gap:10px;border-top:1px solid #f0f4fb;margin-top:10px}
+
+/* 弹窗表单 */
+.form-grid{display:grid;grid-template-columns:92px minmax(0,1fr);gap:9px 10px;align-items:center;margin:6px 0 4px}
+.form-grid label{font-size:12px;color:#667085}
+.form-grid input[type=text],.form-grid select{
+  height:32px;border:1px solid #cfd8e8;border-radius:6px;padding:0 10px;
+  font-size:12.5px;color:#273244;background:#fff;outline:none;width:100%;
+}
+.form-grid input:focus,.form-grid select:focus{border-color:#8fa3ff;box-shadow:0 0 0 2px rgba(65,105,246,.12)}
+.form-grid .ro{font-size:12.5px;color:#475467;background:#f8fafd;border:1px solid #eef2f8;border-radius:6px;padding:6px 10px}
+
+/* 权限态 */
+.perm-gate{display:none;padding:60px 20px}
+.perm-gate.show{display:flex;justify-content:center}
+.pg-card{text-align:center;padding:44px 40px;border:1px solid #e4edf8;border-radius:12px;background:#fff;max-width:720px}
+.pg-ico{width:54px;height:54px;border-radius:14px;background:var(--system-blue-weak);display:grid;place-items:center;font-size:24px;margin:0 auto 14px}
+.pg-card h3{font-size:17px;color:#1f2a44;margin-bottom:8px}
+.pg-card p{font-size:12.5px;color:var(--muted)}
+
+/* 全局消息 */
+.toast{
+  position:fixed;top:56px;left:50%;transform:translateX(-50%) translateY(-12px);
+  z-index:200;background:#2b3245;color:#fff;font-size:13px;
+  padding:9px 18px;border-radius:7px;box-shadow:0 8px 24px rgba(20,32,70,.25);
+  opacity:0;pointer-events:none;transition:all .2s;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#c0392b}
+.toast.ok{background:#1e8e4a}
+
+@media (max-width: 900px) {
+  .content { padding: 16px; }
+  .blk-head { flex-direction: column; }
+  .p7-select { max-width: 100%; }
+  .pick-list { min-width: 0; }
+  .modal-box.wide { width: 94vw !important; }
+}
+@media (max-width: 600px) {
+  .filter-bar { flex-wrap: wrap; }
+  .fb-search { width: 100%; }
+}
+</style>
