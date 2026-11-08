@@ -138,7 +138,7 @@
                 id BIGINT PRIMARY KEY COMMENT '雪花主键',
                 search_id BIGINT NOT NULL COMMENT '检索历史 id',
                 result_set_id VARCHAR(40) NOT NULL COMMENT '冗余 RST',
-                rank INT NOT NULL,
+                result_rank INT NOT NULL,
                 item_id VARCHAR(64) COMMENT '算子条目 id',
                 modality VARCHAR(16),
                 score DECIMAL(10,6),
@@ -149,7 +149,7 @@
                 create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
                 update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 del_flag CHAR(1) NOT NULL DEFAULT 'F',
-                KEY idx_search (search_id, rank)
+                KEY idx_search (search_id, result_rank)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 结果集条目快照';
 
             CREATE TABLE IF NOT EXISTS cmr_click_event (
