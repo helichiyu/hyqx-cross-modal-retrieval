@@ -4,7 +4,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,27 +20,21 @@ import java.util.List;
  * @since 2026-11-03
  */
 @Component
-@RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    private final JwtService jwtService;
+    /* 临时关闭登录鉴权：所有请求注入管理员上下文。 */
+    private static final LoginUser BYPASS_USER = new LoginUser(0L, "admin", "管理员", "admin");
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        String header = request.getHeader("Authorization");
-        if (header != null && header.startsWith("Bearer ") && SecurityContextHolder.getContext().getAuthentication() == null) {
-            LoginUser user = jwtService.verify(header.substring(7));
-            if (user != null) {
-                List<SimpleGrantedAuthority> authorities = Permissions.of(user.role()).stream()
-                        .map(SimpleGrantedAuthority::new)
-                        .toList();
-                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                        user.username(), null, authorities);
-                SecurityContextHolder.getContext().setAuthentication(auth);
-                AuthContext.set(user);
-            }
-        }
+        List<SimpleGrantedAuthority> authorities = Permissions.of(BYPASS_USER.role()).stream()
+                .map(SimpleGrantedAuthority::new)
+                .toList();
+        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                BYPASS_USER.username(), null, authorities);
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        AuthContext.set(BYPASS_USER);
         try {
             chain.doFilter(request, response);
         } finally {

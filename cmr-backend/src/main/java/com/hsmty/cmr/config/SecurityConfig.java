@@ -45,7 +45,7 @@ public class SecurityConfig {
                                 "/cmr/auth/login",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html",
                                 "/actuator/health/**").permitAll()
-                        .anyRequest().authenticated())
+                        .anyRequest().permitAll())
                 .exceptionHandling(eh -> eh
                         .authenticationEntryPoint((req, res, ex) -> writeEnvelope(res, 401, "未登录或登录已过期"))
                         .accessDeniedHandler((req, res, ex) -> writeEnvelope(res, 403, "无权限执行该操作")))

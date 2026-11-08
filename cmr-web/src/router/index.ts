@@ -5,12 +5,6 @@ import { useAuthStore } from '../stores/auth'
 // role 维度：admin=管理员 operator=运营 user=普通检索用户
 export const routes = [
   {
-    path: '/login',
-    name: 'login',
-    component: () => import('../views/LoginView.vue'),
-    meta: { title: '登录' },
-  },
-  {
     path: '/',
     component: () => import('../layout/PortalLayout.vue'),
     redirect: '/search',
@@ -79,20 +73,9 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach(async (to) => {
+router.beforeEach((to) => {
   const auth = useAuthStore()
-  if (to.name === 'login') {
-    return true
-  }
-  if (!auth.token) {
-    return { name: 'login', query: { redirect: to.fullPath } }
-  }
-  if (!auth.user) {
-    await auth.fetchUser()
-    if (!auth.user) {
-      return { name: 'login' }
-    }
-  }
+
   const permission = to.meta.permission as string | undefined
   if (permission && !auth.permissions.has(permission)) {
     return { name: 'search' }

@@ -21,18 +21,12 @@
     <el-container>
       <el-header class="header">
         <div class="header-title">{{ $route.meta.title }}</div>
-        <el-dropdown @command="onCommand">
-          <span class="user-chip">
-            <el-icon><User /></el-icon>
-            {{ auth.user?.nickname || auth.user?.username }}
-            <el-tag size="small" effect="plain">{{ roleLabel }}</el-tag>
-          </span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="logout">退出登录</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+
+        <span class="user-chip">
+          <el-icon><User /></el-icon>
+          {{ auth.user?.nickname || auth.user?.username }}
+          <el-tag size="small" effect="plain">{{ roleLabel }}</el-tag>
+        </span>
       </el-header>
       <el-main class="main">
         <router-view />
@@ -43,14 +37,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { routes } from '../router'
 
 const auth = useAuthStore()
 const route = useRoute()
-const router = useRouter()
-
 const ROLE_LABELS: Record<string, string> = {
   admin: '管理员',
   operator: '运营',
@@ -72,11 +64,6 @@ const menus = computed(() => {
     }))
 })
 
-function onCommand(cmd: string) {
-  if (cmd === 'logout') {
-    auth.logout().then(() => router.push('/login'))
-  }
-}
 </script>
 
 <style scoped>
