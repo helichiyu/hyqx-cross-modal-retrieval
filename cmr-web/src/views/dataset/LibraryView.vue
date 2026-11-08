@@ -34,12 +34,12 @@
             <span class="ib-k">输入边界</span>
             <span class="src-chips">
               <span v-if="!datasources.length" class="src-empty">暂无数据源</span>
-              <span v-for="source in datasources" :key="source.id" class="src-chip" :title="`${source.endpoint} · ${source.protocol || '自动拉取'} · ${source.authType || 'none'}`">
-                <i class="dot on"></i>
+              <span v-for="source in datasources" :key="source.id" class="src-chip" :title="sourceTitle(source)">
+                <i class="dot" :class="sourceDotClass(source)"></i>
                 <span class="sc-name">{{ source.name }}</span>
                 <span class="sc-proto">{{ source.protocol || '自动拉取' }}</span>
                 <b>{{ datasourceCount(source.id) }}</b><span class="sc-unit">个</span>
-                <button class="btn-link" type="button" @click="testSource(source)">测试连接</button>
+                <span v-if="sourceTestResults[source.id]" class="sc-test">{{ sourceTestText(source) }}</span><button class="btn-link" type="button" :disabled="testingSourceIds.has(source.id)" @click="testSource(source)">{{ testingSourceIds.has(source.id) ? '测试中…' : '测试连接' }}</button>
               </span>
             </span>
             <button class="btn-primary" type="button" @click="sourceVisible = true"><span aria-hidden="true">＋</span> 登记数据源</button>
@@ -265,9 +265,10 @@ import {
   datasetDetail,
   listDatasources,
   pageDatasets,
+  testDatasource,
   rebuildDataset,
 } from '../../api'
-import type { DatasetDetailVO, DatasetVO, DatasourceVO, IndexVO } from '../../api/types'
+import type { DatasetDetailVO, DatasetVO, DatasourceTestVO, DatasourceVO, IndexVO } from '../../api/types'
 import { useDictStore } from '../../stores/dict'
 
 const dictStore = useDictStore()
@@ -287,6 +288,8 @@ const detailLoading = ref(false)
 
 const sourceVisible = ref(false)
 const sourceSubmitting = ref(false)
+const testingSourceIds = ref(new Set<number>())
+const sourceTestResults = ref<Record<number, DatasourceTestVO>>({})
 const datasetVisible = ref(false)
 const datasetSubmitting = ref(false)
 const adjudicateVisible = ref(false)
@@ -350,8 +353,48 @@ function indexLabel(status: string) {
   return ({ candidate: '候选', active: '生效', retired: '已退役' } as Record<string, string>)[status] || status
 }
 
-function testSource(source: DatasourceVO) {
-  showToast(`${source.name} 连接信息已登记，当前版本暂不发起真实连接测试`, 'info')
+async function testSource(source: DatasourceVO) {
+  if (testingSourceIds.value.has(source.id)) return
+  testingSourceIds.value = new Set([...testingSourceIds.value, source.id])
+  try {
+    const result = await testDatasource(source.id)
+    sourceTestResults.value = { ...sourceTestResults.value, [source.id]: result }
+    showToast(sourceTestMessage(source, result), result.connected === null ? 'info' : result.connected ? 'ok' : 'err')
+  } catch (error) {
+    showToast((error as Error).message, 'err')
+  } finally {
+    const next = new Set(testingSourceIds.value)
+    next.delete(source.id)
+    testingSourceIds.value = next
+  }
+}
+
+function sourceDotClass(source: DatasourceVO) {
+  const result = sourceTestResults.value[source.id]
+  if (!result) return 'on'
+  if (result.connected === null) return 'wait'
+  return result.connected ? 'on' : 'off'
+}
+
+function sourceTestText(source: DatasourceVO) {
+  const result = sourceTestResults.value[source.id]
+  if (!result) return ''
+  if (result.connected === null) return '待推送验证'
+  return result.connected ? '连接成功' : '连接失败'
+}
+
+function sourceTestMessage(source: DatasourceVO, result: DatasourceTestVO) {
+  const parts = [`${source.name} ${sourceTestText(source)}`]
+  if (result.statusCode != null) parts.push(`HTTP ${result.statusCode}`)
+  if (result.latencyMs != null) parts.push(`${result.latencyMs}ms`)
+  parts.push(result.message)
+  return parts.join(' · ')
+}
+
+function sourceTitle(source: DatasourceVO) {
+  const base = `${source.endpoint} · ${source.protocol || '自动拉取'} · ${source.authType || 'none'}`
+  const result = sourceTestResults.value[source.id]
+  return result ? `${base} · ${sourceTestMessage(source, result)}` : base
 }
 
 async function submitSource() {
@@ -530,6 +573,9 @@ button{font-family:inherit;cursor:pointer}
 .src-chip{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #dbe4f5;border-radius:999px;padding:2px 4px 2px 9px;font-size:11.5px;color:#344054;max-width:100%}
 .src-chip .dot{width:7px;height:7px;border-radius:50%;background:#c8cfdd;flex-shrink:0}
 .src-chip .dot.on{background:var(--success)}
+.src-chip .dot.off{background:var(--danger,#e5484d)}
+.src-chip .dot.wait{background:#f0b323}
+.sc-test{color:#8a96ad;font-size:10.5px;white-space:nowrap}
 .sc-name{font-weight:600;color:#273244;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sc-proto{color:#8a96ad;font-size:10.5px;white-space:nowrap}
 .src-chip b{font-variant-numeric:tabular-nums;color:#1f2a44;font-weight:700}

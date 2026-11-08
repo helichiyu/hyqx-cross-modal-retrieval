@@ -2,6 +2,7 @@ import { http } from './http'
 import type {
   DatasetDetailVO,
   DatasetVO,
+  DatasourceTestVO,
   DatasourceVO,
   DictItem,
   EvalItemVO,
@@ -70,6 +71,8 @@ export const listDatasources = () => http.get<DatasourceVO[]>('datasources')
 
 export const createDatasource = (body: Record<string, unknown>) =>
   http.post<DatasourceVO>('datasources', body)
+
+export const testDatasource = (id: number) => http.post<DatasourceTestVO>(`datasources/${id}/test`)
 
 export const listIndexes = (datasetId: number) =>
   http.get<IndexVO[]>('indexes', { datasetId })

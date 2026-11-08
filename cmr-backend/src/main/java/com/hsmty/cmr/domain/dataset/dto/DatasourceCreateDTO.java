@@ -18,7 +18,7 @@ public class DatasourceCreateDTO {
     /** http/https 接口地址（protocol=http 时必填） */
     private String endpoint;
 
-    /** http/api/upload */
+    /** pull/http/api=主动拉取；push/upload=推送接收 */
     private String protocol = "upload";
 
     /** none/token/basic */

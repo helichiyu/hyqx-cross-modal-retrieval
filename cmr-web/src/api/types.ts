@@ -167,6 +167,13 @@ export interface DatasourceVO {
   createTime: string | null
 }
 
+export interface DatasourceTestVO {
+  connected: boolean | null
+  statusCode: number | null
+  latencyMs: number | null
+  message: string
+}
+
 export interface StrategyVO {
   id: number
   bizNo: string
