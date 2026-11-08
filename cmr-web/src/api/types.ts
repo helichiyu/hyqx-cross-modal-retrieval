@@ -38,6 +38,7 @@ export interface HistoryVO {
   queryText: string | null
   queryFile: string | null
   queryModality: string | null
+  targetModality: string | null
   clarified: boolean | null
   scene: string | null
   itemCount: number | null
@@ -80,6 +81,7 @@ export interface SearchResultVO {
   taskId: number
   taskBizNo: string
   queryModality: string
+  targetModality: string | null
   itemCount: number
   elapsedMs: number
   strategy: Record<string, unknown>
