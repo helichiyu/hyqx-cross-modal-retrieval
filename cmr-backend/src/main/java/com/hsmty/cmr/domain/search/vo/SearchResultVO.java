@@ -28,6 +28,8 @@ public class SearchResultVO {
 
     private String queryModality;
 
+    private String targetModality;
+
     private Integer itemCount;
 
     private Integer elapsedMs;

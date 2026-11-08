@@ -44,6 +44,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static com.hsmty.cmr.domain.dataset.entity.table.CmrIndexTableDef.CMR_INDEX;
@@ -106,6 +107,8 @@ public class SearchService {
         if (!blank(dto.getQueryFile())) {
             fileService.resolve(dto.getQueryFile());
         }
+        List<String> targetModalities = normalizedTargetModalities(dto.getTargetModalities());
+        String targetModality = targetModalities == null ? null : targetModalities.get(0);
 
         // 策略：显式参数覆盖场景生效策略
         StrategyService.EffectiveStrategy effective = strategyService.effectiveOf(dto.getScene());
@@ -131,6 +134,7 @@ public class SearchService {
         history.setQueryText(!blank(dto.getClarifiedQuery()) ? dto.getClarifiedQuery() : dto.getQuery());
         history.setQueryFile(dto.getQueryFile());
         history.setQueryModality(queryModality);
+        history.setTargetModality(targetModality);
         history.setClarified(Boolean.TRUE.equals(dto.getClarified()));
         history.setScene(dto.getScene());
         history.setStrategyVersionId(effective.versionId());
@@ -152,7 +156,7 @@ public class SearchService {
         history.setTaskId(task.getId());
         historyMapper.update(history);
 
-        taskExecutor.runSyncWithRetry(task, t -> doSearch(t, history, index, weights, rerank, topK));
+        taskExecutor.runSyncWithRetry(task, t -> doSearch(t, history, index, targetModalities, weights, rerank, topK));
         // 任务已按失败处置落库；检索历史保留零结果记录，向用户返回原因
         CmrTask done = taskService.requireTask(task.getId());
         if (!CmrTask.STATUS_DONE.equals(done.getStatus())) {
@@ -163,7 +167,8 @@ public class SearchService {
     }
 
     private void doSearch(CmrTask task, CmrSearchHistory history, CmrIndex index,
-                          Map<String, Integer> weights, boolean rerank, int topK) {
+                          List<String> targetModalities, Map<String, Integer> weights,
+                          boolean rerank, int topK) {
         taskService.updateStep(task, "search");
         Map<String, Object> payload = new LinkedHashMap<>();
         if (!blank(history.getQueryText())) {
@@ -173,6 +178,9 @@ public class SearchService {
             payload.put("queryFile", history.getQueryFile());
         }
         payload.put("indexDir", index.getIndexDir());
+        if (targetModalities != null) {
+            payload.put("targetModalities", targetModalities);
+        }
         payload.put("topK", topK);
         payload.put("weights", weights);
         payload.put("rerank", rerank);
@@ -305,6 +313,9 @@ public class SearchService {
         dto.setQueryFile(history.getQueryFile());
         dto.setScene(history.getScene());
         dto.setClarified(history.getClarified());
+        if (!blank(history.getTargetModality())) {
+            dto.setTargetModalities(List.of(history.getTargetModality()));
+        }
         Map<String, Object> snapshot = JsonUtils.read(
                 history.getStrategySnapshotJson() == null ? "{}" : history.getStrategySnapshotJson(),
                 new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
@@ -353,6 +364,7 @@ public class SearchService {
                 .taskId(history.getTaskId())
                 .taskBizNo(taskService.bizNoOf(history.getTaskId()))
                 .queryModality(history.getQueryModality())
+                .targetModality(history.getTargetModality())
                 .itemCount(history.getItemCount())
                 .elapsedMs(history.getElapsedMs())
                 .strategy(strategy)
@@ -366,6 +378,18 @@ public class SearchService {
                 .score(e.getScore()).sourceFile(e.getSourceFile()).locatorJson(e.getLocatorJson())
                 .text(e.getText()).clicked(e.getClicked())
                 .build();
+    }
+
+    private List<String> normalizedTargetModalities(List<String> targetModalities) {
+        if (targetModalities == null) {
+            return null;
+        }
+        BizException.assertTrue(targetModalities.isEmpty(), "目标模态不能为空");
+        boolean invalid = targetModalities.stream()
+                .anyMatch(value -> value == null || value.isBlank()
+                        || !Set.of("text", "image", "audio", "video").contains(value));
+        BizException.assertTrue(invalid, "目标模态只能是 text/image/audio/video");
+        return List.copyOf(targetModalities);
     }
 
     private String modalityOf(String path) {

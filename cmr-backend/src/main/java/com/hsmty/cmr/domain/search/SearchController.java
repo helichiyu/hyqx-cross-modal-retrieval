@@ -55,7 +55,7 @@ public class SearchController {
     @Operation(summary = "执行检索（408；返回结果集+SRH+任务+策略快照）")
     @PreAuthorize("hasAnyAuthority('cmr:search:create')")
     @PostMapping
-    public ApiResult<SearchResultVO> execute(@RequestBody SearchExecuteDTO dto) {
+    public ApiResult<SearchResultVO> execute(@Valid @RequestBody SearchExecuteDTO dto) {
         return ApiResult.success(searchService.execute(dto));
     }
 

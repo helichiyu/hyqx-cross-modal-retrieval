@@ -336,7 +336,13 @@ const demoStates = [
 const displayView = computed(() => demoView.value || actualView.value)
 const contextQuery = computed(() => detail.value?.history.queryText || '以文件语义检索')
 const contextTask = computed(() => detail.value?.history.taskId || '未关联')
-const contextPair = computed(() => detail.value?.history.queryModality ? `${modalityLabel(detail.value.history.queryModality)}检索` : '未记录')
+const contextPair = computed(() => {
+  const history = detail.value?.history
+  if (history?.queryModality && history.targetModality) {
+    return `${shortModalityLabel(history.queryModality)}搜${shortModalityLabel(history.targetModality)}`
+  }
+  return history?.queryModality ? `${shortModalityLabel(history.queryModality)}检索` : '未记录'
+})
 const taskRoute = computed(() => `/tasks/${detail.value?.history.taskId || ''}`)
 const modifyRoute = computed(() => `/search?q=${encodeURIComponent(detail.value?.history.queryText || '')}`)
 const adoptLabel = computed(() => adoptStatus.value === 'adopted' ? '已采用' : adoptStatus.value === 'discarded' ? '已废弃' : '未采用')
@@ -380,6 +386,10 @@ function groupCount(key: string) {
 
 function modalityLabel(modality: string) {
   return ({ text: '文本', image: '图像', audio: '音频', video: '视频' } as Record<string, string>)[modality] || modality
+}
+
+function shortModalityLabel(modality: string) {
+  return ({ text: '文', image: '图', audio: '音', video: '视频' } as Record<string, string>)[modality] || modality
 }
 
 function qualityLevel(score: number) {

@@ -2,8 +2,11 @@ package com.hsmty.cmr.domain.search.dto;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -24,6 +27,10 @@ public class SearchExecuteDTO {
 
     /** 407 澄清选定后的改写 query */
     private String clarifiedQuery;
+
+    /** 目标模态；不传时由 408 按四模态召回 */
+    @NotEmpty(message = "目标模态不能为空")
+    private List<@Pattern(regexp = "text|image|audio|video", message = "目标模态只能是 text/image/audio/video") String> targetModalities;
 
     private Boolean clarified = false;
 

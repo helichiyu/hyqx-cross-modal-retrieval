@@ -307,6 +307,12 @@ const selectedTarget = computed(() => {
   return targets[findTargetIndex(selectedPair.value)] || ''
 })
 
+const targetValues: Record<string, string> = {
+  文本: 'text',
+  图像: 'image',
+  音频: 'audio',
+  视频: 'video',
+}
 const targetIcons: Record<Target, string> = {
   文本: 'Document',
   图像: 'Picture',
@@ -554,6 +560,7 @@ async function runSearch(clarifiedQuery?: string) {
     if (queryFile.value) body.queryFile = queryFile.value
     if (query.value.trim()) body.query = query.value.trim()
     if (scene.value) body.scene = scene.value
+    if (selectedTarget.value) body.targetModalities = [targetValues[selectedTarget.value]]
     if (clarifiedQuery) {
       body.query = clarifiedQuery
       body.clarified = true
