@@ -24,7 +24,7 @@ import static com.hsmty.cmr.domain.auth.entity.table.CmrDictTableDef.CMR_DICT;
  */
 @Tag(name = "字典")
 @RestController
-@RequestMapping("dict")
+@RequestMapping({"dict", "dicts"})
 @RequiredArgsConstructor
 public class DictController {
 

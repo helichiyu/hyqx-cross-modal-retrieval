@@ -2,10 +2,16 @@ import type { ApiEnvelope } from './types'
 import { useAuthStore } from '../stores/auth'
 import router from '../router'
 
-const BASE = '/hs-api/cmr'
+const BASE = '/hs-api/cmr/'
 const TOKEN_KEY = 'cmr_token'
 
+/* 临时关闭登录鉴权：不携带历史 token。 */
+const AUTH_BYPASS_ENABLED = true
+
 export function getToken(): string {
+  if (AUTH_BYPASS_ENABLED) {
+    return ''
+  }
   return localStorage.getItem(TOKEN_KEY) ?? ''
 }
 
@@ -66,7 +72,7 @@ async function request<T>(
   }
   if (resp.status === 401) {
     clearToken()
-    router.push('/login')
+    router.push('/')
     throw new ApiError('登录已过期，请重新登录', 401)
   }
   const json = (await resp.json().catch(() => null)) as ApiEnvelope<T> | null
