@@ -2,6 +2,7 @@ package com.hsmty.cmr.domain.search;
 
 import com.hsmty.cmr.common.api.ApiResult;
 import com.hsmty.cmr.domain.operation.service.WordService;
+import com.hsmty.cmr.domain.search.dto.ClickDTO;
 import com.hsmty.cmr.domain.search.dto.SearchExecuteDTO;
 import com.hsmty.cmr.domain.search.dto.UnderstandDTO;
 import com.hsmty.cmr.domain.search.service.SearchService;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -83,14 +85,9 @@ public class SearchController {
     @Operation(summary = "条目点击埋点")
     @PreAuthorize("hasAnyAuthority('cmr:search:page')")
     @PostMapping("results/{resultSetId}/click")
-    public ApiResult<Void> click(@PathVariable String resultSetId, @RequestBody ClickDTO dto) {
+    public ApiResult<Void> click(@PathVariable String resultSetId, @Valid @RequestBody ClickDTO dto) {
         searchService.click(resultSetId, dto.getRank());
         return ApiResult.success();
     }
 
-    /** 点击入参 */
-    @lombok.Data
-    public static class ClickDTO {
-        private Integer rank;
-    }
 }
