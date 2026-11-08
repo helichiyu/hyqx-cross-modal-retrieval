@@ -29,6 +29,11 @@ spring:
       host: ${CMR_REDIS_HOST:127.0.0.1}
       port: ${CMR_REDIS_PORT:6379}
 
+management:
+  health:
+    redis:
+      enabled: ${CMR_REDIS_HEALTH_ENABLED:false}
+
 mybatis-flex:
   configuration:
     map-underscore-to-camel-case: true
