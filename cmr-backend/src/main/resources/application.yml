@@ -6,6 +6,8 @@ server:
 spring:
   application:
     name: hsmty-module-cmr-server
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
   threads:
     virtual:
       enabled: true
@@ -47,6 +49,8 @@ logging:
     com.hsmty.cmr: INFO
 
 cmr:
+  auth:
+    enabled: ${CMR_AUTH_ENABLED:false}
   operator:
     base-url: ${CMR_OPERATOR_BASE:http://127.0.0.1:6300}
     timeout-search-ms: 15000

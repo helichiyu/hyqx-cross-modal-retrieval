@@ -34,3 +34,6 @@ target/
 # 算子运行产物与打包产物
 runtime/
 dist/
+
+# 本地数据库/密钥配置
+cmr-backend/src/main/resources/application-local.yml
