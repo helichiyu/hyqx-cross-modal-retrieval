@@ -50,7 +50,7 @@
 
     <div class="modal-mask" :class="{show:labelVisible}" @click.self="labelVisible=false"><div class="modal-box wide"><div class="modal-head"><h3>标注：{{labelSet?.name}}</h3><button class="modal-close" type="button" @click="labelVisible=false">×</button></div><div class="modal-body label-list"><div v-if="!labelItems.length" class="empty">无待标注条目</div><div v-for="(item,index) in labelItems" :key="item.id" class="label-item"><div class="label-title"><span class="badge gray">#{{index+1}}</span><b>{{item.query}}</b><span v-if="item.labeled" class="badge ok">已标注</span></div><div class="label-input"><input v-model="labelAnswers[item.id]" placeholder="正确答案 itemId，逗号分隔；无正确答案留空"><button class="btn-ghost btn-xs" type="button" @click="saveLabel(item)">保存</button></div></div></div><div class="modal-foot"><button class="btn-ghost" type="button" @click="labelVisible=false">关闭</button></div></div></div>
 
-    <div class="modal-mask" :class="{show:reportVisible}" @click.self="reportVisible=false"><div class="modal-box wide"><div class="modal-head"><h3>评测报告</h3><button class="modal-close" type="button" @click="reportVisible=false">×</button></div><div class="modal-body"><pre class="report-pre">{{report?reportText(report):''}}</pre></div><div class="modal-foot"><button class="btn-ghost" type="button" @click="reportVisible=false">关闭</button></div></div></div>
+    <div class="modal-mask" :class="{show:reportVisible}" @click.self="reportVisible=false"><div class="modal-box wide"><div class="modal-head"><h3>评测报告</h3><button class="modal-close" type="button" @click="reportVisible=false">×</button></div><div class="modal-body"><pre class="report-pre">{{report?reportText(report):''}}</pre></div><div class="modal-foot"><button class="btn-ghost" type="button" @click="reportVisible=false">关闭</button><router-link class="btn-primary" :to="strategyAdjustRoute">转策略调整 ↗</router-link></div></div></div>
     <div class="dev-mask" :class="{open:devOpen}" @click="closeDev"></div>
 <div class="dev-drawer" :class="{open:devOpen}" role="dialog" aria-modal="true" aria-label="研发需求说明">
   <div class="dev-head">
@@ -112,7 +112,7 @@ const sets=ref<EvalSetVO[]>([]);const runs=ref<EvalRecordVO[]>([]);const setsLoa
 const createVisible=ref(false);const creating=ref(false);const createForm=reactive({name:'',remark:'',filters:['zeroResult'] as string[]})
 const labelVisible=ref(false);const labelSet=ref<EvalSetVO|null>(null);const labelItems=ref<EvalItemVO[]>([]);const labelAnswers=reactive<Record<number,string>>({})
 const benchSetId=ref(0);const benchVersionId=ref<number|string>('');const strategyVersionsList=ref<StrategyVersionVO[]>([]);const runSubmitting=ref(false);const evaluating=ref(false);const evalPollingActive=ref(false)
-const reportVisible=ref(false);const report=ref<EvalRecordVO|null>(null)
+const reportVisible=ref(false);const report=ref<EvalRecordVO|null>(null);const strategyAdjustRoute=computed(()=>report.value?.strategyVersionId?{path:'/strategies',query:{strategyVersionId:report.value.strategyVersionId}}:'/strategies')
 const devOpen=ref(false);const toastVisible=ref(false);const toastMessage=ref('');const toastType=ref<'info'|'ok'|'err'>('info');let toastTimer:ReturnType<typeof setTimeout>|undefined
 const filterOptions=[{key:'zeroResult',label:'零结果'},{key:'noClick',label:'无点击'},{key:'reSearch',label:'复搜'}]
 const doneSets=computed(()=>sets.value.filter(x=>x.status==='done'));const activeRun=computed(()=>runs.value[0]||null);const previousRun=computed(()=>runs.value[1]||null);const allStrategyVersions=computed(()=>strategyVersionsList.value)

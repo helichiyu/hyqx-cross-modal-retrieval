@@ -224,6 +224,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   createDictItem,
   createStrategy,
@@ -240,6 +241,7 @@ import { useDictStore } from '../../stores/dict'
 type MainTab = 'config' | 'scene' | 'ops'
 type OpsTab = 'eval' | 'rollback'
 
+const route = useRoute()
 const dictStore = useDictStore()
 const activeTab = ref<MainTab>('config')
 const opsTab = ref<OpsTab>('eval')
@@ -327,6 +329,7 @@ onMounted(async () => {
   ])
   if (scenes.value[0]) editor.scene = scenes.value[0].alias
   await reloadStrategies()
+  await locateStrategyFromRoute()
 })
 
 async function reloadStrategies() {
@@ -439,6 +442,26 @@ async function saveStrategy(shouldPublish: boolean) {
     showToast((error as Error).message, 'err')
   } finally {
     editorSaving.value = false
+  }
+}
+
+async function locateStrategyFromRoute() {
+  const strategyVersionId = Number(route.query.strategyVersionId)
+  if (!Number.isFinite(strategyVersionId) || strategyVersionId <= 0) {
+    return
+  }
+  for (const row of strategies.value) {
+    try {
+      const detail = await strategyDetail(row.id)
+      if (detail.versions.some(version => version.id === strategyVersionId)) {
+        opsStrategyId.value = row.id
+        opsDetail.value = detail
+        activeTab.value = 'ops'
+        return
+      }
+    } catch {
+      // 单个策略详情失败时继续查找下一个。
+    }
   }
 }
 
