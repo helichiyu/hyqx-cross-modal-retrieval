@@ -18,9 +18,9 @@
             <tr v-else-if="!feedbacks.length"><td colspan="5" class="table-empty">暂无反馈单</td></tr>
             <tr v-for="row in feedbacks" v-else :key="row.id">
               <td class="tid">{{ row.bizNo }}<div class="fb-note">{{ row.searchBizNo || '—' }} · {{ row.description || '无补充说明' }}</div></td>
-              <td>{{ dictLabel(fbTypeDict,row.type) }}</td><td>{{ dictLabel(fbTargetDict,row.target) }}</td>
+              <td>{{ dictLabel(fbTypeDict,row.type) }}</td><td><router-link v-if="row.target && row.status!=='pending'" class="row-link" :to="feedbackTargetRoute(row.target)">{{ dictLabel(fbTargetDict,row.target) }} →</router-link><template v-else>{{ dictLabel(fbTargetDict,row.target) }}</template></td>
               <td><span class="badge" :class="feedbackStatusClass(row.status)">{{ dictLabel(fbStatusDict,row.status) }}</span></td>
-              <td><button v-if="row.status==='pending'" class="btn-ghost btn-xs" type="button" @click="openProcess(row)">开始处理</button><button v-if="row.status!=='closed'" class="btn-ghost btn-xs" type="button" @click="openClose(row)">闭环</button><button v-if="row.status==='closed'" class="btn-ghost btn-xs" type="button" disabled>已闭环</button></td>
+              <td><button v-if="row.status==='pending'" class="btn-ghost btn-xs" type="button" @click="openProcess(row)">开始处理</button><router-link v-if="row.status==='processing' && row.target" class="btn-ghost btn-xs" :to="feedbackTargetRoute(row.target)">去处理</router-link><button v-if="row.status!=='closed'" class="btn-ghost btn-xs" type="button" @click="openClose(row)">闭环</button><button v-if="row.status==='closed'" class="btn-ghost btn-xs" type="button" disabled>已闭环</button></td>
             </tr>
           </tbody></table></div>
           <div class="pager-bar"><span class="pager-total">共 {{ fbTotal }} 条</span><button class="pager-btn" type="button" :disabled="fbPage<=1" @click="loadFeedbacks(fbPage-1)">上一页</button><button class="pager-num is-cur" type="button">{{ fbPage }}</button><span class="pager-gap">/</span><span class="pager-total">{{ fbPageCount }}</span><button class="pager-btn" type="button" :disabled="fbPage>=fbPageCount" @click="loadFeedbacks(fbPage+1)">下一页</button></div>
@@ -208,6 +208,7 @@ const fbPageCount=computed(()=>Math.max(1,Math.ceil(fbTotal.value/fbPageSize)));
 onMounted(async()=>{[fbTypeDict.value,fbStatusDict.value,fbTargetDict.value,scenes.value]=await Promise.all([dictStore.ensure('cmr_feedback_type'),dictStore.ensure('cmr_feedback_status'),dictStore.ensure('cmr_feedback_target'),dictStore.ensure('cmr_scene')]);await Promise.all([loadFeedbacks(1),loadWords()])})
 function dictLabel(dict:DictItem[],alias?:string|null){return dict.find(x=>x.alias===alias)?.label||alias||'—'}
 function sceneLabel(alias:string){return alias==='all'?'全部场景':scenes.value.find(x=>x.alias===alias)?.label||alias}
+function feedbackTargetRoute(target:string){return target==='strategy'?'/strategies':'/library'}
 function feedbackStatusClass(status:string){return({pending:'wait',processing:'run',closed:'ok'}as Record<string,string>)[status]||'gray'}
 async function loadFeedbacks(page:number){fbPage.value=page;fbLoading.value=true;try{const data=await pageFeedbacks({pageNum:page,pageSize:fbPageSize,type:fbTypeFilter.value,status:fbStatusFilter.value});feedbacks.value=data.records;fbTotal.value=data.total}catch(e){showToast((e as Error).message,'err')}finally{fbLoading.value=false}}
 async function openRegister(){registerVisible.value=true;selectedHistoryId.value=null;registerForm.description='';historyKeyword.value='';try{const data=await pageHistory({pageNum:1,pageSize:50});histories.value=data.records}catch(e){showToast((e as Error).message,'err')}}

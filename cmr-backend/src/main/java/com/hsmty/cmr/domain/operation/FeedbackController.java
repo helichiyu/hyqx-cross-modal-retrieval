@@ -47,8 +47,9 @@ public class FeedbackController {
     @GetMapping
     public ApiResult<PageResult<FeedbackVO>> page(PageQuery query,
                                                   @RequestParam(required = false) String type,
-                                                  @RequestParam(required = false) String status) {
-        return ApiPageResult.success(feedbackService.page(query, type, status));
+                                                  @RequestParam(required = false) String status,
+                                                  @RequestParam(required = false) Long searchId) {
+        return ApiPageResult.success(feedbackService.page(query, type, status, searchId));
     }
 
     @Operation(summary = "开始处理（回填去向）")

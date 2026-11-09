@@ -64,8 +64,11 @@ public class FeedbackService {
         return FeedbackVO.from(feedback, history.getBizNo());
     }
 
-    public PageResult<FeedbackVO> page(PageQuery query, String type, String status) {
+    public PageResult<FeedbackVO> page(PageQuery query, String type, String status, Long searchId) {
         QueryWrapper qw = QueryWrapper.create().from(CMR_FEEDBACK);
+        if (searchId != null) {
+            qw.where(CMR_FEEDBACK.SEARCH_ID.eq(searchId));
+        }
         if (notBlank(type)) {
             qw.where(CMR_FEEDBACK.TYPE.eq(type));
         }
