@@ -256,6 +256,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   activateIndex,
   adjudicateDataset,
@@ -268,11 +269,13 @@ import {
   testDatasource,
   rebuildDataset,
 } from '../../api'
-import type { DatasetDetailVO, DatasetVO, DatasourceTestVO, DatasourceVO, IndexVO } from '../../api/types'
+import type { DatasetDetailVO, DatasetVO, DatasourceTestVO, DatasourceVO, IndexVO, TaskVO } from '../../api/types'
 import { useDictStore } from '../../stores/dict'
 
+const router = useRouter()
 const dictStore = useDictStore()
 const rows = ref<DatasetVO[]>([])
+const lastBuildTask = ref<TaskVO | null>(null)
 const datasources = ref<DatasourceVO[]>([])
 const detail = ref<DatasetDetailVO | null>(null)
 const currentDataset = ref<DatasetVO | null>(null)
@@ -442,7 +445,9 @@ async function submitDataset() {
     datasetVisible.value = false
     datasetForm.name = ''; datasetForm.version = ''; datasetForm.datasetPath = ''; datasetFile.value = undefined
     await reload(false)
-    showToast(`建库任务已启动：${created.bizNo}`, 'ok')
+    const detail = await datasetDetail(created.id)
+    lastBuildTask.value = detail.tasks.find(task => task.type === 'build') || null
+    showToast(lastBuildTask.value ? `建库任务已启动：${lastBuildTask.value.bizNo}` : `数据集已登记：${created.bizNo}`, 'ok')
   } catch (error) { showToast((error as Error).message, 'err') }
   finally { datasetSubmitting.value = false }
 }
@@ -465,8 +470,11 @@ async function confirmProductionRow(row: DatasetVO) {
 }
 
 async function rebuild(row: DatasetVO) {
-  try { const task = await rebuildDataset(row.id); showToast(`重建任务已启动：${task.bizNo}`, 'ok') }
-  catch (error) { showToast((error as Error).message, 'err') }
+  try {
+    const task = await rebuildDataset(row.id)
+    lastBuildTask.value = task
+    showToast(`重建任务已启动：${task.bizNo}`, 'ok')
+  } catch (error) { showToast((error as Error).message, 'err') }
 }
 
 async function openDetail(row: DatasetVO) {
@@ -599,6 +607,8 @@ button{font-family:inherit;cursor:pointer}
 .btn-link{border:0;border-left:1px solid #e6edf8;background:transparent;color:var(--system-blue);font-size:11px;font-weight:600;padding:0 6px;margin-left:2px;white-space:nowrap}
 .btn-link:hover{text-decoration:underline}
 .btn-link:disabled{color:#9aa6bd;cursor:default}
+.task-entry{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:11.5px;color:#667085}
+.task-entry b{color:#1f2a44}
 
 /* 状态流转说明条 */
 .flowline{display:flex;flex-wrap:wrap;align-items:center;gap:4px 5px;border:1px dashed #e2e9f5;border-radius:6px;background:#f8fbff;padding:5px 9px;font-size:11px;color:#8a96ad;line-height:1.6}

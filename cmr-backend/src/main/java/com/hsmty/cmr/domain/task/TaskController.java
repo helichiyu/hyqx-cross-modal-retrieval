@@ -98,7 +98,7 @@ public class TaskController {
                 .bizNo(task.getBizNo())
                 .type(task.getType())
                 .refId(task.getRefId())
-                .refBizNo(refBizNo(task))
+                .refBizNo(refBizNo(task)).refRoute(refRoute(task))
                 .status(task.getStatus())
                 .failType(task.getFailType())
                 .failDisposal(task.getFailDisposal())
@@ -109,6 +109,21 @@ public class TaskController {
                 .finishedTime(task.getFinishedTime())
                 .createTime(task.getCreateTime())
                 .build();
+    }
+
+    private String refRoute(CmrTask task) {
+        if (task.getRefId() == null) {
+            return null;
+        }
+        return switch (task.getType() == null ? "" : task.getType()) {
+            case CmrTask.TYPE_BUILD -> "/library";
+            case CmrTask.TYPE_EVAL -> "/evaluation";
+            case CmrTask.TYPE_SEARCH -> {
+                CmrSearchHistory history = searchHistoryMapper.selectOneById(task.getRefId());
+                yield history == null ? null : "/search/results/" + history.getResultSetId();
+            }
+            default -> null;
+        };
     }
 
     private String refBizNo(CmrTask task) {

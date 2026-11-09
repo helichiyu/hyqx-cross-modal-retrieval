@@ -123,6 +123,7 @@ export interface TaskVO {
   type: string
   refId: number | null
   refBizNo: string | null
+  refRoute: string | null
   status: string
   failType: string | null
   failDisposal: string | null

@@ -10,7 +10,7 @@
           <div class="tc-grid">
             <div class="tc-field"><div class="k">任务编号</div><div class="v mono">{{ detail.task.bizNo }}</div></div>
             <div class="tc-field"><div class="k">任务类型</div><div class="v">{{ typeLabel }}</div></div>
-            <div class="tc-field"><div class="k">关联对象</div><div class="v mono">{{ detail.task.refBizNo || '—' }}</div></div>
+            <div class="tc-field"><div class="k">关联对象</div><div class="v mono"><span>{{ detail.task.refBizNo || '—' }}</span><router-link v-if="detail.task.refRoute" class="ref-link" :to="detail.task.refRoute">{{ refActionLabel }}</router-link></div></div>
             <div class="tc-field"><div class="k">当前步骤</div><div class="v">{{ detail.task.currentStep || '—' }}</div></div>
             <div class="tc-field"><div class="k">状态</div><div class="v"><span class="badge" :class="statusClass">{{ statusLabel }}</span></div></div>
             <div class="tc-field"><div class="k">创建时间</div><div class="v">{{ detail.task.createTime || '—' }}</div></div>
@@ -23,7 +23,9 @@
           <div class="res-body">
             <div v-if="detail.task.status!=='failed'" class="res-ok">
               <div class="res-count"><span class="res-k">步骤日志</span><b>{{ detail.logs.length }}</b><span>条</span></div>
-              <router-link class="btn-primary" to="/tasks">返回任务管理</router-link>
+              <router-link v-if="detail.task.type==='search' && detail.task.refRoute" class="btn-primary" :to="detail.task.refRoute">查看结果</router-link>
+              <router-link v-else-if="detail.task.refRoute" class="btn-primary" :to="detail.task.refRoute">{{ refActionLabel }}</router-link>
+              <router-link class="btn-ghost" to="/tasks">返回任务管理</router-link>
             </div>
             <div v-else class="res-fail"><span class="f-ico">⚠️</span><div class="fail-main"><div class="fail-k">失败原因</div><p>{{ detail.task.errorMsg || '未记录失败原因' }}</p></div><router-link class="btn-ghost" to="/tasks">查看失败任务</router-link></div>
           </div>
@@ -104,7 +106,7 @@
 <script setup lang="ts">
 import {computed,onMounted,ref} from 'vue';import{useRoute}from'vue-router';import{taskDetail}from'../../api';import type{TaskDetailVO}from'../../api/types';import{useDictStore}from'../../stores/dict'
 const route=useRoute();const dictStore=useDictStore();const detail=ref<TaskDetailVO|null>(null);const errorMessage=ref('');const loading=ref(true);const typeDict=ref<{alias:string;label:string}[]>([]);const statusDict=ref<{alias:string;label:string}[]>([]);const pageNum=ref(1);const pageSize=ref(8);const devOpen=ref(false)
-const taskId=computed(()=>Number(route.params.id));const typeLabel=computed(()=>typeDict.value.find(x=>x.alias===detail.value?.task.type)?.label||detail.value?.task.type||'—');const statusLabel=computed(()=>statusDict.value.find(x=>x.alias===detail.value?.task.status)?.label||detail.value?.task.status||'—');const statusClass=computed(()=>({ready:'run',running:'run',done:'ok',failed:'fail'}as Record<string,string>)[detail.value?.task.status||'']||'run');const pageCount=computed(()=>Math.max(1,Math.ceil((detail.value?.logs.length||0)/pageSize.value)));const pagedLogs=computed(()=>{const list=detail.value?.logs||[];return list.slice((pageNum.value-1)*pageSize.value,pageNum.value*pageSize.value)})
+const taskId=computed(()=>Number(route.params.id));const refActionLabel=computed(()=>detail.value?.task.type==='search'?'查看结果':detail.value?.task.type==='build'?'查看数据集':detail.value?.task.type==='eval'?'查看评测':'查看关联对象');const typeLabel=computed(()=>typeDict.value.find(x=>x.alias===detail.value?.task.type)?.label||detail.value?.task.type||'—');const statusLabel=computed(()=>statusDict.value.find(x=>x.alias===detail.value?.task.status)?.label||detail.value?.task.status||'—');const statusClass=computed(()=>({ready:'run',running:'run',done:'ok',failed:'fail'}as Record<string,string>)[detail.value?.task.status||'']||'run');const pageCount=computed(()=>Math.max(1,Math.ceil((detail.value?.logs.length||0)/pageSize.value)));const pagedLogs=computed(()=>{const list=detail.value?.logs||[];return list.slice((pageNum.value-1)*pageSize.value,pageNum.value*pageSize.value)})
 onMounted(async()=>{[typeDict.value,statusDict.value]=await Promise.all([dictStore.ensure('cmr_task_type'),dictStore.ensure('cmr_task_status')]);try{detail.value=await taskDetail(taskId.value)}catch(e){errorMessage.value=(e as Error).message}finally{loading.value=false}})
 function changePage(p:number){pageNum.value=p}function openDev(){devOpen.value=true}function closeDev(){devOpen.value=false}
 </script>
@@ -248,11 +250,14 @@ button{font-family:inherit;cursor:pointer}
 .res-count span{font-size:13px;color:var(--muted)}
 .res-count .res-k{font-size:12px;color:#9aa6bd;margin-right:2px}
 .res-ok .btn-primary{margin-left:auto}
+.ref-link{margin-left:8px;color:var(--system-blue);font-weight:600;text-decoration:none}
+.ref-link:hover{text-decoration:underline}
 .res-fail{
   display:flex;align-items:center;gap:14px;flex-wrap:wrap;
   padding:13px 16px;border:1px solid #f3c4c6;border-radius:8px;background:#fff7f7;
 }
 .res-fail .f-ico{font-size:18px}
+.res-fail .btn-ghost{margin-left:auto}
 .fail-main{flex:1;min-width:260px}
 .fail-k{font-size:11px;color:#b42318;font-weight:700;margin-bottom:3px}
 .fail-main p{font-size:12.5px;color:#8c5560;line-height:1.6}
