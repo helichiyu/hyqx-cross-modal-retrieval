@@ -70,6 +70,10 @@ cmr:
     key: ${CMR_CRYPTO_KEY:change-me-crypto-32bytes-0123456789!}
   model:
     whitelist: ${CMR_MODEL_WHITELIST:}
+  retention:
+    search-log-days: ${CMR_SEARCH_LOG_DAYS:30}
+    search-log-batch-size: ${CMR_SEARCH_LOG_BATCH_SIZE:1000}
+    search-log-cron: "${CMR_SEARCH_LOG_CLEANUP_CRON:0 30 2 * * *}"
   eval:
     default-eval-file: dataset/eval/default.jsonl
     lines:
