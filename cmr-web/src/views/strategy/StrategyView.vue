@@ -234,6 +234,7 @@ import {
   rollbackStrategy,
   strategyConsistency,
   strategyDetail,
+  strategyDiff,
   strategyModelOptions,
   updateDraft,
 } from '../../api'
@@ -321,21 +322,7 @@ watch(activeTab, tab => {
   }
 })
 
-const opsDiffRows = computed(() => {
-  if (!opsDetail.value?.draft) return []
-  const current = opsDetail.value.current
-  const draft = opsDetail.value.draft
-  const cw = parseWeights(current?.weightsJson)
-  const dw = parseWeights(draft.weightsJson)
-  return [
-    { name: '文本权重', from: `${cw.text}%`, to: `${dw.text}%` },
-    { name: '图像权重', from: `${cw.image}%`, to: `${dw.image}%` },
-    { name: '音频权重', from: `${cw.audio}%`, to: `${dw.audio}%` },
-    { name: '视频权重', from: `${cw.video}%`, to: `${dw.video}%` },
-    { name: '重排', from: current?.rerank ? '开' : '关', to: draft.rerank ? '开' : '关' },
-    { name: 'TopK', from: String(current?.topK ?? '—'), to: String(draft.topK ?? '—') },
-  ]
-})
+const opsDiffRows = ref<Array<{ name: string; from: string; to: string }>>([])
 
 onMounted(async () => {
   ;[scenes.value, strategyStatusDict.value] = await Promise.all([
@@ -511,9 +498,48 @@ async function loadOpsDetail() {
   }
   try {
     opsDetail.value = await strategyDetail(opsStrategyId.value)
+    await loadOpsDiff(opsDetail.value)
   } catch (error) {
     showToast((error as Error).message, 'err')
   }
+}
+
+async function loadOpsDiff(detail: StrategyDetailVO) {
+  if (!detail.draft) {
+    opsDiffRows.value = []
+    return
+  }
+  if (detail.current) {
+    try {
+      const data = await strategyDiff(detail.strategy.id, detail.current.versionNo, detail.draft.versionNo)
+      const weights = (data.weights || {}) as Record<string, { from: number; to: number }>
+      const rerank = data.rerank as { from: boolean; to: boolean } | undefined
+      const topK = data.topK as { from: number; to: number } | undefined
+      opsDiffRows.value = [
+        { name: '文本权重', from: `${weights.text?.from ?? 0}%`, to: `${weights.text?.to ?? 0}%` },
+        { name: '图像权重', from: `${weights.image?.from ?? 0}%`, to: `${weights.image?.to ?? 0}%` },
+        { name: '音频权重', from: `${weights.audio?.from ?? 0}%`, to: `${weights.audio?.to ?? 0}%` },
+        { name: '视频权重', from: `${weights.video?.from ?? 0}%`, to: `${weights.video?.to ?? 0}%` },
+        { name: '重排', from: rerank?.from ? '开' : '关', to: rerank?.to ? '开' : '关' },
+        { name: 'TopK', from: String(topK?.from ?? '—'), to: String(topK?.to ?? '—') },
+      ]
+      return
+    } catch {
+      // 后端 diff 失败时保留本地回显，避免策略运维整块不可用。
+    }
+  }
+  const current = detail.current
+  const draft = detail.draft
+  const cw = parseWeights(current?.weightsJson)
+  const dw = parseWeights(draft.weightsJson)
+  opsDiffRows.value = [
+    { name: '文本权重', from: `${cw.text}%`, to: `${dw.text}%` },
+    { name: '图像权重', from: `${cw.image}%`, to: `${dw.image}%` },
+    { name: '音频权重', from: `${cw.audio}%`, to: `${dw.audio}%` },
+    { name: '视频权重', from: `${cw.video}%`, to: `${dw.video}%` },
+    { name: '重排', from: current?.rerank ? '开' : '关', to: draft.rerank ? '开' : '关' },
+    { name: 'TopK', from: String(current?.topK ?? '—'), to: String(draft.topK ?? '—') },
+  ]
 }
 
 async function publishOpsDraft() {
