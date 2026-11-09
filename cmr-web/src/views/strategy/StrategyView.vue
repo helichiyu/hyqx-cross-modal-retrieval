@@ -113,7 +113,7 @@
             </div>
 
             <div v-if="opsTab === 'rollback'">
-              <div class="sec-head" style="margin:10px 0 8px"><span class="sec-title p5-small-title">版本历史</span><span class="head-act"><span class="chk-line">✓ 一致性检查通过</span></span></div>
+              <div class="sec-head" style="margin:10px 0 8px"><span class="sec-title p5-small-title">版本历史</span><span class="head-act"><span v-if="consistencyResult" class="chk-line show" :class="{ fail: consistencyResult.passed === false }">{{ consistencyResult.passed === true ? '✓ 一致性检查通过' : '✕ 一致性检查未通过' }}</span><button class="mini-btn" type="button" :disabled="consistencyChecking" @click="checkConsistency">{{ consistencyChecking ? '检查中…' : '一致性检查' }}</button></span></div>
               <div class="mini-table" style="--tc:minmax(0,.7fr) minmax(0,1.4fr) 100px minmax(0,1fr) 110px">
                 <div class="mt-row head"><div>版本</div><div>变更摘要</div><div>发布时间</div><div>状态</div><div>操作</div></div>
                 <div v-if="!opsDetail?.versions.length" class="mt-row"><div class="table-empty">暂无历史版本</div></div>
@@ -149,7 +149,7 @@
           </section>
           <section class="ed-sec">
             <div class="ed-sec-head"><span class="p-title">向量参数</span></div>
-            <div class="ed-op"><label class="ed-pick">统一向量空间<select class="ed-select" disabled><option>{{ editorModelVersion || '当前生效索引模型' }}</option></select></label><span class="ed-fixed">统一检索固定一套向量空间，不可切换</span></div>
+            <div class="ed-op"><label class="ed-pick">统一向量空间<select class="ed-select" disabled><option v-for="model in modelChoices" :key="model" :value="model">{{ model }}</option></select></label><span class="ed-fixed">{{ modelHint }}</span></div>
           </section>
           <section class="ed-sec">
             <div class="ed-sec-head"><span class="p-title">融合参数</span></div>
@@ -232,7 +232,9 @@ import {
   pageStrategies,
   publishStrategy,
   rollbackStrategy,
+  strategyConsistency,
   strategyDetail,
+  strategyModelOptions,
   updateDraft,
 } from '../../api'
 import type { DictItem, StrategyDetailVO, StrategyVersionVO, StrategyVO } from '../../api/types'
@@ -272,6 +274,9 @@ const selectedScene = ref<DictItem | null>(null)
 
 const opsStrategyId = ref(0)
 const opsDetail = ref<StrategyDetailVO | null>(null)
+const modelOptions = ref<Record<string, unknown> | null>(null)
+const consistencyResult = ref<Record<string, unknown> | null>(null)
+const consistencyChecking = ref(false)
 
 const confirmVisible = ref(false)
 const confirmTitle = ref('确认')
@@ -298,6 +303,16 @@ const editorVersion = computed(() => {
 })
 const editorStatus = computed(() => editorDetail.value?.strategy.status === 'active' ? '生效中，编辑中' : '草稿')
 const editorModelVersion = computed(() => editorDetail.value?.modelVersion || '')
+const modelChoices = computed(() => {
+  const models = modelOptions.value?.models as string[] | undefined
+  return models?.length ? models : editorModelVersion.value ? [editorModelVersion.value] : ['当前生效索引模型']
+})
+const modelHint = computed(() => {
+  if (!modelOptions.value) return '统一检索固定一套向量空间，不可切换'
+  const enabled = modelOptions.value.whitelistEnabled === true
+  const allowed = modelOptions.value.activeAllowed === true
+  return `${enabled ? '白名单模型' : '索引模型'} · ${allowed ? '当前索引模型校验通过' : '当前索引模型不在白名单内'}`
+})
 const editorReadonlyPreset = computed(() => editorDetail.value?.strategy.name?.includes('系统默认') || false)
 const relatedStrategies = computed(() => selectedScene.value ? strategies.value.filter(item => item.scene === selectedScene.value?.alias) : [])
 watch(activeTab, tab => {
@@ -328,9 +343,33 @@ onMounted(async () => {
     dictStore.ensure('cmr_strategy_status'),
   ])
   if (scenes.value[0]) editor.scene = scenes.value[0].alias
-  await reloadStrategies()
+  await Promise.all([loadModelOptions(), reloadStrategies()])
   await locateStrategyFromRoute()
 })
+
+async function loadModelOptions() {
+  try {
+    modelOptions.value = await strategyModelOptions()
+  } catch {
+    modelOptions.value = null
+  }
+}
+
+async function checkConsistency() {
+  if (!opsStrategyId.value) {
+    showToast('请先选择策略', 'err')
+    return
+  }
+  consistencyChecking.value = true
+  try {
+    consistencyResult.value = await strategyConsistency(opsStrategyId.value)
+    showToast(consistencyResult.value.passed === true ? '一致性检查通过' : '一致性检查未通过', consistencyResult.value.passed === true ? 'ok' : 'err')
+  } catch (error) {
+    showToast((error as Error).message, 'err')
+  } finally {
+    consistencyChecking.value = false
+  }
+}
 
 async function reloadStrategies() {
   strategyLoading.value = true
@@ -933,6 +972,7 @@ a.nav-item{text-decoration:none;color:#344054}
 .act-wrap{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .chk-line{display:none;font-size:11.5px;color:#1e7a43;background:#f2fbf4;border:1px solid #cdeed6;border-radius:4px;padding:1px 8px;white-space:nowrap}
 .chk-line.show{display:inline-block}
+.chk-line.fail{color:#b42318;background:#fff2f0;border-color:#f2c6c0}
 .receipt{display:none;border:1px dashed #b7e2c4;background:#f7fdf9;border-radius:8px;padding:9px 12px;font-size:12px;color:#3d6b52;margin-top:8px}
 .receipt.show{display:block}
 .receipt .rc-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700;color:#1e7a43;margin-bottom:5px}

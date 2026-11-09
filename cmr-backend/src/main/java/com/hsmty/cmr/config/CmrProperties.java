@@ -4,6 +4,8 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * cmr.* 配置项绑定（见 application.yml 与 docs/前后端方案/04 第五节）
@@ -20,6 +22,7 @@ public class CmrProperties {
     private final Volume volume = new Volume();
     private final Jwt jwt = new Jwt();
     private final Crypto crypto = new Crypto();
+    private final Model model = new Model();
     private final Eval eval = new Eval();
     private final Build build = new Build();
 
@@ -57,6 +60,12 @@ public class CmrProperties {
     public static class Crypto {
         /** 数据源认证信息 AES 密钥 */
         private String key = "change-me-crypto-32bytes-0123456789!";
+    }
+
+    /** 向量模型白名单：空列表表示暂未配置，不启用建库拦截 */
+    @Data
+    public static class Model {
+        private List<String> whitelist = new ArrayList<>();
     }
 
     @Data

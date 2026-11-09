@@ -68,6 +68,8 @@ cmr:
     expire-hours: 12
   crypto:
     key: ${CMR_CRYPTO_KEY:change-me-crypto-32bytes-0123456789!}
+  model:
+    whitelist: ${CMR_MODEL_WHITELIST:}
   eval:
     default-eval-file: dataset/eval/default.jsonl
     lines:

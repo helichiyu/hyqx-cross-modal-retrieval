@@ -50,6 +50,20 @@ public class StrategyController {
         return ApiPageResult.success(strategyService.page(query, scene, status));
     }
 
+    @Operation(summary = "向量模型白名单与当前索引模型")
+    @PreAuthorize("hasAnyAuthority('cmr:strategy:page')")
+    @GetMapping("model-options")
+    public ApiResult<Map<String, Object>> modelOptions() {
+        return ApiResult.success(strategyService.modelOptions());
+    }
+
+    @Operation(summary = "策略一致性检查")
+    @PreAuthorize("hasAnyAuthority('cmr:strategy:detail')")
+    @GetMapping("{id}/consistency")
+    public ApiResult<Map<String, Object>> consistency(@PathVariable Long id) {
+        return ApiResult.success(strategyService.consistency(id));
+    }
+
     @Operation(summary = "新建策略（存草稿）")
     @PreAuthorize("hasAnyAuthority('cmr:strategy:create')")
     @PostMapping
