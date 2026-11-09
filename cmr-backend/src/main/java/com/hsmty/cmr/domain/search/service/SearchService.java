@@ -294,7 +294,9 @@ public class SearchService {
         qw.orderBy(CMR_SEARCH_HISTORY.ID.desc());
         Page<CmrSearchHistory> page = historyMapper.paginate(
                 Math.max(query.getPageNum(), 1), Math.max(query.getPageSize(), 1), qw);
-        return PageResult.of(page.getRecords().stream().map(HistoryVO::from).toList(),
+        return PageResult.of(page.getRecords().stream()
+                        .map(h -> HistoryVO.from(h, taskService.bizNoOf(h.getTaskId()), taskService.statusOf(h.getTaskId())))
+                        .toList(),
                 page.getTotalRow(), query.getPageNum(), query.getPageSize());
     }
 
@@ -306,7 +308,8 @@ public class SearchService {
                         .orderBy(CMR_RESULT_ITEM.RANK.asc()))
                 .stream().map(this::toItemVO).toList();
         return HistoryDetailVO.builder()
-                .history(HistoryVO.from(history))
+                .history(HistoryVO.from(history, taskService.bizNoOf(history.getTaskId()),
+                        taskService.statusOf(history.getTaskId())))
                 .strategySnapshotJson(history.getStrategySnapshotJson())
                 .items(items)
                 .build();

@@ -35,6 +35,8 @@ export interface HistoryVO {
   bizNo: string
   resultSetId: string
   taskId: number | null
+  taskBizNo: string | null
+  taskStatus: string | null
   queryText: string | null
   queryFile: string | null
   queryModality: string | null
