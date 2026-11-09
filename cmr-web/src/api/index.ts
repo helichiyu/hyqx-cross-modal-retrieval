@@ -6,8 +6,10 @@ import type {
   DatasourceVO,
   DictItem,
   EvalItemVO,
+  EvalPreviewVO,
   EvalRecordVO,
   EvalSetVO,
+  FeedbackStatsVO,
   FeedbackVO,
   HistoryDetailVO,
   HistoryVO,
@@ -91,6 +93,10 @@ export const taskDetail = (id: number) => http.get<TaskDetailVO>(`tasks/${id}`)
 export const pageStrategies = (params: Record<string, unknown> = {}) =>
   http.get<PageResult<StrategyVO>>('strategies', params)
 
+export const strategyModelOptions = () => http.get<Record<string, unknown>>('strategies/model-options')
+
+export const strategyConsistency = (id: number) => http.get<Record<string, unknown>>(`strategies/${id}/consistency`)
+
 export const strategyDetail = (id: number) => http.get<StrategyDetailVO>(`strategies/${id}`)
 
 export const createStrategy = (body: Record<string, unknown>) =>
@@ -154,6 +160,9 @@ export const pageEvalSets = (params: Record<string, unknown> = {}) =>
 export const evalSetDetail = (id: number, page?: Record<string, unknown>) =>
   http.get<{ evalSet: EvalSetVO; items: PageResult<EvalItemVO> }>(`eval-sets/${id}`, page)
 
+export const previewEvalSet = (filters: Record<string, boolean>) =>
+  http.get<EvalPreviewVO>('eval-sets/preview', filters)
+
 export const createEvalSet = (body: Record<string, unknown>) =>
   http.post<EvalSetVO>('eval-sets', body)
 
@@ -175,6 +184,8 @@ export const evalRunDetail = (id: number) => http.get<EvalRecordVO>(`eval-runs/$
 
 export const pageFeedbacks = (params: Record<string, unknown> = {}) =>
   http.get<PageResult<FeedbackVO>>('feedbacks', params)
+
+export const feedbackStats = () => http.get<FeedbackStatsVO>('feedbacks/stats')
 
 export const createFeedback = (body: Record<string, unknown>) =>
   http.post<FeedbackVO>('feedbacks', body)

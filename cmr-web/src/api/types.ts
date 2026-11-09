@@ -165,6 +165,7 @@ export interface DatasourceVO {
   protocol: string | null
   authType: string | null
   remark: string | null
+  datasetCount: number
   lastTestConnected: boolean | null
   lastTestStatusCode: number | null
   lastTestLatencyMs: number | null
@@ -234,6 +235,21 @@ export interface EvalItemVO {
   labeled: boolean
 }
 
+export interface EvalPreviewItemVO {
+  searchId: number
+  searchBizNo: string
+  query: string
+  queryModality: string | null
+  targetModality: string | null
+  itemCount: number | null
+  createTime: string | null
+}
+
+export interface EvalPreviewVO {
+  count: number
+  items: EvalPreviewItemVO[]
+}
+
 export interface EvalRecordVO {
   id: number
   bizNo: string
@@ -251,6 +267,13 @@ export interface EvalRecordVO {
   createTime: string
 }
 
+export interface FeedbackStatsVO {
+  total: number
+  pending: number
+  processing: number
+  closed: number
+}
+
 export interface FeedbackVO {
   id: number
   bizNo: string
@@ -263,6 +286,7 @@ export interface FeedbackVO {
   resultNote: string | null
   handlerId: number | null
   createTime: string
+  updateTime: string | null
 }
 
 export interface WordVO {
