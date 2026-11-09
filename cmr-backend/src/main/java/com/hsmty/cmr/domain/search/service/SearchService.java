@@ -224,10 +224,15 @@ public class SearchService {
 
     /** 结果集回看（P2 刷新/P9 查看） */
     public HistoryDetailVO resultsOf(String resultSetId) {
+        CmrSearchHistory history = historyOfResultSet(resultSetId);
+        return detail(history.getId());
+    }
+
+    private CmrSearchHistory historyOfResultSet(String resultSetId) {
         CmrSearchHistory history = historyMapper.selectOneByQuery(QueryWrapper.create()
                 .where(CMR_SEARCH_HISTORY.RESULT_SET_ID.eq(resultSetId)));
         BizException.assertNull(history, "结果集不存在");
-        return detail(history.getId());
+        return history;
     }
 
     /** 采用/废弃：一次性终态，二者互斥不可逆 */
@@ -307,6 +312,12 @@ public class SearchService {
                 .build();
     }
 
+    /** 按结果集重跑：P2 错误态可从 resultSetId 找到原 SRH 并重放 */
+    public SearchResultVO rerunByResultSetId(String resultSetId) {
+        CmrSearchHistory history = historyOfResultSet(resultSetId);
+        return rerun(history.getId());
+    }
+
     /** 再次执行：原参数重放（新 SRH，不复用旧结果） */
     public SearchResultVO rerun(Long id) {
         CmrSearchHistory history = historyMapper.selectOneById(id);
@@ -325,6 +336,20 @@ public class SearchService {
                 });
         if (snapshot.get("topK") instanceof Number n) {
             dto.setTopK(n.intValue());
+        }
+        if (snapshot.get("rerank") instanceof Boolean rerank) {
+            dto.setRerank(rerank);
+        }
+        if (snapshot.get("weights") instanceof Map<?, ?> sourceWeights) {
+            Map<String, Integer> weights = new LinkedHashMap<>();
+            sourceWeights.forEach((key, value) -> {
+                if (key != null && value instanceof Number number) {
+                    weights.put(String.valueOf(key), number.intValue());
+                }
+            });
+            if (!weights.isEmpty()) {
+                dto.setWeights(weights);
+            }
         }
         return execute(dto);
     }

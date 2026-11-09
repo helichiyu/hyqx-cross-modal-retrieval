@@ -129,6 +129,9 @@ export const executeSearch = (body: Record<string, unknown>) =>
 export const searchResults = (resultSetId: string) =>
   http.get<HistoryDetailVO>(`search/results/${resultSetId}`)
 
+export const rerunSearchResults = (resultSetId: string) =>
+  http.post<SearchResultVO>(`search/results/${resultSetId}/rerun`)
+
 export const adoptResults = (resultSetId: string, adopted: boolean) =>
   http.post<void>(`search/results/${resultSetId}/${adopted ? 'adopt' : 'discard'}`)
 

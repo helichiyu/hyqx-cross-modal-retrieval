@@ -170,7 +170,7 @@
                   <p class="st-desc">本次查询未生成可展示结果集。</p>
                   <span class="err-code">关联结果集 {{ resultSetId }}</span>
                   <div class="state-actions">
-                    <button class="btn-primary" type="button" @click="load">重试检索</button>
+                    <button class="btn-primary" type="button" :disabled="retrying" @click="retrySearch">{{ retrying ? '重跑中…' : '重试检索' }}</button>
                     <router-link class="btn-ghost ghost-link" to="/tasks">查看失败任务</router-link>
                   </div>
                 </div>
@@ -276,7 +276,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { adoptResults, clickResult, createFeedback, searchResults } from '../../api'
+import { adoptResults, clickResult, createFeedback, rerunSearchResults, searchResults } from '../../api'
 import { http } from '../../api/http'
 import MediaPreview from '../../components/MediaPreview.vue'
 import type { HistoryDetailVO, ResultItemVO } from '../../api/types'
@@ -288,6 +288,7 @@ const resultSetId = computed(() => String(route.params.resultSetId || ''))
 const detail = ref<HistoryDetailVO | null>(null)
 const items = ref<ResultItemVO[]>([])
 const actualView = ref<'loading' | 'result' | 'empty' | 'error'>('loading')
+const retrying = ref(false)
 const demoView = ref<'result' | 'loading' | 'empty' | 'error' | 'edge' | ''>('')
 const errorMessage = ref('结果集加载失败')
 const adoptStatus = ref('unadopted')
@@ -538,6 +539,24 @@ async function submitFeedback() {
     showToast((error as Error).message, 'err')
   } finally {
     feedbackSubmitting.value = false
+  }
+}
+
+async function retrySearch() {
+  if (retrying.value) return
+  retrying.value = true
+  try {
+    const result = await rerunSearchResults(resultSetId.value)
+    selectedIds.value = new Set<number>()
+    clickedIds.value = new Set<number>()
+    expandedId.value = null
+    await router.replace(`/search/results/${result.resultSetId}`)
+    await load()
+    showToast('检索已重新执行', 'ok')
+  } catch (error) {
+    showToast((error as Error).message, 'err')
+  } finally {
+    retrying.value = false
   }
 }
 
