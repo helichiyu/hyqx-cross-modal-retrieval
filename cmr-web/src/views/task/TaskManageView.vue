@@ -132,6 +132,7 @@ const pageCount=computed(()=>Math.max(1,Math.ceil(total.value/pageSize.value)))
 const failedPageCount=computed(()=>Math.max(1,Math.ceil(failedTotal.value/failedPageSize.value)))
 const devOpen=ref(false); const toastVisible=ref(false); const toastMessage=ref(''); const toastType=ref<'info'|'ok'|'err'>('info')
 let toastTimer:ReturnType<typeof setTimeout>|undefined
+let pollTimer:ReturnType<typeof setTimeout>|undefined
 
 onMounted(async()=>{
   [statusDict.value,typeDict.value,disposalDict.value]=await Promise.all([
@@ -139,7 +140,7 @@ onMounted(async()=>{
   ])
   await reload(false)
 })
-onBeforeUnmount(()=>clearTimeout(toastTimer))
+onBeforeUnmount(()=>{clearTimeout(toastTimer);clearTimeout(pollTimer)})
 async function reload(showMessage=true){
   loading.value=true; failedLoading.value=true
   try{
@@ -148,6 +149,7 @@ async function reload(showMessage=true){
       loadFailedTasks(false),
     ])
     rows.value=page.records; total.value=page.total
+    scheduleAutoRefresh()
     if(showMessage)showToast('任务列表已刷新','ok')
   }catch(e){showToast((e as Error).message,'err')}finally{loading.value=false;failedLoading.value=false}
 }
@@ -160,6 +162,7 @@ async function loadFailedTasks(showLoading=true){
     if(showLoading)failedLoading.value=false
   }
 }
+function scheduleAutoRefresh(){clearTimeout(pollTimer);if(rows.value.some(task=>task.status==='ready'||task.status==='running')){pollTimer=setTimeout(()=>void reload(false),5000)}}
 function selectState(state:string){statusFilter.value=state;pageNum.value=1;void reload(false)}
 function changePage(page:number){pageNum.value=page;void reload(false)}
 function changeFailedPage(page:number){failedPage.value=page;void loadFailedTasks().catch(e=>showToast((e as Error).message,'err'))}
