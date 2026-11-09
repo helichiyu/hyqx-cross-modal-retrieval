@@ -18,6 +18,7 @@ import com.hsmty.cmr.domain.evaluation.mapper.EvalItemMapper;
 import com.hsmty.cmr.domain.evaluation.mapper.EvalRecordMapper;
 import com.hsmty.cmr.domain.evaluation.mapper.EvalSetMapper;
 import com.hsmty.cmr.domain.evaluation.vo.EvalItemVO;
+import com.hsmty.cmr.domain.evaluation.vo.EvalPreviewVO;
 import com.hsmty.cmr.domain.evaluation.vo.EvalRecordVO;
 import com.hsmty.cmr.domain.evaluation.vo.EvalSetVO;
 import com.hsmty.cmr.domain.search.entity.CmrSearchHistory;
@@ -100,16 +101,7 @@ public class EvalService {
         boolean reSearch = Boolean.TRUE.equals(filters.get("reSearch"));
         BizException.assertTrue(!zeroResult && !noClick && !reSearch, "至少选择一种筛选条件");
 
-        Map<Long, CmrSearchHistory> picked = new LinkedHashMap<>();
-        if (zeroResult) {
-            searchHistoryMapper.selectZeroResult(FILTER_LIMIT).forEach(h -> picked.put(h.getId(), h));
-        }
-        if (noClick) {
-            searchHistoryMapper.selectNoClick(FILTER_LIMIT).forEach(h -> picked.putIfAbsent(h.getId(), h));
-        }
-        if (reSearch) {
-            searchHistoryMapper.selectReSearch(FILTER_LIMIT).forEach(h -> picked.putIfAbsent(h.getId(), h));
-        }
+        Map<Long, CmrSearchHistory> picked = pickHistories(zeroResult, noClick, reSearch);
         BizException.assertTrue(picked.isEmpty(), "筛选结果为空，无法创建评测集");
 
         CmrEvalSet set = new CmrEvalSet();
@@ -136,6 +128,36 @@ public class EvalService {
         }
         log.info("评测集创建: {} 条目 {} 条（筛选 {}）", set.getBizNo(), picked.size(), filters.keySet());
         return toVO(set);
+    }
+
+    /** 创建前预览：复用创建筛选口径，返回命中总数与前 10 条样例 */
+    public EvalPreviewVO preview(boolean zeroResult, boolean noClick, boolean reSearch) {
+        BizException.assertTrue(!zeroResult && !noClick && !reSearch, "至少选择一种筛选条件");
+        Map<Long, CmrSearchHistory> picked = pickHistories(zeroResult, noClick, reSearch);
+        List<EvalPreviewVO.Item> items = picked.values().stream()
+                .limit(10)
+                .map(h -> EvalPreviewVO.Item.builder()
+                        .searchId(h.getId()).searchBizNo(h.getBizNo())
+                        .query(h.getQueryText() == null ? "(文件检索) " + h.getQueryFile() : h.getQueryText())
+                        .queryModality(h.getQueryModality()).targetModality(h.getTargetModality())
+                        .itemCount(h.getItemCount()).createTime(h.getCreateTime())
+                        .build())
+                .toList();
+        return EvalPreviewVO.builder().count((long) picked.size()).items(items).build();
+    }
+
+    private Map<Long, CmrSearchHistory> pickHistories(boolean zeroResult, boolean noClick, boolean reSearch) {
+        Map<Long, CmrSearchHistory> picked = new LinkedHashMap<>();
+        if (zeroResult) {
+            searchHistoryMapper.selectZeroResult(FILTER_LIMIT).forEach(h -> picked.put(h.getId(), h));
+        }
+        if (noClick) {
+            searchHistoryMapper.selectNoClick(FILTER_LIMIT).forEach(h -> picked.putIfAbsent(h.getId(), h));
+        }
+        if (reSearch) {
+            searchHistoryMapper.selectReSearch(FILTER_LIMIT).forEach(h -> picked.putIfAbsent(h.getId(), h));
+        }
+        return picked;
     }
 
     public CmrEvalSet requireSet(Long id) {

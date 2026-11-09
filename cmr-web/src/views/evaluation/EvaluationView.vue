@@ -46,7 +46,7 @@
 
     <div class="toast" :class="{show:toastVisible,ok:toastType==='ok',err:toastType==='err'}">{{toastMessage}}</div>
 
-    <div class="modal-mask" :class="{show:createVisible}" @click.self="createVisible=false"><div class="modal-box"><div class="modal-head"><h3>新建评测集</h3><button class="modal-close" type="button" @click="createVisible=false">×</button></div><div class="modal-body"><div class="mb-tip">从检索历史中筛选问题 query，创建后进入标注。</div><label class="field">名称<input v-model.trim="createForm.name" maxlength="80" placeholder="例如：零结果专项评测集"></label><div class="filter-checks"><label v-for="item in filterOptions" :key="item.key"><input v-model="createForm.filters" type="checkbox" :value="item.key">{{ item.label }}</label></div><label class="field">说明<input v-model.trim="createForm.remark" placeholder="可选"></label></div><div class="modal-foot"><button class="btn-ghost" type="button" @click="createVisible=false">取消</button><button class="btn-primary" type="button" :disabled="creating" @click="submitCreateSet">创建评测集</button></div></div></div>
+    <div class="modal-mask" :class="{show:createVisible}" @click.self="createVisible=false"><div class="modal-box"><div class="modal-head"><h3>新建评测集</h3><button class="modal-close" type="button" @click="createVisible=false">×</button></div><div class="modal-body"><div class="mb-tip">从检索历史中筛选问题 query，创建后进入标注。</div><label class="field">名称<input v-model.trim="createForm.name" maxlength="80" placeholder="例如：零结果专项评测集"></label><div class="filter-checks"><label v-for="item in filterOptions" :key="item.key"><input v-model="createForm.filters" type="checkbox" :value="item.key">{{ item.label }}</label></div><label class="field">说明<input v-model.trim="createForm.remark" placeholder="可选"></label></div><div v-if="createPreview" class="preview-box"><div class="preview-head">筛选命中 <b>{{ createPreview.count }}</b> 条 query</div><div v-if="createPreview.items.length" class="preview-list"><div v-for="item in createPreview.items" :key="item.searchId" class="preview-item"><span class="mono">{{ item.searchBizNo }}</span><b>{{ item.query }}</b><span>{{ item.itemCount ?? 0 }} 条结果</span></div></div><div v-else class="empty">筛选结果为空，无法创建评测集</div></div><div class="modal-foot"><button class="btn-ghost" type="button" @click="createVisible=false">取消</button><button class="btn-ghost" type="button" :disabled="previewing" @click="previewCreateSet">{{ previewing ? '预览中…' : '筛选并加入' }}</button><button class="btn-primary" type="button" :disabled="creating" @click="submitCreateSet">创建评测集</button></div></div></div>
 
     <div class="modal-mask" :class="{show:labelVisible}" @click.self="labelVisible=false"><div class="modal-box wide"><div class="modal-head"><h3>标注：{{labelSet?.name}}</h3><button class="modal-close" type="button" @click="labelVisible=false">×</button></div><div class="modal-body label-list"><div v-if="!labelItems.length" class="empty">无待标注条目</div><div v-for="(item,index) in labelItems" :key="item.id" class="label-item"><div class="label-title"><span class="badge gray">#{{index+1}}</span><b>{{item.query}}</b><span v-if="item.labeled" class="badge ok">已标注</span></div><div class="label-input"><input v-model="labelAnswers[item.id]" placeholder="正确答案 itemId，逗号分隔；无正确答案留空"><button class="btn-ghost btn-xs" type="button" @click="saveLabel(item)">保存</button></div></div></div><div class="modal-foot"><button class="btn-ghost" type="button" @click="labelVisible=false">关闭</button></div></div></div>
 
@@ -104,12 +104,12 @@
 
 <script setup lang="ts">
 import{computed,onBeforeUnmount,onMounted,reactive,ref}from'vue'
-import{completeEvalSet,createEvalSet,evalRunDetail,evalSetDetail,labelEvalItem,pageEvalRuns,pageEvalSets,pageStrategies,runEval,strategyVersions as fetchStrategyVersions}from'../../api'
-import type{EvalItemVO,EvalRecordVO,EvalSetVO,StrategyVersionVO}from'../../api/types'
+import{completeEvalSet,createEvalSet,evalRunDetail,evalSetDetail,labelEvalItem,pageEvalRuns,pageEvalSets,pageStrategies,previewEvalSet,runEval,strategyVersions as fetchStrategyVersions}from'../../api'
+import type{EvalItemVO,EvalPreviewVO,EvalRecordVO,EvalSetVO,StrategyVersionVO}from'../../api/types'
 import{useDictStore}from'../../stores/dict'
 const dictStore=useDictStore()
 const sets=ref<EvalSetVO[]>([]);const runs=ref<EvalRecordVO[]>([]);const setsLoading=ref(false);const runsLoading=ref(false);const setStatusDict=ref<{alias:string;label:string}[]>([])
-const createVisible=ref(false);const creating=ref(false);const createForm=reactive({name:'',remark:'',filters:['zeroResult'] as string[]})
+const createVisible=ref(false);const creating=ref(false);const createPreview=ref<EvalPreviewVO|null>(null);const previewing=ref(false);const createForm=reactive({name:'',remark:'',filters:['zeroResult'] as string[]})
 const labelVisible=ref(false);const labelSet=ref<EvalSetVO|null>(null);const labelItems=ref<EvalItemVO[]>([]);const labelAnswers=reactive<Record<number,string>>({})
 const benchSetId=ref(0);const benchVersionId=ref<number|string>('');const strategyVersionsList=ref<StrategyVersionVO[]>([]);const runSubmitting=ref(false);const evaluating=ref(false);const evalPollingActive=ref(false)
 const reportVisible=ref(false);const report=ref<EvalRecordVO|null>(null);const strategyAdjustRoute=computed(()=>report.value?.strategyVersionId?{path:'/strategies',query:{strategyVersionId:report.value.strategyVersionId}}:'/strategies')
@@ -128,7 +128,12 @@ function reportText(row:EvalRecordVO){const metrics=parseMetrics(row.metricsJson
 async function loadSets(){setsLoading.value=true;try{const page=await pageEvalSets();sets.value=page.records;if(!benchSetId.value&&doneSets.value[0])benchSetId.value=doneSets.value[0].id}catch(e){showToast((e as Error).message,'err')}finally{setsLoading.value=false}}
 async function loadRuns(){runsLoading.value=true;try{const page=await pageEvalRuns({pageNum:1,pageSize:20,evalSetId:benchSetId.value||undefined});runs.value=page.records}catch(e){showToast((e as Error).message,'err')}finally{runsLoading.value=false}}
 async function loadStrategyVersions(){try{const page=await pageStrategies();const all:StrategyVersionVO[]=[];for(const s of page.records){try{all.push(...await fetchStrategyVersions(s.id))}catch{}}strategyVersionsList.value=all}catch{strategyVersionsList.value=[]}}
-function openCreateSet(){createVisible.value=true;createForm.name='';createForm.remark='';createForm.filters=['zeroResult']}
+function openCreateSet(){createVisible.value=true;createForm.name='';createForm.remark='';createForm.filters=['zeroResult'];createPreview.value=null;void previewCreateSet()}
+async function previewCreateSet(){
+  if(!createForm.filters.length){showToast('至少勾选一个筛选条件','err');return}
+  previewing.value=true
+  try{createPreview.value=await previewEvalSet({zeroResult:createForm.filters.includes('zeroResult'),noClick:createForm.filters.includes('noClick'),reSearch:createForm.filters.includes('reSearch')})}catch(e){showToast((e as Error).message,'err')}finally{previewing.value=false}
+}
 async function submitCreateSet(){if(!createForm.filters.length){showToast('至少勾选一个筛选条件','err');return}creating.value=true;try{const filters={zeroResult:createForm.filters.includes('zeroResult'),noClick:createForm.filters.includes('noClick'),reSearch:createForm.filters.includes('reSearch')};await createEvalSet({name:createForm.name||undefined,filters,remark:createForm.remark||undefined});createVisible.value=false;showToast('评测集已创建，请进入标注','ok');await loadSets()}catch(e){showToast((e as Error).message,'err')}finally{creating.value=false}}
 async function openLabel(row:EvalSetVO){try{const data=await evalSetDetail(row.id,{pageNum:1,pageSize:200});labelSet.value=data.evalSet;labelItems.value=data.items.records;for(const item of labelItems.value){try{labelAnswers[item.id]=(JSON.parse(item.answersJson||'[]')as string[]).join(',')}catch{labelAnswers[item.id]=''}}labelVisible.value=true}catch(e){showToast((e as Error).message,'err')}}
 async function saveLabel(item:EvalItemVO){if(!labelSet.value)return;const answers=(labelAnswers[item.id]||'').split(/[,，\s]+/).map(x=>x.trim()).filter(Boolean);try{await labelEvalItem(labelSet.value.id,item.id,answers);item.labeled=true;item.answersJson=JSON.stringify(answers);labelSet.value.labeledCount=labelItems.value.filter(x=>x.labeled).length;showToast('标注已保存','ok')}catch(e){showToast((e as Error).message,'err')}}
@@ -165,6 +170,12 @@ function openDev(){devOpen.value=true}function closeDev(){devOpen.value=false}
 </script>
 <style scoped>
 .empty-cell{text-align:center;color:#98a2b3;padding:24px!important}.muted{color:#98a2b3;font-size:11px;margin-top:3px}.filter-checks{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0}.filter-checks label{display:flex;align-items:center;gap:6px;font-size:12px;color:#475467}.label-list{display:flex;flex-direction:column;gap:10px;max-height:64vh;overflow:auto}.label-item{border:1px solid #e6edf8;border-radius:8px;padding:10px;background:#fbfdff}.label-title{display:flex;align-items:center;gap:8px;margin-bottom:8px}.label-input{display:flex;gap:8px}.label-input input{flex:1;height:32px;border:1px solid #cfd8e8;border-radius:6px;padding:0 9px}.report-box{border:1px solid #e4edf8;border-radius:8px;background:#fbfdff;padding:14px}.report-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}.report-pre{white-space:pre-wrap;margin:0;color:#344054;font-size:12px;line-height:1.75;font-family:inherit}
+.preview-box{margin-top:12px;border:1px solid #dbe7f8;border-radius:8px;background:#f8fbff;padding:10px}
+.preview-head{font-size:12px;color:#475467;margin-bottom:7px}.preview-head b{color:var(--system-blue)}
+.preview-list{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto}
+.preview-item{display:grid;grid-template-columns:110px minmax(0,1fr) 70px;gap:8px;align-items:center;background:#fff;border:1px solid #e4edf8;border-radius:6px;padding:6px 8px;font-size:11.5px;color:#667085}
+.preview-item b{color:#273244;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 :root{
   --workspace-bg:#f6f9fe;
   --content-soft:#fbfdff;
