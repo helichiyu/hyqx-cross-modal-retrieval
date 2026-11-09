@@ -8,6 +8,7 @@ import com.hsmty.cmr.config.CmrProperties;
 import com.hsmty.cmr.domain.dataset.dto.DatasourceCreateDTO;
 import com.hsmty.cmr.domain.dataset.entity.CmrDatasource;
 import com.hsmty.cmr.domain.dataset.mapper.DatasourceMapper;
+import com.hsmty.cmr.domain.dataset.mapper.DatasetMapper;
 import com.hsmty.cmr.domain.dataset.vo.DatasourceTestVO;
 import com.hsmty.cmr.domain.dataset.vo.DatasourceVO;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -25,6 +26,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 
+import static com.hsmty.cmr.domain.dataset.entity.table.CmrDatasetTableDef.CMR_DATASET;
 import static com.hsmty.cmr.domain.dataset.entity.table.CmrDatasourceTableDef.CMR_DATASOURCE;
 
 /**
@@ -45,14 +47,21 @@ public class DatasourceService {
             .build();
 
     private final DatasourceMapper datasourceMapper;
+    private final DatasetMapper datasetMapper;
     private final SnowflakeIdWorker idWorker;
     private final BizNoGenerator bizNoGenerator;
     private final CmrProperties properties;
 
     public List<DatasourceVO> list() {
-        return datasourceMapper.selectListByQuery(
+        List<DatasourceVO> sources = datasourceMapper.selectListByQuery(
                         QueryWrapper.create().orderBy(CMR_DATASOURCE.ID.desc()))
                 .stream().map(DatasourceVO::from).toList();
+        for (DatasourceVO source : sources) {
+            Long count = datasetMapper.selectCountByQuery(QueryWrapper.create()
+                    .where(CMR_DATASET.DATASOURCE_ID.eq(source.getId())));
+            source.setDatasetCount(count == null ? 0 : count);
+        }
+        return sources;
     }
 
     public DatasourceVO create(DatasourceCreateDTO dto) {
@@ -61,6 +70,12 @@ public class DatasourceService {
             BizException.assertTrue(!dto.getEndpoint().startsWith("http://") && !dto.getEndpoint().startsWith("https://"),
                     "endpoint 必须以 http:// 或 https:// 开头");
         }
+        boolean authenticated = "token".equals(dto.getAuthType()) || "basic".equals(dto.getAuthType());
+        BizException.assertTrue(authenticated && (dto.getAuthConfig() == null || dto.getAuthConfig().isBlank()),
+                "认证信息不能为空");
+        BizException.assertTrue("basic".equals(dto.getAuthType())
+                        && (dto.getAuthConfig() == null || !dto.getAuthConfig().contains(":")),
+                "basic 认证信息格式必须为 username:password");
         CmrDatasource ds = new CmrDatasource();
         ds.setId(idWorker.next());
         ds.setBizNo(bizNoGenerator.next(BizNoGenerator.PREFIX_DATASOURCE));

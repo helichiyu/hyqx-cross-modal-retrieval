@@ -38,7 +38,7 @@
                 <i class="dot" :class="sourceDotClass(source)"></i>
                 <span class="sc-name">{{ source.name }}</span>
                 <span class="sc-proto">{{ source.protocol || '自动拉取' }}</span>
-                <b>{{ datasourceCount(source.id) }}</b><span class="sc-unit">个</span>
+                <b>{{ source.datasetCount ?? 0 }}</b><span class="sc-unit">个</span>
                 <span v-if="sourceTestResults[source.id]" class="sc-test">{{ sourceTestText(source) }}</span><button class="btn-link" type="button" :disabled="testingSourceIds.has(source.id)" @click="testSource(source)">{{ testingSourceIds.has(source.id) ? '测试中…' : '测试连接' }}</button>
               </span>
             </span>
@@ -112,10 +112,10 @@
           <div class="field"><label>数据源名称 *</label><input v-model.trim="sourceForm.name" maxlength="40" required placeholder="如：数据集管理-生产池"></div>
           <div class="field"><label>接口地址 *</label><input v-model.trim="sourceForm.endpoint" maxlength="120" required placeholder="https://ds.example/prod"></div>
           <div class="field-grid">
-            <div class="field"><label>认证方式</label><select v-model="sourceForm.authType"><option value="token">Token</option><option value="none">无</option></select></div>
+            <div class="field"><label>认证方式</label><select v-model="sourceForm.authType"><option value="token">Token</option><option value="basic">Basic</option><option value="none">无</option></select></div>
             <div class="field"><label>协议</label><select v-model="sourceForm.protocol"><option value="pull">自动拉取</option><option value="push">推送接收</option></select></div>
           </div>
-          <div class="field"><label>认证信息</label><input v-model="sourceForm.authConfig" maxlength="200" placeholder="Token 或认证参数"></div>
+          <div class="field"><label>认证信息<span v-if="sourceForm.authType !== 'none'"> *</span></label><input v-model.trim="sourceForm.authConfig" maxlength="200" :required="sourceForm.authType !== 'none'" :disabled="sourceForm.authType === 'none'" :placeholder="sourceForm.authType==='basic' ? 'username:password' : sourceForm.authType==='token' ? '访问 Token' : '无需认证'"></div>
           <div class="field"><label>描述</label><input v-model.trim="sourceForm.remark" maxlength="60" placeholder="生产环境数据集管理池"></div>
           <div class="modal-foot">
             <button class="btn-ghost" type="button" @click="sourceVisible = false">取消</button>
@@ -340,10 +340,6 @@ function datasourceName(id: number | null) {
   return datasources.value.find(item => item.id === id)?.name || '未知数据源'
 }
 
-function datasourceCount(id: number) {
-  return rows.value.filter(item => item.datasourceId === id).length
-}
-
 function statusLabel(status: string) {
   return statusDict.value.find(item => item.alias === status)?.label || status
 }
@@ -417,6 +413,14 @@ function sourceTitle(source: DatasourceVO) {
 }
 
 async function submitSource() {
+  if (sourceForm.authType !== 'none' && !sourceForm.authConfig) {
+    showToast('请填写认证信息', 'err')
+    return
+  }
+  if (sourceForm.authType === 'basic' && !sourceForm.authConfig.includes(':')) {
+    showToast('Basic 认证格式必须为 username:password', 'err')
+    return
+  }
   sourceSubmitting.value = true
   try {
     await createDatasource({ ...sourceForm })

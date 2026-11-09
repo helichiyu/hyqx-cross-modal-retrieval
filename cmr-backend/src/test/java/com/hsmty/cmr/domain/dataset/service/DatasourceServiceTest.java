@@ -4,16 +4,21 @@ import com.hsmty.cmr.common.id.BizNoGenerator;
 import com.hsmty.cmr.common.id.SnowflakeIdWorker;
 import com.hsmty.cmr.common.util.AesUtils;
 import com.hsmty.cmr.config.CmrProperties;
+import com.hsmty.cmr.domain.dataset.dto.DatasourceCreateDTO;
 import com.hsmty.cmr.domain.dataset.entity.CmrDatasource;
 import com.hsmty.cmr.domain.dataset.mapper.DatasourceMapper;
+import com.hsmty.cmr.domain.dataset.mapper.DatasetMapper;
 import com.hsmty.cmr.domain.dataset.vo.DatasourceTestVO;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,7 +40,7 @@ class DatasourceServiceTest {
             CmrProperties properties = new CmrProperties();
             properties.getCrypto().setKey("unit-test-key-32-bytes-abcdefgh!");
             DatasourceService service = new DatasourceService(
-                    mapper, mock(SnowflakeIdWorker.class), mock(BizNoGenerator.class), properties);
+                    mapper, mock(DatasetMapper.class), mock(SnowflakeIdWorker.class), mock(BizNoGenerator.class), properties);
             CmrDatasource datasource = datasource("pull", "token");
             datasource.setEndpoint("http://127.0.0.1:" + server.getAddress().getPort());
             when(mapper.selectOneById(1L)).thenReturn(datasource);
@@ -64,7 +69,7 @@ class DatasourceServiceTest {
         DatasourceMapper mapper = mock(DatasourceMapper.class);
         CmrProperties properties = new CmrProperties();
         DatasourceService service = new DatasourceService(
-                mapper, mock(SnowflakeIdWorker.class), mock(BizNoGenerator.class), properties);
+                mapper, mock(DatasetMapper.class), mock(SnowflakeIdWorker.class), mock(BizNoGenerator.class), properties);
         CmrDatasource datasource = datasource("push", "none");
         when(mapper.selectOneById(2L)).thenReturn(datasource);
 
@@ -81,6 +86,44 @@ class DatasourceServiceTest {
         assertThat(datasource.getLastTestLatencyMs()).isNull();
         assertThat(datasource.getLastTestMessage()).contains("推送接收型");
         assertThat(datasource.getLastTestTime()).isNotNull();
+    }
+
+    @Test
+    void basic认证缺少冒号会被拒绝() {
+        DatasourceService service = new DatasourceService(mock(DatasourceMapper.class), mock(DatasetMapper.class),
+                new SnowflakeIdWorker(1, 1), new BizNoGenerator(), new CmrProperties());
+        DatasourceCreateDTO dto = createDTO("basic", "user-no-password");
+
+        assertThatThrownBy(() -> service.create(dto))
+                .isInstanceOf(com.hsmty.cmr.common.exception.BizException.class)
+                .hasMessageContaining("username:password");
+    }
+
+    @Test
+    void basic认证通过后会加密落库() {
+        DatasourceMapper mapper = mock(DatasourceMapper.class);
+        CmrProperties properties = new CmrProperties();
+        properties.getCrypto().setKey("unit-test-key-32-bytes-abcdefgh!");
+        DatasourceService service = new DatasourceService(mapper, mock(DatasetMapper.class),
+                new SnowflakeIdWorker(1, 1), new BizNoGenerator(), properties);
+
+        service.create(createDTO("basic", "user:password"));
+
+        ArgumentCaptor<CmrDatasource> captor = ArgumentCaptor.forClass(CmrDatasource.class);
+        verify(mapper).insert(captor.capture(), anyBoolean());
+        assertThat(captor.getValue().getAuthConfig()).isNotEqualTo("user:password");
+        assertThat(AesUtils.decrypt(captor.getValue().getAuthConfig(), "unit-test-key-32-bytes-abcdefgh!"))
+                .isEqualTo("user:password");
+    }
+
+    private DatasourceCreateDTO createDTO(String authType, String authConfig) {
+        DatasourceCreateDTO dto = new DatasourceCreateDTO();
+        dto.setName("联调-Basic数据源");
+        dto.setEndpoint("https://ds.example/prod");
+        dto.setProtocol("pull");
+        dto.setAuthType(authType);
+        dto.setAuthConfig(authConfig);
+        return dto;
     }
 
     private CmrDatasource datasource(String protocol, String authType) {

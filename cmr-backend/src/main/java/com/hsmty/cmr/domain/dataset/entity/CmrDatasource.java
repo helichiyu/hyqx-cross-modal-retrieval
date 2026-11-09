@@ -45,4 +45,8 @@ public class CmrDatasource extends BaseEntity {
     private LocalDateTime lastTestTime;
 
     private String remark;
+
+    /** 非表字段：该数据源下数据集总数，由服务回填 */
+    @com.mybatisflex.annotation.Column(ignore = true)
+    private Long datasetCount;
 }
