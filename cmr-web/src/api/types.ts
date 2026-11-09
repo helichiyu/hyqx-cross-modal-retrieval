@@ -235,6 +235,7 @@ export interface EvalRecordVO {
   strategyVersionId: number | null
   taskId: number | null
   taskBizNo: string | null
+  taskStatus: string | null
   metricsJson: string | null
   linesJson: string | null
   conclusion: string

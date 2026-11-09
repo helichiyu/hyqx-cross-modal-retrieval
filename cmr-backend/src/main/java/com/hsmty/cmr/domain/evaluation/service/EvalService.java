@@ -265,6 +265,7 @@ public class EvalService {
                 .id(e.getId()).bizNo(e.getBizNo()).evalSetId(e.getEvalSetId())
                 .indexId(e.getIndexId()).strategyVersionId(e.getStrategyVersionId())
                 .taskId(e.getTaskId()).taskBizNo(taskService.bizNoOf(e.getTaskId()))
+                .taskStatus(taskService.statusOf(e.getTaskId()))
                 .metricsJson(e.getMetricsJson()).linesJson(e.getLinesJson())
                 .conclusion(e.getConclusion()).failedLinesJson(e.getFailedLinesJson())
                 .comparisonJson(e.getComparisonJson()).createTime(e.getCreateTime())

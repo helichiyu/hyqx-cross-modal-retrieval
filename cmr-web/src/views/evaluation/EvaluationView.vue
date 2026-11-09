@@ -18,16 +18,16 @@
       <section class="panel">
         <div class="panel-head"><div class="sec-head"><h2 class="sec-title">② 评测工作台</h2></div></div>
         <div class="run-bar">
-          <label class="field">评测集<select v-model.number="benchSetId"><option :value="0" disabled>选择评测集</option><option v-for="row in doneSets" :key="row.id" :value="row.id">{{ row.name }} · {{ row.queryCount }} 条</option></select></label>
+          <label class="field">评测集<select v-model.number="benchSetId" @change="loadRuns"><option :value="0" disabled>选择评测集</option><option v-for="row in doneSets" :key="row.id" :value="row.id">{{ row.name }} · {{ row.queryCount }} 条</option></select></label>
           <label class="field">评测对象（策略版本）<select v-model="benchVersionId"><option value="">当前生效策略</option><option v-for="v in allStrategyVersions" :key="v.id" :value="v.id">策略 {{ v.strategyId }} · v{{ v.versionNo }}</option></select></label>
-          <button class="btn-primary" type="button" :disabled="runSubmitting" @click="runBench">{{ runSubmitting?'评测中…':'开始评测' }}</button>
+          <button class="btn-primary" type="button" :disabled="runSubmitting" @click="runBench">{{ runSubmitting?(evaluating?'评测中…':'提交中…'):'开始评测' }}</button>
           <div class="base-chip">对比基线 <b>{{ previousRun ? runMetric(previousRun,'recall','—') : '—' }}</b></div>
         </div>
         <div class="metric-cap"><span class="mc-title">指标</span><span class="mc-meta">{{ activeRun ? activeRun.bizNo : '尚未评测' }}</span></div>
         <div class="metrics">
-          <div class="metric"><div class="m-top"><span class="m-name">召回率</span><span class="badge" :class="metricPass(activeRun?.metricsJson,'recall')?'ok':'wait'">{{ metricPass(activeRun?.metricsJson,'recall')?'达标':'待评' }}</span></div><div class="m-sub">Recall@5</div><div class="m-val">{{ activeRun ? runMetric(activeRun,'recall','—') : '—' }}</div><div class="m-base">上次基线 {{ previousRun ? runMetric(previousRun,'recall','—') : '—' }}</div></div>
-          <div class="metric"><div class="m-top"><span class="m-name">精确率</span><span class="badge" :class="metricPass(activeRun?.metricsJson,'precision')?'ok':'wait'">{{ metricPass(activeRun?.metricsJson,'precision')?'达标':'待评' }}</span></div><div class="m-sub">Precision</div><div class="m-val">{{ activeRun ? runMetric(activeRun,'precision','—') : '—' }}</div><div class="m-base">上次基线 {{ previousRun ? runMetric(previousRun,'precision','—') : '—' }}</div></div>
-          <div class="metric"><div class="m-top"><span class="m-name">排序质量（NDCG）</span><span class="badge" :class="metricPass(activeRun?.metricsJson,'ndcg')?'ok':'wait'">{{ metricPass(activeRun?.metricsJson,'ndcg')?'达标':'待评' }}</span></div><div class="m-sub">排序质量（NDCG@10）</div><div class="m-val">{{ activeRun ? runMetric(activeRun,'ndcg','—') : '—' }}</div><div class="m-base">上次基线 {{ previousRun ? runMetric(previousRun,'ndcg','—') : '—' }}</div></div>
+          <div class="metric"><div class="m-top"><span class="m-name">召回率</span><span class="badge" :class="metricPass(activeRun,'recall')?'ok':'wait'">{{ metricPass(activeRun,'recall')?'达标':'待评' }}</span></div><div class="m-sub">Recall@10</div><div class="m-val">{{ activeRun ? runMetric(activeRun,'recall','—') : '—' }}</div><div class="m-base">上次基线 {{ previousRun ? runMetric(previousRun,'recall','—') : '—' }}</div></div>
+          <div class="metric"><div class="m-top"><span class="m-name">精确率</span><span class="badge" :class="metricPass(activeRun,'precision')?'ok':'wait'">{{ metricPass(activeRun,'precision')?'达标':'待评' }}</span></div><div class="m-sub">Precision</div><div class="m-val">{{ activeRun ? runMetric(activeRun,'precision','—') : '—' }}</div><div class="m-base">上次基线 {{ previousRun ? runMetric(previousRun,'precision','—') : '—' }}</div></div>
+          <div class="metric"><div class="m-top"><span class="m-name">排序质量（NDCG）</span><span class="badge" :class="metricPass(activeRun,'ndcg')?'ok':'wait'">{{ metricPass(activeRun,'ndcg')?'达标':'待评' }}</span></div><div class="m-sub">排序质量（NDCG@10）</div><div class="m-val">{{ activeRun ? runMetric(activeRun,'ndcg','—') : '—' }}</div><div class="m-base">上次基线 {{ previousRun ? runMetric(previousRun,'ndcg','—') : '—' }}</div></div>
         </div>
       </section>
 
@@ -39,7 +39,7 @@
       <section class="panel"><div class="panel-head"><div class="sec-head"><h2 class="sec-title">评测历史</h2></div><span class="hist-note">共 {{ runs.length }} 条</span></div>
         <div class="tbl-wrap"><table class="tbl hist-tbl"><thead><tr><th>时间</th><th>评测对象（策略）</th><th>评测集</th><th>召回率</th><th>精确率</th><th>排序质量（NDCG）</th><th>结论</th><th>操作</th></tr></thead><tbody>
           <tr v-if="runsLoading"><td colspan="8" class="empty-cell">加载中…</td></tr><tr v-else-if="!runs.length"><td colspan="8" class="empty-cell">暂无评测历史</td></tr>
-          <tr v-for="row in runs" v-else :key="row.id"><td>{{ row.createTime }}</td><td class="mono">{{ row.strategyVersionId || '当前策略' }}</td><td>{{ setLabel(row.evalSetId) }}</td><td>{{ runMetric(row,'recall','—') }}</td><td>{{ runMetric(row,'precision','—') }}</td><td>{{ runMetric(row,'ndcg','—') }}</td><td><span class="badge" :class="row.conclusion==='pass'?'ok':'fail'">{{ row.conclusion==='pass'?'达标':'未达标' }}</span></td><td><button class="btn-ghost btn-xs" type="button" @click="openReport(row)">查看</button></td></tr>
+          <tr v-for="row in runs" v-else :key="row.id"><td>{{ row.createTime }}</td><td class="mono">{{ row.strategyVersionId || '当前策略' }}</td><td>{{ setLabel(row.evalSetId) }}</td><td>{{ runMetric(row,'recall','—') }}</td><td>{{ runMetric(row,'precision','—') }}</td><td>{{ runMetric(row,'ndcg','—') }}</td><td><span v-if="!row.conclusion" class="badge wait">评测中</span><span v-else class="badge" :class="row.conclusion==='pass'?'ok':'fail'">{{ row.conclusion==='pass'?'达标':'未达标' }}</span></td><td><button class="btn-ghost btn-xs" type="button" @click="openReport(row)">查看</button></td></tr>
         </tbody></table></div>
       </section>
     </div></div>
@@ -77,7 +77,7 @@
       <p>工作台 = 用「评测对象（某个策略）」去检索「评测集里的每条 query」→ 把检索结果和「标准答案」对比 → 算出召回率 / 精确率 / NDCG。</p>
       <p>评测集提供「标准答案」，策略提供「检索能力」，两者一比才有指标；只有评测集没有对象，就没有检索结果可比；只有对象没有标准答案，就判断不了对错。</p>
       <ul>
-        <li><b>召回率 Recall@5</b>：该 query 的标准答案里，落进前 5 条的比例。</li>
+        <li><b>召回率 Recall@10</b>：该 query 的标准答案里，落进前 10 条的比例。</li>
         <li><b>精确率</b>：返回结果里判对（命中标准答案）的条数，占返回条数的比例。</li>
         <li><b>NDCG@10</b>：按位置折损累计命中，命中越靠前得分越高；再除以理想排序，归一到 0–1。</li>
       </ul>
@@ -103,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import{computed,onMounted,reactive,ref}from'vue'
+import{computed,onBeforeUnmount,onMounted,reactive,ref}from'vue'
 import{completeEvalSet,createEvalSet,evalRunDetail,evalSetDetail,labelEvalItem,pageEvalRuns,pageEvalSets,pageStrategies,runEval,strategyVersions as fetchStrategyVersions}from'../../api'
 import type{EvalItemVO,EvalRecordVO,EvalSetVO,StrategyVersionVO}from'../../api/types'
 import{useDictStore}from'../../stores/dict'
@@ -111,29 +111,54 @@ const dictStore=useDictStore()
 const sets=ref<EvalSetVO[]>([]);const runs=ref<EvalRecordVO[]>([]);const setsLoading=ref(false);const runsLoading=ref(false);const setStatusDict=ref<{alias:string;label:string}[]>([])
 const createVisible=ref(false);const creating=ref(false);const createForm=reactive({name:'',remark:'',filters:['zeroResult'] as string[]})
 const labelVisible=ref(false);const labelSet=ref<EvalSetVO|null>(null);const labelItems=ref<EvalItemVO[]>([]);const labelAnswers=reactive<Record<number,string>>({})
-const benchSetId=ref(0);const benchVersionId=ref<number|string>('');const strategyVersionsList=ref<StrategyVersionVO[]>([]);const runSubmitting=ref(false)
+const benchSetId=ref(0);const benchVersionId=ref<number|string>('');const strategyVersionsList=ref<StrategyVersionVO[]>([]);const runSubmitting=ref(false);const evaluating=ref(false);const evalPollingActive=ref(false)
 const reportVisible=ref(false);const report=ref<EvalRecordVO|null>(null)
 const devOpen=ref(false);const toastVisible=ref(false);const toastMessage=ref('');const toastType=ref<'info'|'ok'|'err'>('info');let toastTimer:ReturnType<typeof setTimeout>|undefined
 const filterOptions=[{key:'zeroResult',label:'零结果'},{key:'noClick',label:'无点击'},{key:'reSearch',label:'复搜'}]
 const doneSets=computed(()=>sets.value.filter(x=>x.status==='done'));const activeRun=computed(()=>runs.value[0]||null);const previousRun=computed(()=>runs.value[1]||null);const allStrategyVersions=computed(()=>strategyVersionsList.value)
-onMounted(async()=>{setStatusDict.value=await dictStore.ensure('cmr_eval_set_status');await Promise.all([loadSets(),loadRuns(),loadStrategyVersions()])})
+onMounted(async()=>{setStatusDict.value=await dictStore.ensure('cmr_eval_set_status');await loadSets();await Promise.all([loadRuns(),loadStrategyVersions()])})
+onBeforeUnmount(()=>{evalPollingActive.value=false})
 function setStatusLabel(s:string){return setStatusDict.value.find(x=>x.alias===s)?.label||s}
 function filterText(raw:string){try{const obj=JSON.parse(raw) as Record<string,boolean>;const hits=Object.entries(obj).filter(([,v])=>v).map(([k])=>filterOptions.find(x=>x.key===k)?.label||k);return hits.length?hits.join(' / '):'全部'}catch{return raw||'—'}}
 function parseMetrics(raw?:string|null){try{return JSON.parse(raw||'{}')as Record<string,number>}catch{return{}}}
 function runMetric(row:EvalRecordVO|null,key:string,fallback:string){const metricKey=key.includes('@')?key:`${key}@10`;const value=parseMetrics(row?.metricsJson)[metricKey];return value==null?fallback:Number(value).toFixed(3)}
-function metricPass(raw:string|undefined|null,key:string){const metricKey=key.includes('@')?key:`${key}@10`;const m=parseMetrics(raw);return Object.prototype.hasOwnProperty.call(m,metricKey)}
+function metricPass(row:EvalRecordVO|null|undefined,key:string){const metricKey=key.includes('@')?key:`${key}@10`;const actual=parseMetrics(row?.metricsJson)[metricKey];if(actual==null)return false;const line=parseMetrics(row?.linesJson)[metricKey];return line==null||actual>=line}
 function setLabel(id:number){return sets.value.find(x=>x.id===id)?.name||String(id)}
-function reportText(row:EvalRecordVO){const metrics=parseMetrics(row.metricsJson);const lines=parseMetrics(row.linesJson);return ['结论：'+(row.conclusion==='pass'?'达标':'未达标'),'任务：'+(row.taskBizNo||'—'),'评测集：'+setLabel(row.evalSetId),'',...Object.entries(metrics).map(([k,v])=>`${k}: 实测 ${Number(v).toFixed(4)} / 线值 ${lines[k]??'—'}`)].join('\n')}
+function reportText(row:EvalRecordVO){const metrics=parseMetrics(row.metricsJson);const lines=parseMetrics(row.linesJson);return ['结论：'+(row.taskStatus==='failed'?'任务失败':row.conclusion==='pass'?'达标':'未达标'),'任务：'+(row.taskBizNo||'—'),'评测集：'+setLabel(row.evalSetId),'',...Object.entries(metrics).map(([k,v])=>`${k}: 实测 ${Number(v).toFixed(4)} / 线值 ${lines[k]??'—'}`)].join('\n')}
 async function loadSets(){setsLoading.value=true;try{const page=await pageEvalSets();sets.value=page.records;if(!benchSetId.value&&doneSets.value[0])benchSetId.value=doneSets.value[0].id}catch(e){showToast((e as Error).message,'err')}finally{setsLoading.value=false}}
-async function loadRuns(){runsLoading.value=true;try{const page=await pageEvalRuns();runs.value=page.records}catch(e){showToast((e as Error).message,'err')}finally{runsLoading.value=false}}
+async function loadRuns(){runsLoading.value=true;try{const page=await pageEvalRuns({pageNum:1,pageSize:20,evalSetId:benchSetId.value||undefined});runs.value=page.records}catch(e){showToast((e as Error).message,'err')}finally{runsLoading.value=false}}
 async function loadStrategyVersions(){try{const page=await pageStrategies();const all:StrategyVersionVO[]=[];for(const s of page.records){try{all.push(...await fetchStrategyVersions(s.id))}catch{}}strategyVersionsList.value=all}catch{strategyVersionsList.value=[]}}
 function openCreateSet(){createVisible.value=true;createForm.name='';createForm.remark='';createForm.filters=['zeroResult']}
 async function submitCreateSet(){if(!createForm.filters.length){showToast('至少勾选一个筛选条件','err');return}creating.value=true;try{const filters={zeroResult:createForm.filters.includes('zeroResult'),noClick:createForm.filters.includes('noClick'),reSearch:createForm.filters.includes('reSearch')};await createEvalSet({name:createForm.name||undefined,filters,remark:createForm.remark||undefined});createVisible.value=false;showToast('评测集已创建，请进入标注','ok');await loadSets()}catch(e){showToast((e as Error).message,'err')}finally{creating.value=false}}
 async function openLabel(row:EvalSetVO){try{const data=await evalSetDetail(row.id,{pageNum:1,pageSize:200});labelSet.value=data.evalSet;labelItems.value=data.items.records;for(const item of labelItems.value){try{labelAnswers[item.id]=(JSON.parse(item.answersJson||'[]')as string[]).join(',')}catch{labelAnswers[item.id]=''}}labelVisible.value=true}catch(e){showToast((e as Error).message,'err')}}
 async function saveLabel(item:EvalItemVO){if(!labelSet.value)return;const answers=(labelAnswers[item.id]||'').split(/[,，\s]+/).map(x=>x.trim()).filter(Boolean);try{await labelEvalItem(labelSet.value.id,item.id,answers);item.labeled=true;item.answersJson=JSON.stringify(answers);labelSet.value.labeledCount=labelItems.value.filter(x=>x.labeled).length;showToast('标注已保存','ok')}catch(e){showToast((e as Error).message,'err')}}
 async function completeSet(row:EvalSetVO){try{await completeEvalSet(row.id);showToast('标注已完成','ok');await loadSets()}catch(e){showToast((e as Error).message,'err')}}
-function chooseSetForRun(row:EvalSetVO){benchSetId.value=row.id}
-async function runBench(){if(!benchSetId.value){showToast('请选择评测集','err');return}runSubmitting.value=true;try{const record=await runEval(benchSetId.value,typeof benchVersionId.value==='number'?benchVersionId.value:undefined);report.value=record;showToast('评测已提交','ok');await loadRuns();reportVisible.value=true}catch(e){showToast((e as Error).message,'err')}finally{runSubmitting.value=false}}
+function chooseSetForRun(row:EvalSetVO){benchSetId.value=row.id;void loadRuns()}
+async function runBench(){
+  if(!benchSetId.value){showToast('请选择评测集','err');return}
+  runSubmitting.value=true;evaluating.value=true
+  try{
+    const record=await runEval(benchSetId.value,typeof benchVersionId.value==='number'?benchVersionId.value:undefined)
+    report.value=record;showToast('评测已提交，等待评测任务完成','info');await loadRuns()
+    const completed=await waitForEvaluation(record)
+    if(completed){await loadRuns();reportVisible.value=true;showToast(completed.taskStatus==='failed'?'评测任务失败':'评测完成',completed.taskStatus==='failed'?'err':'ok')}
+  }catch(e){showToast((e as Error).message,'err')}finally{runSubmitting.value=false;evaluating.value=false}
+}
+async function waitForEvaluation(record:EvalRecordVO){
+  evalPollingActive.value=true
+  try{
+    for(let attempt=0;attempt<150&&evalPollingActive.value;attempt++){
+      await delay(2000)
+      if(!evalPollingActive.value)return null
+      const latest=await evalRunDetail(record.id);report.value=latest
+      if(latest.taskStatus==='done'||latest.taskStatus==='failed')return latest
+      if(!latest.taskStatus&&latest.metricsJson)return latest
+    }
+    if(!evalPollingActive.value)return null
+    throw new Error('评测任务超时，请在任务管理查看进展')
+  }finally{evalPollingActive.value=false}
+}
+function delay(ms:number){return new Promise(resolve=>setTimeout(resolve,ms))}
 async function openReport(row:EvalRecordVO){try{report.value=await evalRunDetail(row.id);reportVisible.value=true}catch(e){showToast((e as Error).message,'err')}}
 function showToast(message:string,type:'info'|'ok'|'err'='info'){toastMessage.value=message;toastType.value=type;toastVisible.value=true;clearTimeout(toastTimer);toastTimer=setTimeout(()=>toastVisible.value=false,2600)}
 function openDev(){devOpen.value=true}function closeDev(){devOpen.value=false}
