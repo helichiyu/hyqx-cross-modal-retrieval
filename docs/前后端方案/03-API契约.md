@@ -39,14 +39,16 @@
 | --- | --- | --- | --- |
 | GET | /search/suggest?scene=&prefix= | 登录即可 | 推荐词联想（enabled 词按 sort） |
 | POST | /search/understand | cmr:search:create | 407 代理：{query} 或 {queryFile} → {needClarify, clarifyOptions[], queryModality, hint} |
-| POST | /search | cmr:search:create | 执行检索：{query/queryFile, scene, clarifiedQuery?, weights?, rerank?, topK?} → 结果集（条目+策略快照+resultSetId+taskId+srhNo）；weights/rerank 不传用场景生效策略 |
-| GET | /search/results/{resultSetId} | cmr:search:page | 结果集快照回看（P2 刷新/P9 查看结果） |
+| POST | /search | cmr:search:create | 执行检索：{query/queryFile, scene, clarifiedQuery?, weights?, rerank?, topK?} → 结果集（条目：itemId/rank/score/modality，名称按 ID 实时回查；+策略快照+resultSetId+taskId+srhNo）；weights/rerank 不传用场景生效策略 |
+| GET | /search/results/{resultSetId} | cmr:search:page | 结果集快照回看（P2 刷新/P9 查看结果）；条目名称按 ID 实时回查，条目已删显示「已删除」占位 |
 | POST | /search/results/{resultSetId}/adopt | cmr:search:adopt | 未采用→已采用 |
 | POST | /search/results/{resultSetId}/discard | cmr:search:adopt | 未采用→已废弃（终态，二者互斥不可逆） |
 | POST | /search/results/{resultSetId}/click | cmr:search:page | 条目点击埋点 {rank}（维护 clicked 冗余） |
 | GET | /search-history | cmr:search:page | P9 分页：query 模糊/模态/采用状态/时间/零结果 |
-| GET | /search-history/{id} | cmr:search:page | 详情（含条目与策略快照） |
+| GET | /search-history/{id} | cmr:search:page | 详情（含条目与策略快照；条目名称实时回查，已删显示「已删除」） |
 | POST | /search-history/{id}/rerun | cmr:search:create | 再次执行（原参数重放，新 SRH） |
+
+检索日志可见窗口（02 保留策略）：30 天滚动删除；被反馈单关联（被踩/被标记）的检索永久保留可查。
 
 ## 三、任务域（P3 任务详情 / P6 任务管理）
 
