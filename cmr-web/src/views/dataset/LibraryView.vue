@@ -369,31 +369,47 @@ async function testSource(source: DatasourceVO) {
   }
 }
 
+function sourceTestResult(source: DatasourceVO): DatasourceTestVO | null {
+  const current = sourceTestResults.value[source.id]
+  if (current) return current
+  if (!source.lastTestTime) return null
+  return {
+    connected: source.lastTestConnected,
+    statusCode: source.lastTestStatusCode,
+    latencyMs: source.lastTestLatencyMs,
+    message: source.lastTestMessage || '最近测试结果未记录说明',
+    testedAt: source.lastTestTime,
+  }
+}
+
 function sourceDotClass(source: DatasourceVO) {
-  const result = sourceTestResults.value[source.id]
-  if (!result) return 'on'
+  const result = sourceTestResult(source)
+  if (!result) return ''
   if (result.connected === null) return 'wait'
   return result.connected ? 'on' : 'off'
 }
 
 function sourceTestText(source: DatasourceVO) {
-  const result = sourceTestResults.value[source.id]
-  if (!result) return ''
+  const result = sourceTestResult(source)
+  if (!result) return '未测试'
   if (result.connected === null) return '待推送验证'
   return result.connected ? '连接成功' : '连接失败'
 }
 
-function sourceTestMessage(source: DatasourceVO, result: DatasourceTestVO) {
+function sourceTestMessage(source: DatasourceVO, result?: DatasourceTestVO | null) {
+  const current = result || sourceTestResult(source)
+  if (!current) return `${source.name} 尚未测试`
   const parts = [`${source.name} ${sourceTestText(source)}`]
-  if (result.statusCode != null) parts.push(`HTTP ${result.statusCode}`)
-  if (result.latencyMs != null) parts.push(`${result.latencyMs}ms`)
-  parts.push(result.message)
+  if (current.statusCode != null) parts.push(`HTTP ${current.statusCode}`)
+  if (current.latencyMs != null) parts.push(`${current.latencyMs}ms`)
+  if (current.testedAt) parts.push(new Date(current.testedAt).toLocaleString())
+  parts.push(current.message)
   return parts.join(' · ')
 }
 
 function sourceTitle(source: DatasourceVO) {
   const base = `${source.endpoint} · ${source.protocol || '自动拉取'} · ${source.authType || 'none'}`
-  const result = sourceTestResults.value[source.id]
+  const result = sourceTestResult(source)
   return result ? `${base} · ${sourceTestMessage(source, result)}` : base
 }
 

@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DatasourceServiceTest {
@@ -45,7 +46,14 @@ class DatasourceServiceTest {
             assertThat(result.getStatusCode()).isEqualTo(204);
             assertThat(result.getLatencyMs()).isGreaterThanOrEqualTo(0);
             assertThat(result.getMessage()).isEqualTo("连接成功");
+            assertThat(result.getTestedAt()).isNotNull();
             assertThat(authorization.get()).isEqualTo("Bearer test-token");
+            verify(mapper).update(datasource, false);
+            assertThat(datasource.getLastTestConnected()).isTrue();
+            assertThat(datasource.getLastTestStatusCode()).isEqualTo(204);
+            assertThat(datasource.getLastTestLatencyMs()).isGreaterThanOrEqualTo(0);
+            assertThat(datasource.getLastTestMessage()).isEqualTo("连接成功");
+            assertThat(datasource.getLastTestTime()).isNotNull();
         } finally {
             server.stop(0);
         }
@@ -57,7 +65,8 @@ class DatasourceServiceTest {
         CmrProperties properties = new CmrProperties();
         DatasourceService service = new DatasourceService(
                 mapper, mock(SnowflakeIdWorker.class), mock(BizNoGenerator.class), properties);
-        when(mapper.selectOneById(2L)).thenReturn(datasource("push", "none"));
+        CmrDatasource datasource = datasource("push", "none");
+        when(mapper.selectOneById(2L)).thenReturn(datasource);
 
         DatasourceTestVO result = service.test(2L);
 
@@ -65,6 +74,13 @@ class DatasourceServiceTest {
         assertThat(result.getStatusCode()).isNull();
         assertThat(result.getLatencyMs()).isNull();
         assertThat(result.getMessage()).contains("推送接收型");
+        assertThat(result.getTestedAt()).isNotNull();
+        verify(mapper).update(datasource, false);
+        assertThat(datasource.getLastTestConnected()).isNull();
+        assertThat(datasource.getLastTestStatusCode()).isNull();
+        assertThat(datasource.getLastTestLatencyMs()).isNull();
+        assertThat(datasource.getLastTestMessage()).contains("推送接收型");
+        assertThat(datasource.getLastTestTime()).isNotNull();
     }
 
     private CmrDatasource datasource(String protocol, String authType) {

@@ -164,6 +164,11 @@ export interface DatasourceVO {
   protocol: string | null
   authType: string | null
   remark: string | null
+  lastTestConnected: boolean | null
+  lastTestStatusCode: number | null
+  lastTestLatencyMs: number | null
+  lastTestMessage: string | null
+  lastTestTime: string | null
   createTime: string | null
 }
 
@@ -172,6 +177,7 @@ export interface DatasourceTestVO {
   statusCode: number | null
   latencyMs: number | null
   message: string
+  testedAt: string
 }
 
 export interface StrategyVO {
