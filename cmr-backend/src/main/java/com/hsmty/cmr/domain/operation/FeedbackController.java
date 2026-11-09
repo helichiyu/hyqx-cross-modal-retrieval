@@ -7,6 +7,7 @@ import com.hsmty.cmr.common.api.PageResult;
 import com.hsmty.cmr.domain.operation.dto.FeedbackCreateDTO;
 import com.hsmty.cmr.domain.operation.dto.FeedbackProcessDTO;
 import com.hsmty.cmr.domain.operation.service.FeedbackService;
+import com.hsmty.cmr.domain.operation.vo.FeedbackStatsVO;
 import com.hsmty.cmr.domain.operation.vo.FeedbackVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,6 +41,13 @@ public class FeedbackController {
     @PostMapping
     public ApiResult<FeedbackVO> create(@Valid @RequestBody FeedbackCreateDTO dto) {
         return ApiResult.success(feedbackService.create(dto));
+    }
+
+    @Operation(summary = "反馈全量状态统计")
+    @PreAuthorize("hasAnyAuthority('cmr:feedback:page')")
+    @GetMapping("stats")
+    public ApiResult<FeedbackStatsVO> stats() {
+        return ApiResult.success(feedbackService.stats());
     }
 
     @Operation(summary = "反馈分页（类型/状态筛选）")

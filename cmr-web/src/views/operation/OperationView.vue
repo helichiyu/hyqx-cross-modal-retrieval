@@ -12,7 +12,7 @@
               <button class="btn-primary" type="button" @click="openRegister">登记反馈</button>
             </div>
           </div>
-          <div class="cov-sum"><span><b>{{ fbTotal }}</b> 条反馈单</span><span><b>{{ pendingCount }}</b> 条待处理</span><span><b>{{ processingCount }}</b> 条处理中</span><span><b>{{ closedCount }}</b> 条已闭环</span></div>
+          <div class="cov-sum"><span><b>{{ stats.total || fbTotal }}</b> 条反馈单</span><span><b>{{ pendingCount }}</b> 条待处理</span><span><b>{{ processingCount }}</b> 条处理中</span><span><b>{{ closedCount }}</b> 条已闭环</span></div>
           <div class="dtable fb-table"><table class="dt"><thead><tr><th>反馈单</th><th>类型</th><th>去向</th><th>状态</th><th>操作</th></tr></thead><tbody>
             <tr v-if="fbLoading"><td colspan="5" class="table-empty">加载中…</td></tr>
             <tr v-else-if="!feedbacks.length"><td colspan="5" class="table-empty">暂无反馈单</td></tr>
@@ -191,8 +191,8 @@
 
 <script setup lang="ts">
 import {computed,onMounted,reactive,ref} from 'vue'
-import{closeFeedback,createFeedback,createWord,pageFeedbacks,pageHistory,pageWords,processFeedback,removeWord,updateWord}from'../../api'
-import type{DictItem,FeedbackVO,HistoryVO,WordVO}from'../../api/types'
+import{closeFeedback,createFeedback,createWord,feedbackStats,pageFeedbacks,pageHistory,pageWords,processFeedback,removeWord,updateWord}from'../../api'
+import type{DictItem,FeedbackStatsVO,FeedbackVO,HistoryVO,WordVO}from'../../api/types'
 import{useDictStore}from'../../stores/dict'
 const dictStore=useDictStore()
 const feedbacks=ref<FeedbackVO[]>([]);const fbLoading=ref(false);const fbTotal=ref(0);const fbPage=ref(1);const fbPageSize=10
@@ -204,20 +204,21 @@ const processVisible=ref(false);const processing=ref(false);const processRow=ref
 const closeVisible=ref(false);const closing=ref(false);const closeRow=ref<FeedbackVO|null>(null);const closeNote=ref('')
 const wordVisible=ref(false);const wordSubmitting=ref(false);const wordForm=reactive({id:0,word:'',scene:'all',enabled:true,sort:0})
 const devOpen=ref(false);const toastVisible=ref(false);const toastMessage=ref('');const toastType=ref<'info'|'ok'|'err'>('info');let toastTimer:ReturnType<typeof setTimeout>|undefined
-const fbPageCount=computed(()=>Math.max(1,Math.ceil(fbTotal.value/fbPageSize)));const pendingCount=computed(()=>feedbacks.value.filter(x=>x.status==='pending').length);const processingCount=computed(()=>feedbacks.value.filter(x=>x.status==='processing').length);const closedCount=computed(()=>feedbacks.value.filter(x=>x.status==='closed').length)
-onMounted(async()=>{[fbTypeDict.value,fbStatusDict.value,fbTargetDict.value,scenes.value]=await Promise.all([dictStore.ensure('cmr_feedback_type'),dictStore.ensure('cmr_feedback_status'),dictStore.ensure('cmr_feedback_target'),dictStore.ensure('cmr_scene')]);await Promise.all([loadFeedbacks(1),loadWords()])})
+const fbPageCount=computed(()=>Math.max(1,Math.ceil(fbTotal.value/fbPageSize)));const stats=ref<FeedbackStatsVO>({total:0,pending:0,processing:0,closed:0});const pendingCount=computed(()=>stats.value.pending);const processingCount=computed(()=>stats.value.processing);const closedCount=computed(()=>stats.value.closed)
+onMounted(async()=>{[fbTypeDict.value,fbStatusDict.value,fbTargetDict.value,scenes.value]=await Promise.all([dictStore.ensure('cmr_feedback_type'),dictStore.ensure('cmr_feedback_status'),dictStore.ensure('cmr_feedback_target'),dictStore.ensure('cmr_scene')]);await Promise.all([loadFeedbacks(1),loadStats(),loadWords()])})
 function dictLabel(dict:DictItem[],alias?:string|null){return dict.find(x=>x.alias===alias)?.label||alias||'—'}
 function sceneLabel(alias:string){return alias==='all'?'全部场景':scenes.value.find(x=>x.alias===alias)?.label||alias}
 function feedbackTargetRoute(target:string){return target==='strategy'?'/strategies':'/library'}
 function feedbackStatusClass(status:string){return({pending:'wait',processing:'run',closed:'ok'}as Record<string,string>)[status]||'gray'}
+async function loadStats(){try{stats.value=await feedbackStats()}catch(e){/* 统计失败时保留当前值，列表错误另行提示 */}}
 async function loadFeedbacks(page:number){fbPage.value=page;fbLoading.value=true;try{const data=await pageFeedbacks({pageNum:page,pageSize:fbPageSize,type:fbTypeFilter.value,status:fbStatusFilter.value});feedbacks.value=data.records;fbTotal.value=data.total}catch(e){showToast((e as Error).message,'err')}finally{fbLoading.value=false}}
 async function openRegister(){registerVisible.value=true;selectedHistoryId.value=null;registerForm.description='';historyKeyword.value='';try{const data=await pageHistory({pageNum:1,pageSize:50});histories.value=data.records}catch(e){showToast((e as Error).message,'err')}}
 function filterHistories(){/* computed handles filtering */}
-async function submitRegister(){if(!selectedHistoryId.value){showToast('请先选择一条检索历史','err');return}registerSubmitting.value=true;try{await createFeedback({searchId:selectedHistoryId.value,type:registerForm.type,description:registerForm.description});registerVisible.value=false;showToast('反馈已登记','ok');await loadFeedbacks(1)}catch(e){showToast((e as Error).message,'err')}finally{registerSubmitting.value=false}}
+async function submitRegister(){if(!selectedHistoryId.value){showToast('请先选择一条检索历史','err');return}registerSubmitting.value=true;try{await createFeedback({searchId:selectedHistoryId.value,type:registerForm.type,description:registerForm.description});registerVisible.value=false;showToast('反馈已登记','ok');await Promise.all([loadFeedbacks(1),loadStats()])}catch(e){showToast((e as Error).message,'err')}finally{registerSubmitting.value=false}}
 function openProcess(row:FeedbackVO){processRow.value=row;processTarget.value='strategy';processVisible.value=true}
-async function submitProcess(){if(!processRow.value)return;processing.value=true;try{await processFeedback(processRow.value.id,processTarget.value);processVisible.value=false;showToast('已进入处理中','ok');await loadFeedbacks(fbPage.value)}catch(e){showToast((e as Error).message,'err')}finally{processing.value=false}}
+async function submitProcess(){if(!processRow.value)return;processing.value=true;try{await processFeedback(processRow.value.id,processTarget.value);processVisible.value=false;showToast('已进入处理中','ok');await Promise.all([loadFeedbacks(fbPage.value),loadStats()])}catch(e){showToast((e as Error).message,'err')}finally{processing.value=false}}
 function openClose(row:FeedbackVO){closeRow.value=row;closeNote.value='';closeVisible.value=true}
-async function submitClose(){if(!closeRow.value)return;closing.value=true;try{await closeFeedback(closeRow.value.id,closeNote.value||undefined);closeVisible.value=false;showToast('反馈已闭环','ok');await loadFeedbacks(fbPage.value)}catch(e){showToast((e as Error).message,'err')}finally{closing.value=false}}
+async function submitClose(){if(!closeRow.value)return;closing.value=true;try{await closeFeedback(closeRow.value.id,closeNote.value||undefined);closeVisible.value=false;showToast('反馈已闭环','ok');await Promise.all([loadFeedbacks(fbPage.value),loadStats()])}catch(e){showToast((e as Error).message,'err')}finally{closing.value=false}}
 async function loadWords(){wordLoading.value=true;try{const data=await pageWords({pageNum:1,pageSize:100});words.value=data.records}catch(e){showToast((e as Error).message,'err')}finally{wordLoading.value=false}}
 function openWord(row?:WordVO){wordForm.id=row?.id||0;wordForm.word=row?.word||'';wordForm.scene=row?.scene||'all';wordForm.enabled=row?.enabled??true;wordForm.sort=row?.sort||0;wordVisible.value=true}
 async function submitWord(){if(!wordForm.word.trim()){showToast('请填写推荐词','err');return}wordSubmitting.value=true;try{const body={word:wordForm.word.trim(),scene:wordForm.scene,enabled:wordForm.enabled,sort:wordForm.sort};if(wordForm.id)await updateWord(wordForm.id,body);else await createWord(body);wordVisible.value=false;showToast('推荐词已保存','ok');await loadWords()}catch(e){showToast((e as Error).message,'err')}finally{wordSubmitting.value=false}}

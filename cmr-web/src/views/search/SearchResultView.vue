@@ -24,6 +24,8 @@
           <span class="fp-label">反馈进展</span>
           <router-link v-for="feedback in feedbacks" :key="feedback.id" class="fp-item" to="/operation">
             <b>{{ feedback.bizNo }}</b><span>{{ feedbackStatus(feedback) }}</span><span>{{ feedbackTarget(feedback) }}</span>
+            <span class="fp-time">{{ feedback.updateTime || feedback.createTime || '—' }}</span>
+            <span class="fp-note">{{ feedback.resultNote || feedback.description || '待补充处理说明' }}</span>
           </router-link>
           <router-link class="fp-more" to="/operation">查看全部 →</router-link>
         </div>
@@ -1171,4 +1173,7 @@ button{font-family:inherit;cursor:pointer}
 .fp-item{display:inline-flex;align-items:center;gap:5px;border:1px solid #dbe4f5;border-radius:999px;padding:2px 8px;background:#fff;color:#475467;text-decoration:none}
 .fp-item b{color:#1f2a44}
 .fp-more{color:var(--system-blue);font-weight:600;text-decoration:none}
+.fp-item{align-items:flex-start}
+.fp-time{color:#98a2b3}
+.fp-note{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fp-more:hover{text-decoration:underline}

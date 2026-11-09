@@ -9,6 +9,7 @@ import com.hsmty.cmr.common.id.SnowflakeIdWorker;
 import com.hsmty.cmr.domain.operation.dto.FeedbackCreateDTO;
 import com.hsmty.cmr.domain.operation.entity.CmrFeedback;
 import com.hsmty.cmr.domain.operation.mapper.FeedbackMapper;
+import com.hsmty.cmr.domain.operation.vo.FeedbackStatsVO;
 import com.hsmty.cmr.domain.operation.vo.FeedbackVO;
 import com.hsmty.cmr.domain.search.entity.CmrSearchHistory;
 import com.hsmty.cmr.domain.search.mapper.SearchHistoryMapper;
@@ -62,6 +63,24 @@ public class FeedbackService {
         feedbackMapper.insert(feedback, true);
         log.info("反馈登记: {} type={} search={}", feedback.getBizNo(), dto.getType(), history.getBizNo());
         return FeedbackVO.from(feedback, history.getBizNo());
+    }
+
+    public FeedbackStatsVO stats() {
+        return FeedbackStatsVO.builder()
+                .total(count(null))
+                .pending(count("pending"))
+                .processing(count("processing"))
+                .closed(count("closed"))
+                .build();
+    }
+
+    private Long count(String status) {
+        QueryWrapper qw = QueryWrapper.create().from(CMR_FEEDBACK);
+        if (status != null) {
+            qw.where(CMR_FEEDBACK.STATUS.eq(status));
+        }
+        Long count = feedbackMapper.selectCountByQuery(qw);
+        return count == null ? 0 : count;
     }
 
     public PageResult<FeedbackVO> page(PageQuery query, String type, String status, Long searchId) {
