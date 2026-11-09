@@ -24,6 +24,8 @@ public class HistoryVO {
 
     private Long taskId;
 
+    private Long indexId;
+
     private String taskBizNo;
 
     private String taskStatus;
@@ -53,7 +55,7 @@ public class HistoryVO {
     public static HistoryVO from(CmrSearchHistory e, String taskBizNo, String taskStatus) {
         return HistoryVO.builder()
                 .id(e.getId()).bizNo(e.getBizNo()).resultSetId(e.getResultSetId()).taskId(e.getTaskId())
-                .taskBizNo(taskBizNo).taskStatus(taskStatus)
+                .indexId(e.getIndexId()).taskBizNo(taskBizNo).taskStatus(taskStatus)
                 .queryText(e.getQueryText()).queryFile(e.getQueryFile()).queryModality(e.getQueryModality())
                 .targetModality(e.getTargetModality())
                 .clarified(e.getClarified()).scene(e.getScene()).itemCount(e.getItemCount())

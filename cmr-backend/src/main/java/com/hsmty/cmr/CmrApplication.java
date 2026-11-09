@@ -5,6 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * 跨模态检索中心后端启动类
@@ -17,6 +18,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 @SpringBootApplication
 @EnableConfigurationProperties(CmrProperties.class)
 @EnableMethodSecurity
+@EnableScheduling
 public class CmrApplication {
 
     public static void main(String[] args) {

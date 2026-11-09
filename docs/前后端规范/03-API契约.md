@@ -47,7 +47,7 @@
 | POST | /search/results/{resultSetId}/adopt | cmr:search:adopt | 未采用→已采用 |
 | POST | /search/results/{resultSetId}/discard | cmr:search:adopt | 未采用→已废弃（终态，二者互斥不可逆） |
 | POST | /search/results/{resultSetId}/click | cmr:search:page | 条目点击埋点 {rank}（维护 clicked 冗余） |
-| GET | /search-history | cmr:search:page | P9 分页：query 模糊/查询与目标模态/采用状态/时间/零结果 |
+| GET | /search-history | cmr:search:page | P9 分页：query 模糊/查询与目标模态/采用状态/任务状态/时间/零结果 |
 | GET | /search-history/{id} | cmr:search:page | 详情（含条目与策略快照；条目名称实时回查，已删显示「已删除」） |
 | POST | /search-history/{id}/rerun | cmr:search:create | 再次执行（原参数重放，新 SRH） |
 

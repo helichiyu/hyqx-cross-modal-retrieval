@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="cmr-search-log-add-index-id-20261109" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="cmr_search_history" columnName="index_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="cmr_search_history">
+            <column name="index_id" type="BIGINT" remarks="检索时激活索引（回查锚点）" afterColumn="task_id"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="cmr-search-log-drop-result-source-file-20261109" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="cmr_result_item" columnName="source_file"/>
+        </preConditions>
+        <dropColumn tableName="cmr_result_item" columnName="source_file"/>
+    </changeSet>
+
+    <changeSet id="cmr-search-log-drop-result-locator-json-20261109" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="cmr_result_item" columnName="locator_json"/>
+        </preConditions>
+        <dropColumn tableName="cmr_result_item" columnName="locator_json"/>
+    </changeSet>
+
+    <changeSet id="cmr-search-log-drop-result-text-20261109" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="cmr_result_item" columnName="text"/>
+        </preConditions>
+        <dropColumn tableName="cmr_result_item" columnName="text"/>
+    </changeSet>
+
+    <changeSet id="cmr-search-log-index-eval-item-search-id-20261109" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists tableName="cmr_eval_item" indexName="idx_search_id"/>
+            </not>
+        </preConditions>
+        <createIndex tableName="cmr_eval_item" indexName="idx_search_id">
+            <column name="search_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

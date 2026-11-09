@@ -23,6 +23,7 @@ public class CmrProperties {
     private final Jwt jwt = new Jwt();
     private final Crypto crypto = new Crypto();
     private final Model model = new Model();
+    private final Retention retention = new Retention();
     private final Eval eval = new Eval();
     private final Build build = new Build();
 
@@ -66,6 +67,14 @@ public class CmrProperties {
     @Data
     public static class Model {
         private List<String> whitelist = new ArrayList<>();
+    }
+
+    /** 检索日志保留策略 */
+    @Data
+    public static class Retention {
+        private int searchLogDays = 30;
+        private int searchLogBatchSize = 1000;
+        private String searchLogCron = "0 30 2 * * *";
     }
 
     @Data

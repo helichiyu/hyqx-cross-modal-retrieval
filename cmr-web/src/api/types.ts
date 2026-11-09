@@ -35,6 +35,7 @@ export interface HistoryVO {
   bizNo: string
   resultSetId: string
   taskId: number | null
+  indexId: number | null
   taskBizNo: string | null
   taskStatus: string | null
   queryText: string | null
@@ -54,12 +55,14 @@ export interface ResultItemVO {
   id: number
   rank: number
   itemId: string
+  name: string | null
   modality: string
   score: number
   sourceFile: string | null
   locatorJson: string | null
   text: string | null
   clicked: boolean | null
+  deleted: boolean
 }
 
 export interface HistoryDetailVO {

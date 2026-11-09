@@ -10,7 +10,7 @@ import lombok.EqualsAndHashCode;
 import java.math.BigDecimal;
 
 /**
- * 结果集条目快照（P2/P9 回看，不依赖算子侧结果集缓存）
+ * 结果集条目 ID 快照（P2/P9 回看时按索引 meta.db 实时回查名称/预览）
  *
  * @author cmr
  * @since 2026-11-03
@@ -33,13 +33,6 @@ public class CmrResultItem extends BaseEntity {
     private String modality;
 
     private BigDecimal score;
-
-    /** 逻辑路径 */
-    private String sourceFile;
-
-    private String locatorJson;
-
-    private String text;
 
     /** 冗余：是否被点击（维护自事件表） */
     private Boolean clicked;

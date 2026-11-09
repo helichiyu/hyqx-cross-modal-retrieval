@@ -73,6 +73,7 @@ public class SearchService {
     private final TaskService taskService;
     private final TaskExecutor taskExecutor;
     private final FileService fileService;
+    private final ItemMetaService itemMetaService;
     private final SnowflakeIdWorker idWorker;
     private final BizNoGenerator bizNoGenerator;
 
@@ -130,6 +131,7 @@ public class SearchService {
         CmrSearchHistory history = new CmrSearchHistory();
         history.setId(idWorker.next());
         history.setBizNo(bizNoGenerator.next(BizNoGenerator.PREFIX_SEARCH));
+        history.setIndexId(index.getId());
         history.setResultSetId("PENDING-" + history.getBizNo());
         history.setQueryText(!blank(dto.getClarifiedQuery()) ? dto.getClarifiedQuery() : dto.getQuery());
         history.setQueryFile(dto.getQueryFile());
@@ -201,9 +203,6 @@ public class SearchService {
                 item.setItemId(textOrNull(node.path("itemId").asText(null)));
                 item.setModality(textOrNull(node.path("modality").asText(null)));
                 item.setScore(node.path("score").isNumber() ? node.path("score").decimalValue() : BigDecimal.ZERO);
-                item.setSourceFile(textOrNull(node.path("sourceFile").asText(null)));
-                item.setLocatorJson(node.has("locator") ? JsonUtils.writeQuietly(node.path("locator")) : null);
-                item.setText(textOrNull(node.path("text").asText(null)));
                 item.setClicked(false);
                 item.setDelFlag("F");
                 item.setCreateTime(LocalDateTime.now());
@@ -274,7 +273,8 @@ public class SearchService {
 
     /** 检索历史分页（P9：query 模糊/查询与目标模态/采用状态/零结果） */
     public PageResult<HistoryVO> page(PageQuery query, String keyword, String modality,
-                                      String targetModality, String adoptStatus, Boolean zeroResult) {
+                                      String targetModality, String adoptStatus, String taskStatus,
+                                      Boolean zeroResult) {
         QueryWrapper qw = QueryWrapper.create().from(CMR_SEARCH_HISTORY);
         if (!blank(keyword)) {
             qw.where(CMR_SEARCH_HISTORY.QUERY_TEXT.like(keyword));
@@ -287,6 +287,9 @@ public class SearchService {
         }
         if (!blank(adoptStatus)) {
             qw.where(CMR_SEARCH_HISTORY.ADOPT_STATUS.eq(adoptStatus));
+        }
+        if (!blank(taskStatus)) {
+            qw.where("task_id IN (SELECT id FROM cmr_task WHERE status = ? AND del_flag = 'F')", taskStatus);
         }
         if (Boolean.TRUE.equals(zeroResult)) {
             qw.where(CMR_SEARCH_HISTORY.ITEM_COUNT.eq(0));
@@ -303,10 +306,7 @@ public class SearchService {
     public HistoryDetailVO detail(Long id) {
         CmrSearchHistory history = historyMapper.selectOneById(id);
         BizException.assertNull(history, "检索历史不存在");
-        List<ResultItemVO> items = resultItemMapper.selectListByQuery(QueryWrapper.create()
-                        .where(CMR_RESULT_ITEM.SEARCH_ID.eq(id))
-                        .orderBy(CMR_RESULT_ITEM.RANK.asc()))
-                .stream().map(this::toItemVO).toList();
+        List<ResultItemVO> items = itemsOf(history);
         return HistoryDetailVO.builder()
                 .history(HistoryVO.from(history, taskService.bizNoOf(history.getTaskId()),
                         taskService.statusOf(history.getTaskId())))
@@ -380,10 +380,7 @@ public class SearchService {
     }
 
     private SearchResultVO assemble(CmrSearchHistory history) {
-        List<ResultItemVO> items = resultItemMapper.selectListByQuery(QueryWrapper.create()
-                        .where(CMR_RESULT_ITEM.SEARCH_ID.eq(history.getId()))
-                        .orderBy(CMR_RESULT_ITEM.RANK.asc()))
-                .stream().map(this::toItemVO).toList();
+        List<ResultItemVO> items = itemsOf(history);
         Map<String, Object> strategy = JsonUtils.read(
                 history.getStrategySnapshotJson() == null ? "{}" : history.getStrategySnapshotJson(),
                 new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
@@ -403,11 +400,30 @@ public class SearchService {
                 .build();
     }
 
-    private ResultItemVO toItemVO(CmrResultItem e) {
+    private List<ResultItemVO> itemsOf(CmrSearchHistory history) {
+        List<CmrResultItem> entities = resultItemMapper.selectListByQuery(QueryWrapper.create()
+                        .where(CMR_RESULT_ITEM.SEARCH_ID.eq(history.getId()))
+                        .orderBy(CMR_RESULT_ITEM.RANK.asc()));
+        List<String> itemIds = entities.stream()
+                .map(CmrResultItem::getItemId)
+                .filter(id -> id != null && !id.isBlank())
+                .toList();
+        Map<String, ItemMetaService.ItemMeta> metas = itemMetaService.lookup(history.getIndexId(), itemIds);
+        return entities.stream()
+                .map(item -> toItemVO(item, metas.get(item.getItemId())))
+                .toList();
+    }
+
+    private ResultItemVO toItemVO(CmrResultItem e, ItemMetaService.ItemMeta meta) {
+        boolean deleted = meta == null;
         return ResultItemVO.builder()
-                .id(e.getId()).rank(e.getRank()).itemId(e.getItemId()).modality(e.getModality())
-                .score(e.getScore()).sourceFile(e.getSourceFile()).locatorJson(e.getLocatorJson())
-                .text(e.getText()).clicked(e.getClicked())
+                .id(e.getId()).rank(e.getRank()).itemId(e.getItemId())
+                .name(deleted ? "已删除" : meta.name())
+                .modality(e.getModality()).score(e.getScore())
+                .sourceFile(deleted ? null : meta.sourceFile())
+                .locatorJson(deleted ? null : meta.locatorJson())
+                .text(deleted ? null : meta.text())
+                .clicked(e.getClicked()).deleted(deleted)
                 .build();
     }
 
