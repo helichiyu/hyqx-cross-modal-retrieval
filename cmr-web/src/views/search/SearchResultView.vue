@@ -515,16 +515,16 @@ async function downloadSelected() {
     return
   }
   try {
-    for (const item of selected.slice(0, 200)) {
-      const blob = await http.blob('file', { path: item.sourceFile, download: true })
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = item.sourceFile?.split(/[\\/]/).pop() || `${item.itemId}.bin`
-      anchor.click()
-      URL.revokeObjectURL(url)
-    }
-    showToast('批量回源下载已开始', 'ok')
+    const blob = await http.postBlob('file/package', {
+      paths: selected.map(item => item.sourceFile),
+    })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `cmr-results-${resultSetId.value}.zip`
+    anchor.click()
+    URL.revokeObjectURL(url)
+    showToast('ZIP 打包下载已完成', 'ok')
   } catch (error) {
     showToast((error as Error).message, 'err')
   }
