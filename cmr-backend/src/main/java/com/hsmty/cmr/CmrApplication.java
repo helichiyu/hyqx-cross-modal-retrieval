@@ -1,5 +1,6 @@
 package com.hsmty.cmr;
 
+import com.hsmty.cmr.config.CmrProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -14,7 +15,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
  * @since 2026-11-03
  */
 @SpringBootApplication
-@EnableConfigurationProperties
+@EnableConfigurationProperties(CmrProperties.class)
 @EnableMethodSecurity
 public class CmrApplication {
 

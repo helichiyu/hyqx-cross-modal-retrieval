@@ -1,8 +1,8 @@
 package com.hsmty.cmr.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hsmty.cmr.common.api.ApiResult;
 import com.hsmty.cmr.common.auth.JwtAuthFilter;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,10 +18,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import java.nio.charset.StandardCharsets;
 
 /**
- * 安全配置：无状态 JWT + 方法级 @PreAuthorize；登录/文档/健康检查白名单
- *
- * @author cmr
- * @since 2026-11-03
+ * 安全配置：无状态 JWT + 方法级 @PreAuthorize；登录/文档/健康检查白名单。
+ * cmr.auth.enabled=false 时临时匿名访问，便于本地与内网联调。
  */
 @Configuration
 @EnableWebSecurity
@@ -30,6 +28,7 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
     private final ObjectMapper objectMapper;
+    private final CmrProperties properties;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -40,12 +39,17 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/cmr/auth/login",
-                                "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html",
-                                "/actuator/health/**").permitAll()
-                        .anyRequest().authenticated())
+                .authorizeHttpRequests(auth -> {
+                    if (!properties.getAuth().isEnabled()) {
+                        auth.anyRequest().permitAll();
+                        return;
+                    }
+                    auth.requestMatchers(
+                                    "/cmr/auth/login",
+                                    "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html",
+                                    "/actuator/health/**").permitAll()
+                            .anyRequest().authenticated();
+                })
                 .exceptionHandling(eh -> eh
                         .authenticationEntryPoint((req, res, ex) -> writeEnvelope(res, 401, "未登录或登录已过期"))
                         .accessDeniedHandler((req, res, ex) -> writeEnvelope(res, 403, "无权限执行该操作")))

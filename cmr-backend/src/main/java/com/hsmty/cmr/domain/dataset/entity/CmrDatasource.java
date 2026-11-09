@@ -23,7 +23,7 @@ public class CmrDatasource extends BaseEntity {
 
     private String endpoint;
 
-    /** http/api/upload */
+    /** pull/http/api=主动拉取；push/upload=推送接收 */
     private String protocol;
 
     /** none/token/basic */

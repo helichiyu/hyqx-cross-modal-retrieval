@@ -33,15 +33,16 @@ public class SearchHistoryController {
 
     private final SearchService searchService;
 
-    @Operation(summary = "检索历史分页（query 模糊/模态/采用状态/零结果）")
+    @Operation(summary = "检索历史分页（query 模糊/查询与目标模态/采用状态/零结果）")
     @PreAuthorize("hasAnyAuthority('cmr:search:page')")
     @GetMapping
     public ApiResult<PageResult<HistoryVO>> page(PageQuery query,
                                                  @RequestParam(required = false) String keyword,
                                                  @RequestParam(required = false) String modality,
+                                                 @RequestParam(required = false) String targetModality,
                                                  @RequestParam(required = false) String adoptStatus,
                                                  @RequestParam(required = false) Boolean zeroResult) {
-        return ApiPageResult.success(searchService.page(query, keyword, modality, adoptStatus, zeroResult));
+        return ApiPageResult.success(searchService.page(query, keyword, modality, targetModality, adoptStatus, zeroResult));
     }
 
     @Operation(summary = "检索历史详情（含结果集条目）")

@@ -3,10 +3,34 @@ import { login as apiLogin, logout as apiLogout, me as apiMe } from '../api'
 import { clearToken, getToken, setToken } from '../api/http'
 import type { UserVO } from '../api/types'
 
+/* 临时关闭登录鉴权：前端固定管理员身份；恢复登录时删除本段并还原原 auth store。 */
+const BYPASS_PERMISSIONS = [
+  'cmr:dataset:page', 'cmr:dataset:detail', 'cmr:dataset:create', 'cmr:dataset:adjudicate', 'cmr:dataset:confirm',
+  'cmr:search:create', 'cmr:search:page', 'cmr:search:adopt',
+  'cmr:task:page', 'cmr:task:detail',
+  'cmr:strategy:page', 'cmr:strategy:detail', 'cmr:strategy:create', 'cmr:strategy:update', 'cmr:strategy:publish',
+  'cmr:eval:page', 'cmr:eval:detail', 'cmr:eval:create', 'cmr:eval:update', 'cmr:eval:run',
+  'cmr:feedback:create', 'cmr:feedback:page', 'cmr:feedback:update',
+  'cmr:word:page', 'cmr:word:create', 'cmr:word:update', 'cmr:word:remove',
+  'cmr:file:read',
+]
+
+const BYPASS_USER: UserVO = {
+  username: 'admin',
+  nickname: '管理员',
+  role: 'admin',
+  permissions: BYPASS_PERMISSIONS,
+}
+
+interface AuthState {
+  token: string
+  user: UserVO | null
+}
+
 export const useAuthStore = defineStore('auth', {
-  state: () => ({
-    token: getToken(),
-    user: null as UserVO | null,
+  state: (): AuthState => ({
+    token: '',
+    user: { ...BYPASS_USER },
   }),
   getters: {
     role: (s) => s.user?.role ?? '',
@@ -41,8 +65,7 @@ export const useAuthStore = defineStore('auth', {
     },
     reset() {
       this.token = ''
-      this.user = null
-      clearToken()
+      this.user = { ...BYPASS_USER }
     },
   },
 })

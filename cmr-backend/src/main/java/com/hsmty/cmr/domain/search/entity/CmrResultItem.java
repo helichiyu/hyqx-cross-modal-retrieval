@@ -2,6 +2,7 @@ package com.hsmty.cmr.domain.search.entity;
 
 import com.hsmty.cmr.common.entity.BaseEntity;
 import com.hsmty.cmr.config.AuditListener;
+import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Table;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -24,6 +25,7 @@ public class CmrResultItem extends BaseEntity {
     /** 冗余 RST，便于直接按结果集查询 */
     private String resultSetId;
 
+    @Column("result_rank")
     private Integer rank;
 
     private String itemId;

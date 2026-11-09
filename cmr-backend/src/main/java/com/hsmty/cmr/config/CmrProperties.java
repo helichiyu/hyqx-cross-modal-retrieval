@@ -15,12 +15,19 @@ import java.math.BigDecimal;
 @ConfigurationProperties(prefix = "cmr")
 public class CmrProperties {
 
+    private final Auth auth = new Auth();
     private final Operator operator = new Operator();
     private final Volume volume = new Volume();
     private final Jwt jwt = new Jwt();
     private final Crypto crypto = new Crypto();
     private final Eval eval = new Eval();
     private final Build build = new Build();
+
+    /** 鉴权开关：false=临时匿名系统管理员，true=JWT 登录鉴权 */
+    @Data
+    public static class Auth {
+        private boolean enabled = true;
+    }
 
     /** 算子服务调用配置 */
     @Data

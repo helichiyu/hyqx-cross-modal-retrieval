@@ -36,6 +36,9 @@ public class CmrSearchHistory extends BaseEntity {
     /** text/image/audio/video */
     private String queryModality;
 
+    /** 首个目标模态：text/image/audio/video */
+    private String targetModality;
+
     private Boolean clarified;
 
     private String scene;

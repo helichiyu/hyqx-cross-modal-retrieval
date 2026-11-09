@@ -7,7 +7,7 @@ export interface ApiEnvelope<T> {
 }
 
 export interface PageResult<T> {
-  list: T[]
+  records: T[]
   total: number
   pageNum: number
   pageSize: number
@@ -38,6 +38,7 @@ export interface HistoryVO {
   queryText: string | null
   queryFile: string | null
   queryModality: string | null
+  targetModality: string | null
   clarified: boolean | null
   scene: string | null
   itemCount: number | null
@@ -80,6 +81,7 @@ export interface SearchResultVO {
   taskId: number
   taskBizNo: string
   queryModality: string
+  targetModality: string | null
   itemCount: number
   elapsedMs: number
   strategy: Record<string, unknown>
@@ -138,6 +140,7 @@ export interface TaskLogVO {
   step: string
   status: string
   message: string | null
+  operatorOutputJson: string | null
   createTime: string | null
 }
 
@@ -162,6 +165,13 @@ export interface DatasourceVO {
   authType: string | null
   remark: string | null
   createTime: string | null
+}
+
+export interface DatasourceTestVO {
+  connected: boolean | null
+  statusCode: number | null
+  latencyMs: number | null
+  message: string
 }
 
 export interface StrategyVO {

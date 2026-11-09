@@ -5,4 +5,5 @@
                                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
     <include file="db/changelog/001_cmr_schema.xml"/>
     <include file="db/changelog/002_cmr_dict_init.xml"/>
+    <include file="db/changelog/003_cmr_search_target_modality.xml"/>
 </databaseChangeLog>

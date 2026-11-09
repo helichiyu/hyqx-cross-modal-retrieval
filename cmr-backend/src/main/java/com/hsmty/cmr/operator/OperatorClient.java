@@ -8,7 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -16,7 +16,6 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
-import java.net.http.HttpClient;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
@@ -44,12 +43,9 @@ public class OperatorClient {
     }
 
     private RestClient build(int readTimeoutMs) {
-        HttpClient httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(5))
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .build();
-        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
-        factory.setReadTimeout(Duration.ofMillis(readTimeoutMs));
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(readTimeoutMs);
         return RestClient.builder()
                 .baseUrl(properties.getOperator().getBaseUrl())
                 .requestFactory(factory)
@@ -71,7 +67,7 @@ public class OperatorClient {
     public JsonNode uploadFile(String operatorId, String uniqueId, Path file) {
         MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
         parts.add("file", new FileSystemResource(file));
-        return guard(() -> unwrap(batchClient.post()
+        return guard(operatorId, uniqueId, () -> unwrap(batchClient.post()
                 .uri("/{op}/uploadFile?uniqueId={uid}", operatorId, uniqueId)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(parts)
@@ -81,25 +77,33 @@ public class OperatorClient {
 
     /** 执行算子（批量链超时） */
     public JsonNode predict(String operatorId, Map<String, Object> payload) {
-        return guard(() -> call(batchClient, "/{op}/predict", operatorId, payload));
+        return guard(operatorId, uniqueIdOf(payload), () -> call(batchClient, "/{op}/predict", operatorId, payload));
     }
 
     /** 在线链调用（407 查询理解，短超时） */
     public JsonNode understand(Map<String, Object> payload) {
-        return guard(() -> call(searchClient, "/" + OpIds.UNDERSTAND + "/predict", payload));
+        return guard(OpIds.UNDERSTAND, uniqueIdOf(payload), () -> call(searchClient, "/" + OpIds.UNDERSTAND + "/predict", payload));
     }
 
     /** 408 检索主接口（专用端点，短超时） */
     public JsonNode search(Map<String, Object> payload) {
-        return guard(() -> call(searchClient, "/" + OpIds.RETRIEVAL + "/search", payload));
+        return guard(OpIds.RETRIEVAL, uniqueIdOf(payload), () -> call(searchClient, "/" + OpIds.RETRIEVAL + "/search", payload));
     }
 
-    private <T> T guard(java.util.function.Supplier<T> body) {
+    private <T> T guard(String operatorId, String uniqueId, java.util.function.Supplier<T> body) {
         try {
             return body.get();
         } catch (Exception e) {
-            throw classify(e);
+            OperatorException classified = classify(e);
+            throw new OperatorException(classified.getSide(),
+                    "算子[" + operatorId + "] 任务[" + uniqueId + "]: " + classified.getMessage(),
+                    classified);
         }
+    }
+
+    private String uniqueIdOf(Map<String, Object> payload) {
+        Object value = payload == null ? null : payload.get("uniqueId");
+        return value == null ? "unknown" : value.toString();
     }
 
     /** 清理任务（幂等） */

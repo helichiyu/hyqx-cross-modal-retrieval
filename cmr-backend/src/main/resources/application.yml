@@ -6,6 +6,8 @@ server:
 spring:
   application:
     name: hsmty-module-cmr-server
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
   threads:
     virtual:
       enabled: true
@@ -27,6 +29,11 @@ spring:
       host: ${CMR_REDIS_HOST:127.0.0.1}
       port: ${CMR_REDIS_PORT:6379}
 
+management:
+  health:
+    redis:
+      enabled: ${CMR_REDIS_HEALTH_ENABLED:false}
+
 mybatis-flex:
   configuration:
     map-underscore-to-camel-case: true
@@ -47,6 +54,8 @@ logging:
     com.hsmty.cmr: INFO
 
 cmr:
+  auth:
+    enabled: ${CMR_AUTH_ENABLED:false}
   operator:
     base-url: ${CMR_OPERATOR_BASE:http://127.0.0.1:6300}
     timeout-search-ms: 15000
