@@ -224,10 +224,15 @@ public class SearchService {
 
     /** 结果集回看（P2 刷新/P9 查看） */
     public HistoryDetailVO resultsOf(String resultSetId) {
+        CmrSearchHistory history = historyOfResultSet(resultSetId);
+        return detail(history.getId());
+    }
+
+    private CmrSearchHistory historyOfResultSet(String resultSetId) {
         CmrSearchHistory history = historyMapper.selectOneByQuery(QueryWrapper.create()
                 .where(CMR_SEARCH_HISTORY.RESULT_SET_ID.eq(resultSetId)));
         BizException.assertNull(history, "结果集不存在");
-        return detail(history.getId());
+        return history;
     }
 
     /** 采用/废弃：一次性终态，二者互斥不可逆 */
@@ -289,7 +294,9 @@ public class SearchService {
         qw.orderBy(CMR_SEARCH_HISTORY.ID.desc());
         Page<CmrSearchHistory> page = historyMapper.paginate(
                 Math.max(query.getPageNum(), 1), Math.max(query.getPageSize(), 1), qw);
-        return PageResult.of(page.getRecords().stream().map(HistoryVO::from).toList(),
+        return PageResult.of(page.getRecords().stream()
+                        .map(h -> HistoryVO.from(h, taskService.bizNoOf(h.getTaskId()), taskService.statusOf(h.getTaskId())))
+                        .toList(),
                 page.getTotalRow(), query.getPageNum(), query.getPageSize());
     }
 
@@ -301,10 +308,17 @@ public class SearchService {
                         .orderBy(CMR_RESULT_ITEM.RANK.asc()))
                 .stream().map(this::toItemVO).toList();
         return HistoryDetailVO.builder()
-                .history(HistoryVO.from(history))
+                .history(HistoryVO.from(history, taskService.bizNoOf(history.getTaskId()),
+                        taskService.statusOf(history.getTaskId())))
                 .strategySnapshotJson(history.getStrategySnapshotJson())
                 .items(items)
                 .build();
+    }
+
+    /** 按结果集重跑：P2 错误态可从 resultSetId 找到原 SRH 并重放 */
+    public SearchResultVO rerunByResultSetId(String resultSetId) {
+        CmrSearchHistory history = historyOfResultSet(resultSetId);
+        return rerun(history.getId());
     }
 
     /** 再次执行：原参数重放（新 SRH，不复用旧结果） */
@@ -325,6 +339,20 @@ public class SearchService {
                 });
         if (snapshot.get("topK") instanceof Number n) {
             dto.setTopK(n.intValue());
+        }
+        if (snapshot.get("rerank") instanceof Boolean rerank) {
+            dto.setRerank(rerank);
+        }
+        if (snapshot.get("weights") instanceof Map<?, ?> sourceWeights) {
+            Map<String, Integer> weights = new LinkedHashMap<>();
+            sourceWeights.forEach((key, value) -> {
+                if (key != null && value instanceof Number number) {
+                    weights.put(String.valueOf(key), number.intValue());
+                }
+            });
+            if (!weights.isEmpty()) {
+                dto.setWeights(weights);
+            }
         }
         return execute(dto);
     }

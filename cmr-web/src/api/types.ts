@@ -35,6 +35,8 @@ export interface HistoryVO {
   bizNo: string
   resultSetId: string
   taskId: number | null
+  taskBizNo: string | null
+  taskStatus: string | null
   queryText: string | null
   queryFile: string | null
   queryModality: string | null
@@ -123,6 +125,7 @@ export interface TaskVO {
   type: string
   refId: number | null
   refBizNo: string | null
+  refRoute: string | null
   status: string
   failType: string | null
   failDisposal: string | null
@@ -164,6 +167,12 @@ export interface DatasourceVO {
   protocol: string | null
   authType: string | null
   remark: string | null
+  datasetCount: number
+  lastTestConnected: boolean | null
+  lastTestStatusCode: number | null
+  lastTestLatencyMs: number | null
+  lastTestMessage: string | null
+  lastTestTime: string | null
   createTime: string | null
 }
 
@@ -172,6 +181,7 @@ export interface DatasourceTestVO {
   statusCode: number | null
   latencyMs: number | null
   message: string
+  testedAt: string
 }
 
 export interface StrategyVO {
@@ -227,6 +237,21 @@ export interface EvalItemVO {
   labeled: boolean
 }
 
+export interface EvalPreviewItemVO {
+  searchId: number
+  searchBizNo: string
+  query: string
+  queryModality: string | null
+  targetModality: string | null
+  itemCount: number | null
+  createTime: string | null
+}
+
+export interface EvalPreviewVO {
+  count: number
+  items: EvalPreviewItemVO[]
+}
+
 export interface EvalRecordVO {
   id: number
   bizNo: string
@@ -235,12 +260,20 @@ export interface EvalRecordVO {
   strategyVersionId: number | null
   taskId: number | null
   taskBizNo: string | null
+  taskStatus: string | null
   metricsJson: string | null
   linesJson: string | null
   conclusion: string
   failedLinesJson: string | null
   comparisonJson: string | null
   createTime: string
+}
+
+export interface FeedbackStatsVO {
+  total: number
+  pending: number
+  processing: number
+  closed: number
 }
 
 export interface FeedbackVO {
@@ -255,6 +288,7 @@ export interface FeedbackVO {
   resultNote: string | null
   handlerId: number | null
   createTime: string
+  updateTime: string | null
 }
 
 export interface WordVO {

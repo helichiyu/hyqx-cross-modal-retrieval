@@ -12,22 +12,22 @@
             <td><b>{{ row.name }}</b><div class="mono muted">{{ row.bizNo }}</div></td><td>{{ row.queryCount }} 条</td><td>{{ filterText(row.filtersJson) }}</td><td><span class="badge" :class="row.status==='done'?'ok':'wait'">{{ setStatusLabel(row.status) }}</span></td>
             <td class="col-act"><button class="btn-ghost btn-xs" type="button" @click="openLabel(row)">标注 {{ row.labeledCount }}/{{ row.queryCount }}</button><button v-if="row.status==='labeling'" class="btn-ghost btn-xs" type="button" @click="completeSet(row)">完成标注</button><button v-if="row.status==='done'" class="btn-ghost btn-xs" type="button" @click="chooseSetForRun(row)">发起评测</button></td>
           </tr>
-        </tbody></table></div>
+        </tbody></table></div><div class="pager-bar"><span>共 {{ setsTotal }} 条</span><button class="pager-btn" type="button" :disabled="setsPage<=1" @click="loadSets(setsPage-1)">上一页</button><span>{{ setsPage }} / {{ setsPageCount }}</span><button class="pager-btn" type="button" :disabled="setsPage>=setsPageCount" @click="loadSets(setsPage+1)">下一页</button></div>
       </section>
 
       <section class="panel">
         <div class="panel-head"><div class="sec-head"><h2 class="sec-title">② 评测工作台</h2></div></div>
         <div class="run-bar">
-          <label class="field">评测集<select v-model.number="benchSetId"><option :value="0" disabled>选择评测集</option><option v-for="row in doneSets" :key="row.id" :value="row.id">{{ row.name }} · {{ row.queryCount }} 条</option></select></label>
-          <label class="field">评测对象（策略版本）<select v-model="benchVersionId"><option value="">当前生效策略</option><option v-for="v in allStrategyVersions" :key="v.id" :value="v.id">策略 {{ v.strategyId }} · v{{ v.versionNo }}</option></select></label>
-          <button class="btn-primary" type="button" :disabled="runSubmitting" @click="runBench">{{ runSubmitting?'评测中…':'开始评测' }}</button>
+          <label class="field">评测集<select v-model.number="benchSetId" @change="loadRuns(1)"><option :value="0" disabled>选择评测集</option><option v-for="row in doneSets" :key="row.id" :value="row.id">{{ row.name }} · {{ row.queryCount }} 条</option></select></label>
+          <label class="field">评测对象（策略版本）<select v-model="benchVersionId"><option value="">当前生效策略</option><option v-for="v in allStrategyVersions" :key="v.id" :value="v.id">{{ versionLabel(v.id) }}</option></select></label>
+          <button class="btn-primary" type="button" :disabled="runSubmitting" @click="runBench">{{ runSubmitting?(evaluating?'评测中…':'提交中…'):'开始评测' }}</button>
           <div class="base-chip">对比基线 <b>{{ previousRun ? runMetric(previousRun,'recall','—') : '—' }}</b></div>
         </div>
         <div class="metric-cap"><span class="mc-title">指标</span><span class="mc-meta">{{ activeRun ? activeRun.bizNo : '尚未评测' }}</span></div>
         <div class="metrics">
-          <div class="metric"><div class="m-top"><span class="m-name">召回率</span><span class="badge" :class="metricPass(activeRun?.metricsJson,'recall')?'ok':'wait'">{{ metricPass(activeRun?.metricsJson,'recall')?'达标':'待评' }}</span></div><div class="m-sub">Recall@5</div><div class="m-val">{{ activeRun ? runMetric(activeRun,'recall','—') : '—' }}</div><div class="m-base">上次基线 {{ previousRun ? runMetric(previousRun,'recall','—') : '—' }}</div></div>
-          <div class="metric"><div class="m-top"><span class="m-name">精确率</span><span class="badge" :class="metricPass(activeRun?.metricsJson,'precision')?'ok':'wait'">{{ metricPass(activeRun?.metricsJson,'precision')?'达标':'待评' }}</span></div><div class="m-sub">Precision</div><div class="m-val">{{ activeRun ? runMetric(activeRun,'precision','—') : '—' }}</div><div class="m-base">上次基线 {{ previousRun ? runMetric(previousRun,'precision','—') : '—' }}</div></div>
-          <div class="metric"><div class="m-top"><span class="m-name">排序质量（NDCG）</span><span class="badge" :class="metricPass(activeRun?.metricsJson,'ndcg')?'ok':'wait'">{{ metricPass(activeRun?.metricsJson,'ndcg')?'达标':'待评' }}</span></div><div class="m-sub">排序质量（NDCG@10）</div><div class="m-val">{{ activeRun ? runMetric(activeRun,'ndcg','—') : '—' }}</div><div class="m-base">上次基线 {{ previousRun ? runMetric(previousRun,'ndcg','—') : '—' }}</div></div>
+          <div class="metric"><div class="m-top"><span class="m-name">召回率</span><span class="badge" :class="metricPass(activeRun,'recall')?'ok':'wait'">{{ metricPass(activeRun,'recall')?'达标':'待评' }}</span></div><div class="m-sub">Recall@10</div><div class="m-val">{{ activeRun ? runMetric(activeRun,'recall','—') : '—' }}</div><div class="m-base">上次基线 {{ previousRun ? runMetric(previousRun,'recall','—') : '—' }}</div></div>
+          <div class="metric"><div class="m-top"><span class="m-name">精确率</span><span class="badge" :class="metricPass(activeRun,'precision')?'ok':'wait'">{{ metricPass(activeRun,'precision')?'达标':'待评' }}</span></div><div class="m-sub">Precision</div><div class="m-val">{{ activeRun ? runMetric(activeRun,'precision','—') : '—' }}</div><div class="m-base">上次基线 {{ previousRun ? runMetric(previousRun,'precision','—') : '—' }}</div></div>
+          <div class="metric"><div class="m-top"><span class="m-name">排序质量（NDCG）</span><span class="badge" :class="metricPass(activeRun,'ndcg')?'ok':'wait'">{{ metricPass(activeRun,'ndcg')?'达标':'待评' }}</span></div><div class="m-sub">排序质量（NDCG@10）</div><div class="m-val">{{ activeRun ? runMetric(activeRun,'ndcg','—') : '—' }}</div><div class="m-base">上次基线 {{ previousRun ? runMetric(previousRun,'ndcg','—') : '—' }}</div></div>
         </div>
       </section>
 
@@ -36,21 +36,21 @@
         <div v-else class="report-box"><div class="report-head"><b>{{ report.bizNo }}</b><span class="badge" :class="report.conclusion==='pass'?'ok':'fail'">{{ report.conclusion==='pass'?'达标':'未达标' }}</span></div><pre class="report-pre">{{ reportText(report) }}</pre></div>
       </section>
 
-      <section class="panel"><div class="panel-head"><div class="sec-head"><h2 class="sec-title">评测历史</h2></div><span class="hist-note">共 {{ runs.length }} 条</span></div>
+      <section class="panel"><div class="panel-head"><div class="sec-head"><h2 class="sec-title">评测历史</h2></div><span class="hist-note">共 {{ runsTotal }} 条</span></div>
         <div class="tbl-wrap"><table class="tbl hist-tbl"><thead><tr><th>时间</th><th>评测对象（策略）</th><th>评测集</th><th>召回率</th><th>精确率</th><th>排序质量（NDCG）</th><th>结论</th><th>操作</th></tr></thead><tbody>
           <tr v-if="runsLoading"><td colspan="8" class="empty-cell">加载中…</td></tr><tr v-else-if="!runs.length"><td colspan="8" class="empty-cell">暂无评测历史</td></tr>
-          <tr v-for="row in runs" v-else :key="row.id"><td>{{ row.createTime }}</td><td class="mono">{{ row.strategyVersionId || '当前策略' }}</td><td>{{ setLabel(row.evalSetId) }}</td><td>{{ runMetric(row,'recall','—') }}</td><td>{{ runMetric(row,'precision','—') }}</td><td>{{ runMetric(row,'ndcg','—') }}</td><td><span class="badge" :class="row.conclusion==='pass'?'ok':'fail'">{{ row.conclusion==='pass'?'达标':'未达标' }}</span></td><td><button class="btn-ghost btn-xs" type="button" @click="openReport(row)">查看</button></td></tr>
-        </tbody></table></div>
+          <tr v-for="row in runs" v-else :key="row.id"><td>{{ row.createTime }}</td><td>{{ versionLabel(row.strategyVersionId) }}</td><td>{{ setLabel(row.evalSetId) }}</td><td>{{ runMetric(row,'recall','—') }}</td><td>{{ runMetric(row,'precision','—') }}</td><td>{{ runMetric(row,'ndcg','—') }}</td><td><span v-if="!row.conclusion" class="badge wait">评测中</span><span v-else class="badge" :class="row.conclusion==='pass'?'ok':'fail'">{{ row.conclusion==='pass'?'达标':'未达标' }}</span></td><td><button class="btn-ghost btn-xs" type="button" @click="openReport(row)">查看</button></td></tr>
+        </tbody></table></div><div class="pager-bar"><button class="pager-btn" type="button" :disabled="runsPage<=1" @click="loadRuns(runsPage-1)">上一页</button><span>{{ runsPage }} / {{ runsPageCount }}</span><button class="pager-btn" type="button" :disabled="runsPage>=runsPageCount" @click="loadRuns(runsPage+1)">下一页</button></div>
       </section>
     </div></div>
 
     <div class="toast" :class="{show:toastVisible,ok:toastType==='ok',err:toastType==='err'}">{{toastMessage}}</div>
 
-    <div class="modal-mask" :class="{show:createVisible}" @click.self="createVisible=false"><div class="modal-box"><div class="modal-head"><h3>新建评测集</h3><button class="modal-close" type="button" @click="createVisible=false">×</button></div><div class="modal-body"><div class="mb-tip">从检索历史中筛选问题 query，创建后进入标注。</div><label class="field">名称<input v-model.trim="createForm.name" maxlength="80" placeholder="例如：零结果专项评测集"></label><div class="filter-checks"><label v-for="item in filterOptions" :key="item.key"><input v-model="createForm.filters" type="checkbox" :value="item.key">{{ item.label }}</label></div><label class="field">说明<input v-model.trim="createForm.remark" placeholder="可选"></label></div><div class="modal-foot"><button class="btn-ghost" type="button" @click="createVisible=false">取消</button><button class="btn-primary" type="button" :disabled="creating" @click="submitCreateSet">创建评测集</button></div></div></div>
+    <div class="modal-mask" :class="{show:createVisible}" @click.self="createVisible=false"><div class="modal-box"><div class="modal-head"><h3>新建评测集</h3><button class="modal-close" type="button" @click="createVisible=false">×</button></div><div class="modal-body"><div class="mb-tip">从检索历史中筛选问题 query，创建后进入标注。</div><label class="field">名称<input v-model.trim="createForm.name" maxlength="80" placeholder="例如：零结果专项评测集"></label><div class="filter-checks"><label v-for="item in filterOptions" :key="item.key"><input v-model="createForm.filters" type="checkbox" :value="item.key">{{ item.label }}</label></div><label class="field">说明<input v-model.trim="createForm.remark" placeholder="可选"></label></div><div v-if="createPreview" class="preview-box"><div class="preview-head">筛选命中 <b>{{ createPreview.count }}</b> 条 query</div><div v-if="createPreview.items.length" class="preview-list"><div v-for="item in createPreview.items" :key="item.searchId" class="preview-item"><span class="mono">{{ item.searchBizNo }}</span><b>{{ item.query }}</b><span>{{ item.itemCount ?? 0 }} 条结果</span></div></div><div v-else class="empty">筛选结果为空，无法创建评测集</div></div><div class="modal-foot"><button class="btn-ghost" type="button" @click="createVisible=false">取消</button><button class="btn-ghost" type="button" :disabled="previewing" @click="previewCreateSet">{{ previewing ? '预览中…' : '筛选并加入' }}</button><button class="btn-primary" type="button" :disabled="creating" @click="submitCreateSet">创建评测集</button></div></div></div>
 
-    <div class="modal-mask" :class="{show:labelVisible}" @click.self="labelVisible=false"><div class="modal-box wide"><div class="modal-head"><h3>标注：{{labelSet?.name}}</h3><button class="modal-close" type="button" @click="labelVisible=false">×</button></div><div class="modal-body label-list"><div v-if="!labelItems.length" class="empty">无待标注条目</div><div v-for="(item,index) in labelItems" :key="item.id" class="label-item"><div class="label-title"><span class="badge gray">#{{index+1}}</span><b>{{item.query}}</b><span v-if="item.labeled" class="badge ok">已标注</span></div><div class="label-input"><input v-model="labelAnswers[item.id]" placeholder="正确答案 itemId，逗号分隔；无正确答案留空"><button class="btn-ghost btn-xs" type="button" @click="saveLabel(item)">保存</button></div></div></div><div class="modal-foot"><button class="btn-ghost" type="button" @click="labelVisible=false">关闭</button></div></div></div>
+    <div class="modal-mask" :class="{show:labelVisible}" @click.self="labelVisible=false"><div class="modal-box wide"><div class="modal-head"><h3>标注：{{labelSet?.name}}</h3><button class="modal-close" type="button" @click="labelVisible=false">×</button></div><div class="modal-body label-list"><div v-if="!labelItems.length" class="empty">无待标注条目</div><div v-for="(item,index) in labelItems" :key="item.id" class="label-item"><div class="label-title"><span class="badge gray">#{{index+1}}</span><b>{{item.query}}</b><span v-if="item.labeled" class="badge ok">已标注</span></div><div class="label-input"><input v-model="labelAnswers[item.id]" placeholder="正确答案 itemId，逗号分隔；无正确答案留空"><button class="btn-ghost btn-xs" type="button" @click="saveLabel(item)">保存</button></div></div></div><div class="pager-bar"><span>共 {{ labelTotal }} 条</span><button class="pager-btn" type="button" :disabled="labelPage<=1" @click="changeLabelPage(labelPage-1)">上一页</button><span>{{ labelPage }} / {{ labelPageCount }}</span><button class="pager-btn" type="button" :disabled="labelPage>=labelPageCount" @click="changeLabelPage(labelPage+1)">下一页</button></div><div class="modal-foot"><button class="btn-ghost" type="button" @click="labelVisible=false">关闭</button></div></div></div>
 
-    <div class="modal-mask" :class="{show:reportVisible}" @click.self="reportVisible=false"><div class="modal-box wide"><div class="modal-head"><h3>评测报告</h3><button class="modal-close" type="button" @click="reportVisible=false">×</button></div><div class="modal-body"><pre class="report-pre">{{report?reportText(report):''}}</pre></div><div class="modal-foot"><button class="btn-ghost" type="button" @click="reportVisible=false">关闭</button></div></div></div>
+    <div class="modal-mask" :class="{show:reportVisible}" @click.self="reportVisible=false"><div class="modal-box wide"><div class="modal-head"><h3>评测报告</h3><button class="modal-close" type="button" @click="reportVisible=false">×</button></div><div class="modal-body"><pre class="report-pre">{{report?reportText(report):''}}</pre></div><div class="modal-foot"><button class="btn-ghost" type="button" @click="reportVisible=false">关闭</button><router-link class="btn-primary" :to="strategyAdjustRoute">转策略调整 ↗</router-link></div></div></div>
     <div class="dev-mask" :class="{open:devOpen}" @click="closeDev"></div>
 <div class="dev-drawer" :class="{open:devOpen}" role="dialog" aria-modal="true" aria-label="研发需求说明">
   <div class="dev-head">
@@ -77,7 +77,7 @@
       <p>工作台 = 用「评测对象（某个策略）」去检索「评测集里的每条 query」→ 把检索结果和「标准答案」对比 → 算出召回率 / 精确率 / NDCG。</p>
       <p>评测集提供「标准答案」，策略提供「检索能力」，两者一比才有指标；只有评测集没有对象，就没有检索结果可比；只有对象没有标准答案，就判断不了对错。</p>
       <ul>
-        <li><b>召回率 Recall@5</b>：该 query 的标准答案里，落进前 5 条的比例。</li>
+        <li><b>召回率 Recall@10</b>：该 query 的标准答案里，落进前 10 条的比例。</li>
         <li><b>精确率</b>：返回结果里判对（命中标准答案）的条数，占返回条数的比例。</li>
         <li><b>NDCG@10</b>：按位置折损累计命中，命中越靠前得分越高；再除以理想排序，归一到 0–1。</li>
       </ul>
@@ -103,43 +103,85 @@
 </template>
 
 <script setup lang="ts">
-import{computed,onMounted,reactive,ref}from'vue'
-import{completeEvalSet,createEvalSet,evalRunDetail,evalSetDetail,labelEvalItem,pageEvalRuns,pageEvalSets,pageStrategies,runEval,strategyVersions as fetchStrategyVersions}from'../../api'
-import type{EvalItemVO,EvalRecordVO,EvalSetVO,StrategyVersionVO}from'../../api/types'
+import{computed,onBeforeUnmount,onMounted,reactive,ref}from'vue'
+import{completeEvalSet,createEvalSet,evalRunDetail,evalSetDetail,labelEvalItem,pageEvalRuns,pageEvalSets,pageStrategies,previewEvalSet,runEval,strategyVersions as fetchStrategyVersions}from'../../api'
+import type{EvalItemVO,EvalPreviewVO,EvalRecordVO,EvalSetVO,StrategyVO,StrategyVersionVO}from'../../api/types'
 import{useDictStore}from'../../stores/dict'
 const dictStore=useDictStore()
-const sets=ref<EvalSetVO[]>([]);const runs=ref<EvalRecordVO[]>([]);const setsLoading=ref(false);const runsLoading=ref(false);const setStatusDict=ref<{alias:string;label:string}[]>([])
-const createVisible=ref(false);const creating=ref(false);const createForm=reactive({name:'',remark:'',filters:['zeroResult'] as string[]})
+const sets=ref<EvalSetVO[]>([]);const runs=ref<EvalRecordVO[]>([]);const setsLoading=ref(false);const runsLoading=ref(false);const setStatusDict=ref<{alias:string;label:string}[]>([]);const setsPage=ref(1);const setsPageSize=10;const setsTotal=ref(0);const runsPage=ref(1);const runsPageSize=10;const runsTotal=ref(0);const labelPage=ref(1);const labelPageSize=10;const labelTotal=ref(0);const strategies=ref<StrategyVO[]>([])
+const createVisible=ref(false);const creating=ref(false);const createPreview=ref<EvalPreviewVO|null>(null);const previewing=ref(false);const createForm=reactive({name:'',remark:'',filters:['zeroResult'] as string[]})
 const labelVisible=ref(false);const labelSet=ref<EvalSetVO|null>(null);const labelItems=ref<EvalItemVO[]>([]);const labelAnswers=reactive<Record<number,string>>({})
-const benchSetId=ref(0);const benchVersionId=ref<number|string>('');const strategyVersionsList=ref<StrategyVersionVO[]>([]);const runSubmitting=ref(false)
-const reportVisible=ref(false);const report=ref<EvalRecordVO|null>(null)
+const labelPageCount=computed(()=>Math.max(1,Math.ceil(labelTotal.value/labelPageSize)));const evalSetNames=ref<Record<number,string>>({});const setsPageCount=computed(()=>Math.max(1,Math.ceil(setsTotal.value/setsPageSize)));const runsPageCount=computed(()=>Math.max(1,Math.ceil(runsTotal.value/runsPageSize)));const benchSetId=ref(0);const benchVersionId=ref<number|string>('');const strategyVersionsList=ref<StrategyVersionVO[]>([]);const runSubmitting=ref(false);const evaluating=ref(false);const evalPollingActive=ref(false)
+const reportVisible=ref(false);const report=ref<EvalRecordVO|null>(null);const strategyAdjustRoute=computed(()=>report.value?.strategyVersionId?{path:'/strategies',query:{strategyVersionId:report.value.strategyVersionId}}:'/strategies')
 const devOpen=ref(false);const toastVisible=ref(false);const toastMessage=ref('');const toastType=ref<'info'|'ok'|'err'>('info');let toastTimer:ReturnType<typeof setTimeout>|undefined
 const filterOptions=[{key:'zeroResult',label:'零结果'},{key:'noClick',label:'无点击'},{key:'reSearch',label:'复搜'}]
 const doneSets=computed(()=>sets.value.filter(x=>x.status==='done'));const activeRun=computed(()=>runs.value[0]||null);const previousRun=computed(()=>runs.value[1]||null);const allStrategyVersions=computed(()=>strategyVersionsList.value)
-onMounted(async()=>{setStatusDict.value=await dictStore.ensure('cmr_eval_set_status');await Promise.all([loadSets(),loadRuns(),loadStrategyVersions()])})
+onMounted(async()=>{setStatusDict.value=await dictStore.ensure('cmr_eval_set_status');await loadSets();await Promise.all([loadRuns(),loadStrategyVersions()])})
+onBeforeUnmount(()=>{evalPollingActive.value=false})
 function setStatusLabel(s:string){return setStatusDict.value.find(x=>x.alias===s)?.label||s}
 function filterText(raw:string){try{const obj=JSON.parse(raw) as Record<string,boolean>;const hits=Object.entries(obj).filter(([,v])=>v).map(([k])=>filterOptions.find(x=>x.key===k)?.label||k);return hits.length?hits.join(' / '):'全部'}catch{return raw||'—'}}
 function parseMetrics(raw?:string|null){try{return JSON.parse(raw||'{}')as Record<string,number>}catch{return{}}}
+function parseRecord(raw?:string|null){try{return JSON.parse(raw||'{}')as Record<string,unknown>}catch{return{}}}
+function comparisonText(raw?:string|null){const record=parseRecord(raw);const entries=Object.entries(record);return entries.length?entries.map(([k,v])=>`${k}: ${typeof v==='object'?JSON.stringify(v):String(v)}`).join('；'):'—'}
 function runMetric(row:EvalRecordVO|null,key:string,fallback:string){const metricKey=key.includes('@')?key:`${key}@10`;const value=parseMetrics(row?.metricsJson)[metricKey];return value==null?fallback:Number(value).toFixed(3)}
-function metricPass(raw:string|undefined|null,key:string){const metricKey=key.includes('@')?key:`${key}@10`;const m=parseMetrics(raw);return Object.prototype.hasOwnProperty.call(m,metricKey)}
-function setLabel(id:number){return sets.value.find(x=>x.id===id)?.name||String(id)}
-function reportText(row:EvalRecordVO){const metrics=parseMetrics(row.metricsJson);const lines=parseMetrics(row.linesJson);return ['结论：'+(row.conclusion==='pass'?'达标':'未达标'),'任务：'+(row.taskBizNo||'—'),'评测集：'+setLabel(row.evalSetId),'',...Object.entries(metrics).map(([k,v])=>`${k}: 实测 ${Number(v).toFixed(4)} / 线值 ${lines[k]??'—'}`)].join('\n')}
-async function loadSets(){setsLoading.value=true;try{const page=await pageEvalSets();sets.value=page.records;if(!benchSetId.value&&doneSets.value[0])benchSetId.value=doneSets.value[0].id}catch(e){showToast((e as Error).message,'err')}finally{setsLoading.value=false}}
-async function loadRuns(){runsLoading.value=true;try{const page=await pageEvalRuns();runs.value=page.records}catch(e){showToast((e as Error).message,'err')}finally{runsLoading.value=false}}
-async function loadStrategyVersions(){try{const page=await pageStrategies();const all:StrategyVersionVO[]=[];for(const s of page.records){try{all.push(...await fetchStrategyVersions(s.id))}catch{}}strategyVersionsList.value=all}catch{strategyVersionsList.value=[]}}
-function openCreateSet(){createVisible.value=true;createForm.name='';createForm.remark='';createForm.filters=['zeroResult']}
-async function submitCreateSet(){if(!createForm.filters.length){showToast('至少勾选一个筛选条件','err');return}creating.value=true;try{const filters={zeroResult:createForm.filters.includes('zeroResult'),noClick:createForm.filters.includes('noClick'),reSearch:createForm.filters.includes('reSearch')};await createEvalSet({name:createForm.name||undefined,filters,remark:createForm.remark||undefined});createVisible.value=false;showToast('评测集已创建，请进入标注','ok');await loadSets()}catch(e){showToast((e as Error).message,'err')}finally{creating.value=false}}
-async function openLabel(row:EvalSetVO){try{const data=await evalSetDetail(row.id,{pageNum:1,pageSize:200});labelSet.value=data.evalSet;labelItems.value=data.items.records;for(const item of labelItems.value){try{labelAnswers[item.id]=(JSON.parse(item.answersJson||'[]')as string[]).join(',')}catch{labelAnswers[item.id]=''}}labelVisible.value=true}catch(e){showToast((e as Error).message,'err')}}
-async function saveLabel(item:EvalItemVO){if(!labelSet.value)return;const answers=(labelAnswers[item.id]||'').split(/[,，\s]+/).map(x=>x.trim()).filter(Boolean);try{await labelEvalItem(labelSet.value.id,item.id,answers);item.labeled=true;item.answersJson=JSON.stringify(answers);labelSet.value.labeledCount=labelItems.value.filter(x=>x.labeled).length;showToast('标注已保存','ok')}catch(e){showToast((e as Error).message,'err')}}
-async function completeSet(row:EvalSetVO){try{await completeEvalSet(row.id);showToast('标注已完成','ok');await loadSets()}catch(e){showToast((e as Error).message,'err')}}
-function chooseSetForRun(row:EvalSetVO){benchSetId.value=row.id}
-async function runBench(){if(!benchSetId.value){showToast('请选择评测集','err');return}runSubmitting.value=true;try{const record=await runEval(benchSetId.value,typeof benchVersionId.value==='number'?benchVersionId.value:undefined);report.value=record;showToast('评测已提交','ok');await loadRuns();reportVisible.value=true}catch(e){showToast((e as Error).message,'err')}finally{runSubmitting.value=false}}
+function metricPass(row:EvalRecordVO|null|undefined,key:string){const metricKey=key.includes('@')?key:`${key}@10`;const actual=parseMetrics(row?.metricsJson)[metricKey];if(actual==null)return false;const line=parseMetrics(row?.linesJson)[metricKey];return line==null||actual>=line}
+function setLabel(id:number){return evalSetNames.value[id]||sets.value.find(x=>x.id===id)?.name||String(id)}
+function strategyName(id:number){return strategies.value.find(x=>x.id===id)?.name||`策略 ${id}`}
+function versionLabel(id?:number|null){if(!id)return '当前生效策略';const version=strategyVersionsList.value.find(x=>x.id===id);return version?`${strategyName(version.strategyId)} · v${version.versionNo}`:`版本 ${id}`}
+function reportText(row:EvalRecordVO){const metrics=parseMetrics(row.metricsJson);const lines=parseMetrics(row.linesJson);return ['结论：'+(row.taskStatus==='failed'?'任务失败':row.conclusion==='pass'?'达标':'未达标'),'任务：'+(row.taskBizNo||'—'),'评测对象：'+versionLabel(row.strategyVersionId),'评测集：'+setLabel(row.evalSetId),'对比：'+comparisonText(row.comparisonJson),'',...Object.entries(metrics).map(([k,v])=>`${k}: 实测 ${Number(v).toFixed(4)} / 线值 ${lines[k]??'—'}`)].join('\n')}
+async function loadSets(pageNo=setsPage.value){setsPage.value=pageNo;setsLoading.value=true;try{const page=await pageEvalSets({pageNum:pageNo,pageSize:setsPageSize});sets.value=page.records;setsTotal.value=page.total;for(const item of page.records)evalSetNames.value[item.id]=item.name;if(!benchSetId.value&&doneSets.value[0]){benchSetId.value=doneSets.value[0].id;await loadRuns(1)}}catch(e){showToast((e as Error).message,'err')}finally{setsLoading.value=false}}
+async function loadRuns(pageNo=runsPage.value){runsPage.value=pageNo;runsLoading.value=true;try{const page=await pageEvalRuns({pageNum:pageNo,pageSize:runsPageSize,evalSetId:benchSetId.value||undefined});runs.value=page.records;runsTotal.value=page.total}catch(e){showToast((e as Error).message,'err')}finally{runsLoading.value=false}}
+async function loadStrategyVersions(){try{const page=await pageStrategies({pageNum:1,pageSize:200});strategies.value=page.records;const all:StrategyVersionVO[]=[];for(const s of page.records){try{all.push(...await fetchStrategyVersions(s.id))}catch{}}strategyVersionsList.value=all}catch{strategies.value=[];strategyVersionsList.value=[]}}
+function openCreateSet(){createVisible.value=true;createForm.name='';createForm.remark='';createForm.filters=['zeroResult'];createPreview.value=null;void previewCreateSet()}
+async function previewCreateSet(){
+  if(!createForm.filters.length){showToast('至少勾选一个筛选条件','err');return}
+  previewing.value=true
+  try{createPreview.value=await previewEvalSet({zeroResult:createForm.filters.includes('zeroResult'),noClick:createForm.filters.includes('noClick'),reSearch:createForm.filters.includes('reSearch')})}catch(e){showToast((e as Error).message,'err')}finally{previewing.value=false}
+}
+async function submitCreateSet(){if(!createForm.filters.length){showToast('至少勾选一个筛选条件','err');return}creating.value=true;try{const filters={zeroResult:createForm.filters.includes('zeroResult'),noClick:createForm.filters.includes('noClick'),reSearch:createForm.filters.includes('reSearch')};await createEvalSet({name:createForm.name||undefined,filters,remark:createForm.remark||undefined});createVisible.value=false;showToast('评测集已创建，请进入标注','ok');await loadSets(1)}catch(e){showToast((e as Error).message,'err')}finally{creating.value=false}}
+async function openLabel(row:EvalSetVO){labelSet.value=row;labelPage.value=1;labelVisible.value=true;await loadLabelPage(1)}
+async function loadLabelPage(pageNo:number){if(!labelSet.value)return;labelPage.value=pageNo;try{const data=await evalSetDetail(labelSet.value.id,{pageNum:pageNo,pageSize:labelPageSize});labelSet.value=data.evalSet;labelItems.value=data.items.records;labelTotal.value=data.items.total;for(const item of labelItems.value){try{labelAnswers[item.id]=(JSON.parse(item.answersJson||'[]')as string[]).join(',')}catch{labelAnswers[item.id]=''}}}catch(e){showToast((e as Error).message,'err')}}
+function changeLabelPage(pageNo:number){void loadLabelPage(pageNo)}
+async function saveLabel(item:EvalItemVO){if(!labelSet.value)return;const answers=(labelAnswers[item.id]||'').split(/[,，\s]+/).map(x=>x.trim()).filter(Boolean);const wasLabeled=item.labeled;try{await labelEvalItem(labelSet.value.id,item.id,answers);item.labeled=true;item.answersJson=JSON.stringify(answers);if(!wasLabeled&&labelSet.value)labelSet.value.labeledCount=(labelSet.value.labeledCount||0)+1;showToast('标注已保存','ok')}catch(e){showToast((e as Error).message,'err')}}
+async function completeSet(row:EvalSetVO){try{await completeEvalSet(row.id);showToast('标注已完成','ok');await loadSets(setsPage.value)}catch(e){showToast((e as Error).message,'err')}}
+function chooseSetForRun(row:EvalSetVO){benchSetId.value=row.id;void loadRuns(1)}
+async function runBench(){
+  if(!benchSetId.value){showToast('请选择评测集','err');return}
+  runSubmitting.value=true;evaluating.value=true
+  try{
+    const record=await runEval(benchSetId.value,typeof benchVersionId.value==='number'?benchVersionId.value:undefined)
+    report.value=record;showToast('评测已提交，等待评测任务完成','info');await loadRuns(1)
+    const completed=await waitForEvaluation(record)
+    if(completed){await loadRuns(1);reportVisible.value=true;showToast(completed.taskStatus==='failed'?'评测任务失败':'评测完成',completed.taskStatus==='failed'?'err':'ok')}
+  }catch(e){showToast((e as Error).message,'err')}finally{runSubmitting.value=false;evaluating.value=false}
+}
+async function waitForEvaluation(record:EvalRecordVO){
+  evalPollingActive.value=true
+  try{
+    for(let attempt=0;attempt<150&&evalPollingActive.value;attempt++){
+      await delay(2000)
+      if(!evalPollingActive.value)return null
+      const latest=await evalRunDetail(record.id);report.value=latest
+      if(latest.taskStatus==='done'||latest.taskStatus==='failed')return latest
+      if(!latest.taskStatus&&latest.metricsJson)return latest
+    }
+    if(!evalPollingActive.value)return null
+    throw new Error('评测任务超时，请在任务管理查看进展')
+  }finally{evalPollingActive.value=false}
+}
+function delay(ms:number){return new Promise(resolve=>setTimeout(resolve,ms))}
 async function openReport(row:EvalRecordVO){try{report.value=await evalRunDetail(row.id);reportVisible.value=true}catch(e){showToast((e as Error).message,'err')}}
 function showToast(message:string,type:'info'|'ok'|'err'='info'){toastMessage.value=message;toastType.value=type;toastVisible.value=true;clearTimeout(toastTimer);toastTimer=setTimeout(()=>toastVisible.value=false,2600)}
 function openDev(){devOpen.value=true}function closeDev(){devOpen.value=false}
 </script>
 <style scoped>
 .empty-cell{text-align:center;color:#98a2b3;padding:24px!important}.muted{color:#98a2b3;font-size:11px;margin-top:3px}.filter-checks{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0}.filter-checks label{display:flex;align-items:center;gap:6px;font-size:12px;color:#475467}.label-list{display:flex;flex-direction:column;gap:10px;max-height:64vh;overflow:auto}.label-item{border:1px solid #e6edf8;border-radius:8px;padding:10px;background:#fbfdff}.label-title{display:flex;align-items:center;gap:8px;margin-bottom:8px}.label-input{display:flex;gap:8px}.label-input input{flex:1;height:32px;border:1px solid #cfd8e8;border-radius:6px;padding:0 9px}.report-box{border:1px solid #e4edf8;border-radius:8px;background:#fbfdff;padding:14px}.report-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}.report-pre{white-space:pre-wrap;margin:0;color:#344054;font-size:12px;line-height:1.75;font-family:inherit}
+.preview-box{margin-top:12px;border:1px solid #dbe7f8;border-radius:8px;background:#f8fbff;padding:10px}
+.preview-head{font-size:12px;color:#475467;margin-bottom:7px}.preview-head b{color:var(--system-blue)}
+.preview-list{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto}
+.preview-item{display:grid;grid-template-columns:110px minmax(0,1fr) 70px;gap:8px;align-items:center;background:#fff;border:1px solid #e4edf8;border-radius:6px;padding:6px 8px;font-size:11.5px;color:#667085}
+.preview-item b{color:#273244;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 :root{
   --workspace-bg:#f6f9fe;
   --content-soft:#fbfdff;

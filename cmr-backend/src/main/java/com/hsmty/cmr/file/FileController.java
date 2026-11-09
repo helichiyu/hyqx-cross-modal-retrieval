@@ -1,6 +1,7 @@
 package com.hsmty.cmr.file;
 
 import com.hsmty.cmr.common.api.ApiResult;
+import com.hsmty.cmr.file.dto.FilePackageDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,6 +27,7 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.util.Map;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * 共享卷文件接口：媒体预览（Range）/材料下载统一入口、查询文件上传
@@ -49,6 +52,22 @@ public class FileController {
         LogicalFile logical = fileService.resolve(path);
         long length = Files.size(logical.absolute());
         return serve(logical, length, download, request.getHeader(HttpHeaders.RANGE));
+    }
+
+    @Operation(summary = "批量打包下载共享卷文件（ZIP）")
+    @PreAuthorize("hasAnyAuthority('cmr:file:read')")
+    @PostMapping("package")
+    public void packageFiles(@jakarta.validation.Valid @RequestBody FilePackageDTO dto,
+                             HttpServletResponse response) throws IOException {
+        java.nio.file.Path zip = fileService.createZip(dto.getPaths());
+        try {
+            response.setContentType("application/zip");
+            response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=cmr-results.zip");
+            Files.copy(zip, response.getOutputStream());
+            response.flushBuffer();
+        } finally {
+            Files.deleteIfExists(zip);
+        }
     }
 
     @Operation(summary = "上传查询文件（以图/音/视搜检索）")

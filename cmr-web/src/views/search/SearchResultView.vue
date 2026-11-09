@@ -20,6 +20,16 @@
           <router-link class="ctx-link" to="/operation">结果反馈归类 →</router-link>
         </section>
 
+        <div v-if="feedbacks.length" class="feedback-progress" aria-label="反馈处理进展">
+          <span class="fp-label">反馈进展</span>
+          <router-link v-for="feedback in feedbacks" :key="feedback.id" class="fp-item" to="/operation">
+            <b>{{ feedback.bizNo }}</b><span>{{ feedbackStatus(feedback) }}</span><span>{{ feedbackTarget(feedback) }}</span>
+            <span class="fp-time">{{ feedback.updateTime || feedback.createTime || '—' }}</span>
+            <span class="fp-note">{{ feedback.resultNote || feedback.description || '待补充处理说明' }}</span>
+          </router-link>
+          <router-link class="fp-more" to="/operation">查看全部 →</router-link>
+        </div>
+
         <section class="rs-bar">
           <span class="rs-line">结果集 {{ resultSetId }} · {{ items.length }} 条</span>
           <span class="rs-state">
@@ -170,7 +180,7 @@
                   <p class="st-desc">本次查询未生成可展示结果集。</p>
                   <span class="err-code">关联结果集 {{ resultSetId }}</span>
                   <div class="state-actions">
-                    <button class="btn-primary" type="button" @click="load">重试检索</button>
+                    <button class="btn-primary" type="button" :disabled="retrying" @click="retrySearch">{{ retrying ? '重跑中…' : '重试检索' }}</button>
                     <router-link class="btn-ghost ghost-link" to="/tasks">查看失败任务</router-link>
                   </div>
                 </div>
@@ -276,10 +286,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { adoptResults, clickResult, createFeedback, searchResults } from '../../api'
+import { adoptResults, clickResult, createFeedback, pageFeedbacks, rerunSearchResults, searchResults } from '../../api'
 import { http } from '../../api/http'
 import MediaPreview from '../../components/MediaPreview.vue'
-import type { HistoryDetailVO, ResultItemVO } from '../../api/types'
+import type { FeedbackVO, HistoryDetailVO, ResultItemVO } from '../../api/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -287,7 +297,9 @@ const resultSetId = computed(() => String(route.params.resultSetId || ''))
 
 const detail = ref<HistoryDetailVO | null>(null)
 const items = ref<ResultItemVO[]>([])
+const feedbacks = ref<FeedbackVO[]>([])
 const actualView = ref<'loading' | 'result' | 'empty' | 'error'>('loading')
+const retrying = ref(false)
 const demoView = ref<'result' | 'loading' | 'empty' | 'error' | 'edge' | ''>('')
 const errorMessage = ref('结果集加载失败')
 const adoptStatus = ref('unadopted')
@@ -373,11 +385,33 @@ async function load() {
     detail.value = data
     items.value = data.items || []
     adoptStatus.value = data.history.adoptStatus || 'unadopted'
+    void loadFeedbackProgress()
     actualView.value = items.value.length ? 'result' : 'empty'
   } catch (error) {
     errorMessage.value = (error as Error).message || '结果集加载失败'
     actualView.value = 'error'
   }
+}
+
+async function loadFeedbackProgress() {
+  if (!detail.value?.history.id) {
+    feedbacks.value = []
+    return
+  }
+  try {
+    const page = await pageFeedbacks({ pageNum: 1, pageSize: 20, searchId: detail.value.history.id })
+    feedbacks.value = page.records
+  } catch {
+    feedbacks.value = []
+  }
+}
+
+function feedbackStatus(feedback: FeedbackVO) {
+  return ({ pending: '待处理', processing: '处理中', closed: '已闭环' } as Record<string, string>)[feedback.status] || feedback.status
+}
+
+function feedbackTarget(feedback: FeedbackVO) {
+  return ({ strategy: '策略调优', datasource: '数据源补充', backfill: '数据回填' } as Record<string, string>)[feedback.target || ''] || '待定去向'
 }
 
 function groupCount(key: string) {
@@ -483,16 +517,16 @@ async function downloadSelected() {
     return
   }
   try {
-    for (const item of selected.slice(0, 200)) {
-      const blob = await http.blob('file', { path: item.sourceFile, download: true })
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = item.sourceFile?.split(/[\\/]/).pop() || `${item.itemId}.bin`
-      anchor.click()
-      URL.revokeObjectURL(url)
-    }
-    showToast('批量回源下载已开始', 'ok')
+    const blob = await http.postBlob('file/package', {
+      paths: selected.map(item => item.sourceFile),
+    })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `cmr-results-${resultSetId.value}.zip`
+    anchor.click()
+    URL.revokeObjectURL(url)
+    showToast('ZIP 打包下载已完成', 'ok')
   } catch (error) {
     showToast((error as Error).message, 'err')
   }
@@ -533,11 +567,30 @@ async function submitFeedback() {
     })
     feedbackVisible.value = false
     feedbackForm.description = ''
+    await loadFeedbackProgress()
     showToast('反馈已登记，可在结果运营页跟踪', 'ok')
   } catch (error) {
     showToast((error as Error).message, 'err')
   } finally {
     feedbackSubmitting.value = false
+  }
+}
+
+async function retrySearch() {
+  if (retrying.value) return
+  retrying.value = true
+  try {
+    const result = await rerunSearchResults(resultSetId.value)
+    selectedIds.value = new Set<number>()
+    clickedIds.value = new Set<number>()
+    expandedId.value = null
+    await router.replace(`/search/results/${result.resultSetId}`)
+    await load()
+    showToast('检索已重新执行', 'ok')
+  } catch (error) {
+    showToast((error as Error).message, 'err')
+  } finally {
+    retrying.value = false
   }
 }
 
@@ -1114,3 +1167,13 @@ button{font-family:inherit;cursor:pointer}
 .cm-ck{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#344054;padding:5px 0;text-align:left}
 .cm-ck input{width:14px;height:14px;accent-color:var(--system-blue);cursor:pointer}
 </style>
+
+.feedback-progress{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0;padding:8px 12px;border:1px solid #dbe7f8;border-radius:8px;background:#f8fbff;font-size:11.5px;color:#667085}
+.fp-label{font-weight:700;color:#344054}
+.fp-item{display:inline-flex;align-items:center;gap:5px;border:1px solid #dbe4f5;border-radius:999px;padding:2px 8px;background:#fff;color:#475467;text-decoration:none}
+.fp-item b{color:#1f2a44}
+.fp-more{color:var(--system-blue);font-weight:600;text-decoration:none}
+.fp-item{align-items:flex-start}
+.fp-time{color:#98a2b3}
+.fp-note{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fp-more:hover{text-decoration:underline}

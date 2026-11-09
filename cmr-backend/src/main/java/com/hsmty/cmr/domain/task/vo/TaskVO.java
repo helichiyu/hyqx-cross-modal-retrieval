@@ -26,6 +26,9 @@ public class TaskVO {
     /** 关联对象业务编号（DS/EVAL/SRH），用于跳转 */
     private String refBizNo;
 
+    /** 关联对象前端路由：build=/library，search=/search/results/{rst}，eval=/evaluation */
+    private String refRoute;
+
     private String status;
 
     private String failType;

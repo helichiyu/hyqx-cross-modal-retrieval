@@ -8,6 +8,7 @@ import com.hsmty.cmr.domain.evaluation.dto.EvalRunDTO;
 import com.hsmty.cmr.domain.evaluation.dto.EvalSetCreateDTO;
 import com.hsmty.cmr.domain.evaluation.dto.LabelDTO;
 import com.hsmty.cmr.domain.evaluation.service.EvalService;
+import com.hsmty.cmr.domain.evaluation.vo.EvalPreviewVO;
 import com.hsmty.cmr.domain.evaluation.vo.EvalRecordVO;
 import com.hsmty.cmr.domain.evaluation.vo.EvalSetVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,6 +48,15 @@ public class EvalController {
                                                  @RequestParam(required = false) String name,
                                                  @RequestParam(required = false) String status) {
         return ApiPageResult.success(evalService.page(query, name, status));
+    }
+
+    @Operation(summary = "创建评测集前候选预览")
+    @PreAuthorize("hasAnyAuthority('cmr:eval:create')")
+    @GetMapping("eval-sets/preview")
+    public ApiResult<EvalPreviewVO> preview(@RequestParam(required = false, defaultValue = "false") boolean zeroResult,
+                                            @RequestParam(required = false, defaultValue = "false") boolean noClick,
+                                            @RequestParam(required = false, defaultValue = "false") boolean reSearch) {
+        return ApiResult.success(evalService.preview(zeroResult, noClick, reSearch));
     }
 
     @Operation(summary = "创建评测集（三类筛选至少一项）")

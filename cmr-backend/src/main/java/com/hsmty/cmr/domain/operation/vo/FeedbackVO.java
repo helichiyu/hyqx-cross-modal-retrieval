@@ -38,13 +38,14 @@ public class FeedbackVO {
     private Long handlerId;
 
     private LocalDateTime createTime;
+    private LocalDateTime updateTime;
 
     public static FeedbackVO from(CmrFeedback e, String searchBizNo) {
         return FeedbackVO.builder()
                 .id(e.getId()).bizNo(e.getBizNo()).searchId(e.getSearchId()).searchBizNo(searchBizNo)
                 .type(e.getType()).description(e.getDescription()).status(e.getStatus())
                 .target(e.getTarget()).resultNote(e.getResultNote()).handlerId(e.getHandlerId())
-                .createTime(e.getCreateTime())
+                .createTime(e.getCreateTime()).updateTime(e.getUpdateTime())
                 .build();
     }
 }

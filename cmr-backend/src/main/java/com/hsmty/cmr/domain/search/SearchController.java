@@ -66,6 +66,13 @@ public class SearchController {
         return ApiResult.success(searchService.resultsOf(resultSetId));
     }
 
+    @Operation(summary = "结果集重跑（新 SRH / 新结果集）")
+    @PreAuthorize("hasAnyAuthority('cmr:search:create')")
+    @PostMapping("results/{resultSetId}/rerun")
+    public ApiResult<SearchResultVO> rerun(@PathVariable String resultSetId) {
+        return ApiResult.success(searchService.rerunByResultSetId(resultSetId));
+    }
+
     @Operation(summary = "结果集采用")
     @PreAuthorize("hasAnyAuthority('cmr:search:adopt')")
     @PostMapping("results/{resultSetId}/adopt")

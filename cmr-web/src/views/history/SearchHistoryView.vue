@@ -5,7 +5,7 @@
       <section class="card hist-card">
         <div class="sec-head"><span class="sec-title">历史记录</span><span class="sec-sub">共 {{total}} 条</span></div>
         <div class="filter-bar">
-          <input v-model="keyword" class="fb-search" type="text" placeholder="关键词筛选历史 query（如：发票 / 作业 / 窗口）…" @keyup.enter="load(1)">
+          <input v-model="keyword" class="fb-search" type="text" placeholder="关键词筛选历史 query（如：发票 / 作业 / 窗口）…" @input="scheduleKeywordSearch" @keyup.enter="loadNow">
           <select v-model="modalityFilter" class="fb-sel" title="模态对筛选" @change="load(1)"><option value="">全部模态对</option><option v-for="item in modalityPairOptions" :key="item.value" :value="item.value">{{item.label}}</option></select>
           <select v-model="adoptFilter" class="fb-sel" title="采用状态筛选" @change="load(1)"><option value="">全部状态</option><option value="adopted">已采用</option><option value="discarded">已废弃</option><option value="unadopted">未采用</option></select>
           <button class="btn-ghost" type="button" @click="resetFilters">清空筛选</button>
@@ -16,7 +16,7 @@
           <div v-else-if="error" class="state-box err"><span class="big">⚠️</span>{{ error }}<div class="acts"><button class="btn-primary" type="button" @click="load(pageNum)">重新载入</button></div></div>
           <div v-else-if="!rows.length" class="state-box"><span class="big">🗂️</span>没有匹配的历史记录，换个关键词试试，或 <router-link class="row-link" to="/search">前往检索台</router-link> 发起新检索。</div>
           <div v-for="row in rows" v-else :key="row.id" class="mt-row">
-            <div class="c">{{ row.createTime }}</div><div class="c">{{ row.queryText || '（文件语义检索）' }}</div><div>{{ modalityPair(row) }}</div><div class="num">{{ row.itemCount ?? 0 }}</div><div><span class="badge" :class="row.adoptStatus==='adopted'?'ok':row.adoptStatus==='discarded'?'fail':'wait'">{{ adoptLabel(row.adoptStatus) }}</span></div><div class="c mono">{{ row.taskId || row.resultSetId }}</div>
+            <div class="c">{{ row.createTime }}</div><div class="c">{{ row.queryText || '（文件语义检索）' }}</div><div>{{ modalityPair(row) }}</div><div class="num">{{ row.itemCount ?? 0 }}</div><div><span class="badge" :class="taskStatusClass(row.taskStatus)">{{ taskStatusLabel(row.taskStatus) }}</span><small class="adopt-hint">{{ adoptLabel(row.adoptStatus) }}</small></div><div class="c mono"><router-link v-if="row.taskId" class="row-link" :to="`/tasks/${row.taskId}`">{{ row.taskBizNo || row.taskId }}</router-link><span v-else>{{ row.resultSetId }}</span></div>
             <div class="act-wrap"><button class="mini-btn" type="button" @click="openDetail(row)">查看</button><button class="mini-btn primary" type="button" @click="rerun(row)">再次执行</button></div>
           </div>
         </div>
@@ -45,8 +45,8 @@
   </div>
 </template>
 <script setup lang="ts">
-import{computed,onMounted,ref}from'vue';import{useRouter}from'vue-router';import{historyDetail,pageHistory,rerunHistory}from'../../api';import type{HistoryDetailVO,HistoryVO}from'../../api/types'
-const router=useRouter();const rows=ref<HistoryVO[]>([]);const total=ref(0);const pageNum=ref(1);const pageSize=10;const keyword=ref('');const modalityFilter=ref('');const adoptFilter=ref('');const loading=ref(false);const error=ref('');const detail=ref<HistoryDetailVO|null>(null);const detailVisible=ref(false);const devOpen=ref(false);const toastVisible=ref(false);const toastMessage=ref('');const toastType=ref<'info'|'ok'|'err'>('info');let toastTimer:ReturnType<typeof setTimeout>|undefined
+import{computed,onBeforeUnmount,onMounted,ref}from'vue';import{useRouter}from'vue-router';import{historyDetail,pageHistory,rerunHistory}from'../../api';import type{HistoryDetailVO,HistoryVO}from'../../api/types'
+const router=useRouter();const rows=ref<HistoryVO[]>([]);const total=ref(0);const pageNum=ref(1);const pageSize=10;const keyword=ref('');const modalityFilter=ref('');const adoptFilter=ref('');const loading=ref(false);const error=ref('');const detail=ref<HistoryDetailVO|null>(null);const detailVisible=ref(false);const devOpen=ref(false);const toastVisible=ref(false);const toastMessage=ref('');const toastType=ref<'info'|'ok'|'err'>('info');let toastTimer:ReturnType<typeof setTimeout>|undefined;let searchTimer:ReturnType<typeof setTimeout>|undefined
 const pageCount=computed(()=>Math.max(1,Math.ceil(total.value/pageSize)))
 const modalityPairOptions=[
   {value:'text:text',label:'文搜文'},{value:'text:image',label:'文搜图'},{value:'text:audio',label:'文搜音'},{value:'text:video',label:'文搜视频'},
@@ -56,8 +56,13 @@ const modalityPairOptions=[
 ]
 function historyFilterParams(){const[modality,targetModality]=modalityFilter.value.split(':');return{modality:modality||'',targetModality:targetModality||''}}
 onMounted(()=>load(1))
+onBeforeUnmount(()=>{clearTimeout(toastTimer);clearTimeout(searchTimer)})
+function scheduleKeywordSearch(){clearTimeout(searchTimer);searchTimer=setTimeout(()=>void load(1),350)}
+function loadNow(){clearTimeout(searchTimer);void load(1)}
+function taskStatusLabel(value?:string|null){return({ready:'就绪',running:'执行中',done:'完成',failed:'失败'}as Record<string,string>)[value||'']||'未知'}
+function taskStatusClass(value?:string|null){return({ready:'run',running:'run',done:'ok',failed:'fail'}as Record<string,string>)[value||'']||'wait'}
 async function load(page:number){pageNum.value=page;loading.value=true;error.value='';try{const data=await pageHistory({pageNum:page,pageSize,keyword:keyword.value,adoptStatus:adoptFilter.value,...historyFilterParams()});rows.value=data.records;total.value=data.total}catch(e){error.value=(e as Error).message}finally{loading.value=false}}
-function resetFilters(){keyword.value='';modalityFilter.value='';adoptFilter.value='';void load(1)}
+function resetFilters(){clearTimeout(searchTimer);keyword.value='';modalityFilter.value='';adoptFilter.value='';void load(1)}
 function modalityLabel(value?:string|null){return({text:'文本',image:'图像',audio:'音频',video:'视频'}as Record<string,string>)[value||'']||value||'—'}
 function adoptLabel(value?:string|null){return({adopted:'已采用',discarded:'已废弃',unadopted:'未采用'}as Record<string,string>)[value||'']||'未采用'}
 function shortModalityLabel(value?:string|null){return({text:'文',image:'图',audio:'音',video:'视频'}as Record<string,string>)[value||'']||value||'—'}
@@ -67,7 +72,7 @@ async function rerun(row:HistoryVO){try{const result=await rerunHistory(row.id);
 function showToast(message:string,type:'info'|'ok'|'err'='info'){toastMessage.value=message;toastType.value=type;toastVisible.value=true;clearTimeout(toastTimer);toastTimer=setTimeout(()=>toastVisible.value=false,2600)}function openDev(){devOpen.value=true}function closeDev(){devOpen.value=false}
 </script>
 <style scoped>
-.hist-card{padding:15px 18px}.detail-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}.detail-grid div{border:1px solid #eef2f8;border-radius:8px;padding:9px;background:#fbfdff}.detail-grid span{display:block;color:#98a2b3;font-size:11px;margin-bottom:3px}.table-empty{text-align:center;color:#98a2b3;padding:24px!important}.ghost-route{text-decoration:none;display:inline-flex;align-items:center}.p9-root .mini-table{--tc:150px minmax(0,1.5fr) 90px 80px 90px 180px 160px}.state-box{grid-column:1/-1}
+.hist-card{padding:15px 18px}.detail-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}.detail-grid div{border:1px solid #eef2f8;border-radius:8px;padding:9px;background:#fbfdff}.detail-grid span{display:block;color:#98a2b3;font-size:11px;margin-bottom:3px}.table-empty{text-align:center;color:#98a2b3;padding:24px!important}.ghost-route{text-decoration:none;display:inline-flex;align-items:center}.p9-root .mini-table{--tc:150px minmax(0,1.5fr) 90px 80px 90px 180px 160px}.state-box{grid-column:1/-1}.adopt-hint{display:block;margin-top:3px;color:#98a2b3;font-size:10.5px;text-align:center}
 :root{
   /* 清爽冷白蓝 token（与 P1 定稿基准一致） */
   --workspace-bg:#f6f9fe;

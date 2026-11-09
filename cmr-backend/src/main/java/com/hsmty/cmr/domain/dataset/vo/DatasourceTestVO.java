@@ -3,6 +3,8 @@ package com.hsmty.cmr.domain.dataset.vo;
 import lombok.Builder;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 /**
  * 数据源连接测试结果
  *
@@ -21,4 +23,6 @@ public class DatasourceTestVO {
     private Long latencyMs;
 
     private String message;
+
+    private LocalDateTime testedAt;
 }

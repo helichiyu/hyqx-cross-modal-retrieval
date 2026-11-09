@@ -12,15 +12,15 @@
               <button class="btn-primary" type="button" @click="openRegister">登记反馈</button>
             </div>
           </div>
-          <div class="cov-sum"><span><b>{{ fbTotal }}</b> 条反馈单</span><span><b>{{ pendingCount }}</b> 条待处理</span><span><b>{{ processingCount }}</b> 条处理中</span><span><b>{{ closedCount }}</b> 条已闭环</span></div>
+          <div class="cov-sum"><span><b>{{ stats.total || fbTotal }}</b> 条反馈单</span><span><b>{{ pendingCount }}</b> 条待处理</span><span><b>{{ processingCount }}</b> 条处理中</span><span><b>{{ closedCount }}</b> 条已闭环</span></div>
           <div class="dtable fb-table"><table class="dt"><thead><tr><th>反馈单</th><th>类型</th><th>去向</th><th>状态</th><th>操作</th></tr></thead><tbody>
             <tr v-if="fbLoading"><td colspan="5" class="table-empty">加载中…</td></tr>
             <tr v-else-if="!feedbacks.length"><td colspan="5" class="table-empty">暂无反馈单</td></tr>
             <tr v-for="row in feedbacks" v-else :key="row.id">
               <td class="tid">{{ row.bizNo }}<div class="fb-note">{{ row.searchBizNo || '—' }} · {{ row.description || '无补充说明' }}</div></td>
-              <td>{{ dictLabel(fbTypeDict,row.type) }}</td><td>{{ dictLabel(fbTargetDict,row.target) }}</td>
+              <td>{{ dictLabel(fbTypeDict,row.type) }}</td><td><router-link v-if="row.target && row.status!=='pending'" class="row-link" :to="feedbackTargetRoute(row.target)">{{ dictLabel(fbTargetDict,row.target) }} →</router-link><template v-else>{{ dictLabel(fbTargetDict,row.target) }}</template></td>
               <td><span class="badge" :class="feedbackStatusClass(row.status)">{{ dictLabel(fbStatusDict,row.status) }}</span></td>
-              <td><button v-if="row.status==='pending'" class="btn-ghost btn-xs" type="button" @click="openProcess(row)">开始处理</button><button v-if="row.status!=='closed'" class="btn-ghost btn-xs" type="button" @click="openClose(row)">闭环</button><button v-if="row.status==='closed'" class="btn-ghost btn-xs" type="button" disabled>已闭环</button></td>
+              <td><button class="btn-ghost btn-xs" type="button" @click="openFeedbackDetail(row)">详情</button><button v-if="row.status==='pending'" class="btn-ghost btn-xs" type="button" @click="openProcess(row)">开始处理</button><router-link v-if="row.status==='processing' && row.target" class="btn-ghost btn-xs" :to="feedbackTargetRoute(row.target)">去处理</router-link><button v-if="row.status!=='closed'" class="btn-ghost btn-xs" type="button" @click="openClose(row)">闭环</button><button v-if="row.status==='closed'" class="btn-ghost btn-xs" type="button" disabled>已闭环</button></td>
             </tr>
           </tbody></table></div>
           <div class="pager-bar"><span class="pager-total">共 {{ fbTotal }} 条</span><button class="pager-btn" type="button" :disabled="fbPage<=1" @click="loadFeedbacks(fbPage-1)">上一页</button><button class="pager-num is-cur" type="button">{{ fbPage }}</button><span class="pager-gap">/</span><span class="pager-total">{{ fbPageCount }}</span><button class="pager-btn" type="button" :disabled="fbPage>=fbPageCount" @click="loadFeedbacks(fbPage+1)">下一页</button></div>
@@ -36,7 +36,7 @@
               <td class="mono">{{ index+1 }}</td><td class="tid">{{ row.word }}</td><td>{{ sceneLabel(row.scene) }}</td>
               <td><span class="rec-state" :class="row.enabled?'on':'off'">{{ row.enabled?'生效·进入联想':'停推·不进入联想' }}</span></td>
               <td><button class="switch" :class="{on:row.enabled}" type="button" role="switch" :aria-checked="row.enabled" @click="toggleWord(row)"><span class="knob"></span></button></td>
-              <td><button class="rec-del" type="button" @click="removeWordRow(row)">删除</button><button class="rec-del" type="button" @click="openWord(row)">编辑</button></td>
+              <td><button class="rec-del" type="button" @click="askDeleteWord(row)">删除</button><button class="rec-del" type="button" @click="openWord(row)">编辑</button></td>
             </tr>
           </tbody></table></div>
         </section>
@@ -50,14 +50,15 @@
         <div class="modal-head"><h3>登记反馈</h3><button class="modal-close" type="button" @click="registerVisible=false">×</button></div>
         <div class="modal-body">
           <div class="mb-tip">先从检索历史选择一条记录，再填写反馈类型与说明。</div>
-          <input v-model="historyKeyword" class="hist-search" type="search" placeholder="搜索查询内容" @input="filterHistories">
+          <input v-model="historyKeyword" class="hist-search" type="search" placeholder="搜索查询内容或检索编号" @input="scheduleHistorySearch" @keyup.enter="loadHistoryNow">
           <div class="pick-list">
-            <label v-for="row in filteredHistories" :key="row.id" class="pick-row" :class="{ 'is-pick': selectedHistory?.id===row.id }">
-              <input v-model="selectedHistoryId" class="pick-ck" type="radio" :value="row.id">
+            <label v-for="row in histories" :key="row.id" class="pick-row" :class="{ 'is-pick': selectedHistory?.id===row.id }">
+              <input v-model="selectedHistoryId" class="pick-ck" type="radio" :value="row.id" @change="selectedHistoryRecord=row">
               <span class="pick-main"><span class="pick-q">{{ row.queryText || '（文件语义检索）' }}</span><span class="pick-sub">{{ row.createTime }} · 结果 {{ row.itemCount ?? 0 }} 条 · {{ row.bizNo }}</span></span>
             </label>
-            <div v-if="!filteredHistories.length" class="pick-empty">没有匹配的检索记录</div>
+            <div v-if="historyLoading" class="pick-empty">检索历史加载中…</div><div v-else-if="!histories.length" class="pick-empty">没有匹配的检索记录</div>
           </div>
+          <div class="pager"><span>共 {{ historyTotal }} 条</span><button class="pg-num" type="button" :disabled="historyPage<=1" @click="loadHistoryCandidates(historyPage-1)">上一页</button><span>{{ historyPage }} / {{ historyPageCount }}</span><button class="pg-num" type="button" :disabled="historyPage>=historyPageCount" @click="loadHistoryCandidates(historyPage+1)">下一页</button></div>
           <div v-if="selectedHistory" class="pick-chosen">已选择 <b>{{ selectedHistory.queryText || selectedHistory.bizNo }}</b></div>
           <div class="fb-step">反馈内容</div>
           <div class="p7-form-grid">
@@ -92,6 +93,25 @@
         <div class="modal-foot"><button class="btn-ghost" type="button" @click="wordVisible=false">取消</button><button class="btn-primary" type="button" :disabled="wordSubmitting" @click="submitWord">保存</button></div>
       </div>
     </div>
+    <!-- 反馈详情 -->
+    <div class="modal-mask" :class="{show:feedbackDetailVisible}" @click.self="feedbackDetailVisible=false">
+      <div class="modal-box" style="width:620px"><div class="modal-head"><h3>反馈详情</h3><button class="modal-close" type="button" @click="feedbackDetailVisible=false">×</button></div>
+        <div v-if="feedbackDetail" class="modal-body">
+          <div class="detail-grid"><div><span>反馈单</span><b>{{ feedbackDetail.bizNo }}</b></div><div><span>关联检索</span><b>{{ feedbackDetail.searchBizNo || feedbackDetail.searchId }}</b></div><div><span>类型</span><b>{{ dictLabel(fbTypeDict,feedbackDetail.type) }}</b></div><div><span>状态</span><b>{{ dictLabel(fbStatusDict,feedbackDetail.status) }}</b></div><div><span>处理去向</span><b>{{ dictLabel(fbTargetDict,feedbackDetail.target) }}</b></div><div><span>创建时间</span><b>{{ feedbackDetail.createTime || '—' }}</b></div><div><span>更新时间</span><b>{{ feedbackDetail.updateTime || '—' }}</b></div></div>
+          <div class="detail-block"><span>反馈说明</span><p>{{ feedbackDetail.description || '无补充说明' }}</p></div><div class="detail-block"><span>处理结果</span><p>{{ feedbackDetail.resultNote || '尚未形成处理结果' }}</p></div>
+        </div>
+        <div class="modal-foot"><button class="btn-ghost" type="button" @click="feedbackDetailVisible=false">关闭</button></div>
+      </div>
+    </div>
+
+    <!-- 删除推荐词确认 -->
+    <div class="modal-mask" :class="{show:deleteWordVisible}" @click.self="deleteWordVisible=false">
+      <div class="modal-box" style="width:420px"><div class="modal-head"><h3>删除推荐词</h3><button class="modal-close" type="button" @click="deleteWordVisible=false">×</button></div>
+        <div class="modal-body"><div class="mb-tip">确认删除推荐词「<b>{{ deleteWordRowData?.word }}</b>」？删除后不再进入检索联想。</div></div>
+        <div class="modal-foot"><button class="btn-ghost" type="button" @click="deleteWordVisible=false">取消</button><button class="btn-primary" type="button" :disabled="deletingWord" @click="confirmDeleteWord">{{ deletingWord?'删除中…':'确认删除' }}</button></div>
+      </div>
+    </div>
+
     <div class="dev-mask" :class="{ open: devOpen }" @click="closeDev"></div>
     <div class="dev-drawer" :class="{ open: devOpen }" role="dialog" aria-modal="true" aria-label="研发需求说明">
       <div class="dev-head">
@@ -190,38 +210,47 @@
 </template>
 
 <script setup lang="ts">
-import {computed,onMounted,reactive,ref} from 'vue'
-import{closeFeedback,createFeedback,createWord,pageFeedbacks,pageHistory,pageWords,processFeedback,removeWord,updateWord}from'../../api'
-import type{DictItem,FeedbackVO,HistoryVO,WordVO}from'../../api/types'
+import {computed,onBeforeUnmount,onMounted,reactive,ref} from 'vue'
+import{closeFeedback,createFeedback,createWord,feedbackStats,pageFeedbacks,pageHistory,pageWords,processFeedback,removeWord,updateWord}from'../../api'
+import type{DictItem,FeedbackStatsVO,FeedbackVO,HistoryVO,WordVO}from'../../api/types'
 import{useDictStore}from'../../stores/dict'
 const dictStore=useDictStore()
 const feedbacks=ref<FeedbackVO[]>([]);const fbLoading=ref(false);const fbTotal=ref(0);const fbPage=ref(1);const fbPageSize=10
 const fbTypeFilter=ref('');const fbStatusFilter=ref('');const fbTypeDict=ref<DictItem[]>([]);const fbStatusDict=ref<DictItem[]>([]);const fbTargetDict=ref<DictItem[]>([])
 const words=ref<WordVO[]>([]);const wordLoading=ref(false);const scenes=ref<DictItem[]>([])
-const histories=ref<HistoryVO[]>([]);const historyKeyword=ref('');const selectedHistoryId=ref<number|null>(null);const selectedHistory=computed(()=>histories.value.find(x=>x.id===selectedHistoryId.value)||null);const filteredHistories=computed(()=>{const k=historyKeyword.value.trim().toLowerCase();return histories.value.filter(x=>!k||(x.queryText||'').toLowerCase().includes(k)||x.bizNo.toLowerCase().includes(k))})
+const histories=ref<HistoryVO[]>([]);const historyKeyword=ref('');const historyPage=ref(1);const historyPageSize=10;const historyTotal=ref(0);const historyLoading=ref(false);const selectedHistoryId=ref<number|null>(null);const selectedHistoryRecord=ref<HistoryVO|null>(null);const selectedHistory=computed(()=>selectedHistoryRecord.value);const historyPageCount=computed(()=>Math.max(1,Math.ceil(historyTotal.value/historyPageSize)))
 const registerVisible=ref(false);const registerSubmitting=ref(false);const registerForm=reactive({type:'inaccurate',description:''})
 const processVisible=ref(false);const processing=ref(false);const processRow=ref<FeedbackVO|null>(null);const processTarget=ref('strategy')
 const closeVisible=ref(false);const closing=ref(false);const closeRow=ref<FeedbackVO|null>(null);const closeNote=ref('')
+const feedbackDetailVisible=ref(false);const feedbackDetail=ref<FeedbackVO|null>(null)
+const deleteWordVisible=ref(false);const deleteWordRowData=ref<WordVO|null>(null);const deletingWord=ref(false)
 const wordVisible=ref(false);const wordSubmitting=ref(false);const wordForm=reactive({id:0,word:'',scene:'all',enabled:true,sort:0})
-const devOpen=ref(false);const toastVisible=ref(false);const toastMessage=ref('');const toastType=ref<'info'|'ok'|'err'>('info');let toastTimer:ReturnType<typeof setTimeout>|undefined
-const fbPageCount=computed(()=>Math.max(1,Math.ceil(fbTotal.value/fbPageSize)));const pendingCount=computed(()=>feedbacks.value.filter(x=>x.status==='pending').length);const processingCount=computed(()=>feedbacks.value.filter(x=>x.status==='processing').length);const closedCount=computed(()=>feedbacks.value.filter(x=>x.status==='closed').length)
-onMounted(async()=>{[fbTypeDict.value,fbStatusDict.value,fbTargetDict.value,scenes.value]=await Promise.all([dictStore.ensure('cmr_feedback_type'),dictStore.ensure('cmr_feedback_status'),dictStore.ensure('cmr_feedback_target'),dictStore.ensure('cmr_scene')]);await Promise.all([loadFeedbacks(1),loadWords()])})
+const devOpen=ref(false);const toastVisible=ref(false);const toastMessage=ref('');const toastType=ref<'info'|'ok'|'err'>('info');let toastTimer:ReturnType<typeof setTimeout>|undefined;let historySearchTimer:ReturnType<typeof setTimeout>|undefined
+const fbPageCount=computed(()=>Math.max(1,Math.ceil(fbTotal.value/fbPageSize)));const stats=ref<FeedbackStatsVO>({total:0,pending:0,processing:0,closed:0});const pendingCount=computed(()=>stats.value.pending);const processingCount=computed(()=>stats.value.processing);const closedCount=computed(()=>stats.value.closed)
+onMounted(async()=>{[fbTypeDict.value,fbStatusDict.value,fbTargetDict.value,scenes.value]=await Promise.all([dictStore.ensure('cmr_feedback_type'),dictStore.ensure('cmr_feedback_status'),dictStore.ensure('cmr_feedback_target'),dictStore.ensure('cmr_scene')]);await Promise.all([loadFeedbacks(1),loadStats(),loadWords()])})
+onBeforeUnmount(()=>{clearTimeout(toastTimer);clearTimeout(historySearchTimer)})
 function dictLabel(dict:DictItem[],alias?:string|null){return dict.find(x=>x.alias===alias)?.label||alias||'—'}
 function sceneLabel(alias:string){return alias==='all'?'全部场景':scenes.value.find(x=>x.alias===alias)?.label||alias}
+function feedbackTargetRoute(target:string){return target==='strategy'?'/strategies':'/library'}
 function feedbackStatusClass(status:string){return({pending:'wait',processing:'run',closed:'ok'}as Record<string,string>)[status]||'gray'}
+async function loadStats(){try{stats.value=await feedbackStats()}catch(e){/* 统计失败时保留当前值，列表错误另行提示 */}}
 async function loadFeedbacks(page:number){fbPage.value=page;fbLoading.value=true;try{const data=await pageFeedbacks({pageNum:page,pageSize:fbPageSize,type:fbTypeFilter.value,status:fbStatusFilter.value});feedbacks.value=data.records;fbTotal.value=data.total}catch(e){showToast((e as Error).message,'err')}finally{fbLoading.value=false}}
-async function openRegister(){registerVisible.value=true;selectedHistoryId.value=null;registerForm.description='';historyKeyword.value='';try{const data=await pageHistory({pageNum:1,pageSize:50});histories.value=data.records}catch(e){showToast((e as Error).message,'err')}}
-function filterHistories(){/* computed handles filtering */}
-async function submitRegister(){if(!selectedHistoryId.value){showToast('请先选择一条检索历史','err');return}registerSubmitting.value=true;try{await createFeedback({searchId:selectedHistoryId.value,type:registerForm.type,description:registerForm.description});registerVisible.value=false;showToast('反馈已登记','ok');await loadFeedbacks(1)}catch(e){showToast((e as Error).message,'err')}finally{registerSubmitting.value=false}}
+async function openRegister(){registerVisible.value=true;selectedHistoryId.value=null;selectedHistoryRecord.value=null;registerForm.description='';historyKeyword.value='';await loadHistoryCandidates(1)}
+async function loadHistoryCandidates(page:number){historyPage.value=page;historyLoading.value=true;try{const data=await pageHistory({pageNum:page,pageSize:historyPageSize,keyword:historyKeyword.value.trim()});histories.value=data.records;historyTotal.value=data.total}catch(e){showToast((e as Error).message,'err')}finally{historyLoading.value=false}}
+function scheduleHistorySearch(){clearTimeout(historySearchTimer);historySearchTimer=setTimeout(()=>void loadHistoryCandidates(1),350)}
+function loadHistoryNow(){clearTimeout(historySearchTimer);void loadHistoryCandidates(1)}
+async function submitRegister(){if(!selectedHistoryId.value){showToast('请先选择一条检索历史','err');return}registerSubmitting.value=true;try{await createFeedback({searchId:selectedHistoryId.value,type:registerForm.type,description:registerForm.description});registerVisible.value=false;showToast('反馈已登记','ok');await Promise.all([loadFeedbacks(1),loadStats()])}catch(e){showToast((e as Error).message,'err')}finally{registerSubmitting.value=false}}
+function openFeedbackDetail(row:FeedbackVO){feedbackDetail.value=row;feedbackDetailVisible.value=true}
 function openProcess(row:FeedbackVO){processRow.value=row;processTarget.value='strategy';processVisible.value=true}
-async function submitProcess(){if(!processRow.value)return;processing.value=true;try{await processFeedback(processRow.value.id,processTarget.value);processVisible.value=false;showToast('已进入处理中','ok');await loadFeedbacks(fbPage.value)}catch(e){showToast((e as Error).message,'err')}finally{processing.value=false}}
+async function submitProcess(){if(!processRow.value)return;processing.value=true;try{await processFeedback(processRow.value.id,processTarget.value);processVisible.value=false;showToast('已进入处理中','ok');await Promise.all([loadFeedbacks(fbPage.value),loadStats()])}catch(e){showToast((e as Error).message,'err')}finally{processing.value=false}}
 function openClose(row:FeedbackVO){closeRow.value=row;closeNote.value='';closeVisible.value=true}
-async function submitClose(){if(!closeRow.value)return;closing.value=true;try{await closeFeedback(closeRow.value.id,closeNote.value||undefined);closeVisible.value=false;showToast('反馈已闭环','ok');await loadFeedbacks(fbPage.value)}catch(e){showToast((e as Error).message,'err')}finally{closing.value=false}}
+async function submitClose(){if(!closeRow.value)return;closing.value=true;try{await closeFeedback(closeRow.value.id,closeNote.value||undefined);closeVisible.value=false;showToast('反馈已闭环','ok');await Promise.all([loadFeedbacks(fbPage.value),loadStats()])}catch(e){showToast((e as Error).message,'err')}finally{closing.value=false}}
 async function loadWords(){wordLoading.value=true;try{const data=await pageWords({pageNum:1,pageSize:100});words.value=data.records}catch(e){showToast((e as Error).message,'err')}finally{wordLoading.value=false}}
 function openWord(row?:WordVO){wordForm.id=row?.id||0;wordForm.word=row?.word||'';wordForm.scene=row?.scene||'all';wordForm.enabled=row?.enabled??true;wordForm.sort=row?.sort||0;wordVisible.value=true}
 async function submitWord(){if(!wordForm.word.trim()){showToast('请填写推荐词','err');return}wordSubmitting.value=true;try{const body={word:wordForm.word.trim(),scene:wordForm.scene,enabled:wordForm.enabled,sort:wordForm.sort};if(wordForm.id)await updateWord(wordForm.id,body);else await createWord(body);wordVisible.value=false;showToast('推荐词已保存','ok');await loadWords()}catch(e){showToast((e as Error).message,'err')}finally{wordSubmitting.value=false}}
 async function toggleWord(row:WordVO){try{await updateWord(row.id,{word:row.word,scene:row.scene,enabled:!row.enabled,sort:row.sort});row.enabled=!row.enabled;showToast(row.enabled?'已启用':'已停用','ok')}catch(e){showToast((e as Error).message,'err')}}
-async function removeWordRow(row:WordVO){try{await removeWord(row.id);showToast('推荐词已删除','ok');await loadWords()}catch(e){showToast((e as Error).message,'err')}}
+function askDeleteWord(row:WordVO){deleteWordRowData.value=row;deleteWordVisible.value=true}
+async function confirmDeleteWord(){if(!deleteWordRowData.value)return;deletingWord.value=true;try{await removeWord(deleteWordRowData.value.id);deleteWordVisible.value=false;showToast('推荐词已删除','ok');await loadWords()}catch(e){showToast((e as Error).message,'err')}finally{deletingWord.value=false}}
 function showToast(message:string,type:'info'|'ok'|'err'='info'){toastMessage.value=message;toastType.value=type;toastVisible.value=true;clearTimeout(toastTimer);toastTimer=setTimeout(()=>toastVisible.value=false,2600)}
 function openDev(){devOpen.value=true}function closeDev(){devOpen.value=false}
 </script>
@@ -390,6 +419,7 @@ a{color:inherit;text-decoration:none}
 .pick-sub{display:block;font-size:11px;color:#9aa6bd;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pick-sub .zero{color:#c99a12;font-weight:700}
 .pick-empty{padding:22px 12px;text-align:center;font-size:12px;color:#9aa6bd;background:#fff}
+.detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.detail-grid div{border:1px solid #e6edf8;border-radius:7px;background:#fbfdff;padding:8px}.detail-grid span,.detail-block span{display:block;color:#98a2b3;font-size:10.5px;margin-bottom:3px}.detail-grid b{font-size:12px;color:#273244}.detail-block{margin-top:10px;border:1px solid #e6edf8;border-radius:7px;padding:9px;background:#fff}.detail-block p{margin:0;color:#344054;font-size:12px;line-height:1.7;white-space:pre-wrap}
 .pager{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:9px}
 .pg-num{
   min-width:27px;height:27px;padding:0 6px;border:1px solid #d7e0f0;border-radius:6px;

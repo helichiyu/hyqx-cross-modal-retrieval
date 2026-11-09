@@ -137,6 +137,14 @@ public class TaskService {
                 .and(CMR_TASK.TYPE.ne(CmrTask.TYPE_SEARCH)));
     }
 
+    public String statusOf(Long taskId) {
+        if (taskId == null) {
+            return null;
+        }
+        CmrTask task = taskMapper.selectOneById(taskId);
+        return task == null ? null : task.getStatus();
+    }
+
     public String bizNoOf(Long taskId) {
         if (taskId == null) {
             return null;

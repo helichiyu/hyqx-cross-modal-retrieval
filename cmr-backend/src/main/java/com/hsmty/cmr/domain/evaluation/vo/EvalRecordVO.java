@@ -29,6 +29,8 @@ public class EvalRecordVO {
 
     private String taskBizNo;
 
+    private String taskStatus;
+
     private String metricsJson;
 
     private String linesJson;

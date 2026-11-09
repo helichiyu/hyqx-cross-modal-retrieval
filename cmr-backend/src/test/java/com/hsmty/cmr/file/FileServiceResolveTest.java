@@ -9,6 +9,8 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -46,6 +48,21 @@ class FileServiceResolveTest {
         assertThat(file.absolute()).isEqualTo(datasetRoot.resolve("a.txt"));
         assertThat(file.logical()).isEqualTo("dataset/a.txt");
         assertThat(file.mime()).contains("text/plain");
+    }
+
+    @Test
+    void 批量打包共享卷文件并处理同名文件() throws IOException {
+        Files.writeString(datasetRoot.resolve("same.txt"), "one");
+        Files.writeString(runtimeRoot.resolve("same.txt"), "two");
+        Path zip = fileService.createZip(java.util.List.of("dataset/a.txt", "dataset/same.txt", "runtime/same.txt"));
+        try (ZipFile zipFile = new ZipFile(zip.toFile())) {
+            assertThat(zipFile.size()).isEqualTo(3);
+            assertThat(zipFile.getEntry("a.txt")).isNotNull();
+            assertThat(zipFile.getEntry("same.txt")).isNotNull();
+            assertThat(zipFile.getEntry("same-2.txt")).isNotNull();
+        } finally {
+            Files.deleteIfExists(zip);
+        }
     }
 
     @Test

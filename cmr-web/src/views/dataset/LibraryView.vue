@@ -38,7 +38,7 @@
                 <i class="dot" :class="sourceDotClass(source)"></i>
                 <span class="sc-name">{{ source.name }}</span>
                 <span class="sc-proto">{{ source.protocol || '自动拉取' }}</span>
-                <b>{{ datasourceCount(source.id) }}</b><span class="sc-unit">个</span>
+                <b>{{ source.datasetCount ?? 0 }}</b><span class="sc-unit">个</span>
                 <span v-if="sourceTestResults[source.id]" class="sc-test">{{ sourceTestText(source) }}</span><button class="btn-link" type="button" :disabled="testingSourceIds.has(source.id)" @click="testSource(source)">{{ testingSourceIds.has(source.id) ? '测试中…' : '测试连接' }}</button>
               </span>
             </span>
@@ -112,10 +112,10 @@
           <div class="field"><label>数据源名称 *</label><input v-model.trim="sourceForm.name" maxlength="40" required placeholder="如：数据集管理-生产池"></div>
           <div class="field"><label>接口地址 *</label><input v-model.trim="sourceForm.endpoint" maxlength="120" required placeholder="https://ds.example/prod"></div>
           <div class="field-grid">
-            <div class="field"><label>认证方式</label><select v-model="sourceForm.authType"><option value="token">Token</option><option value="none">无</option></select></div>
+            <div class="field"><label>认证方式</label><select v-model="sourceForm.authType"><option value="token">Token</option><option value="basic">Basic</option><option value="none">无</option></select></div>
             <div class="field"><label>协议</label><select v-model="sourceForm.protocol"><option value="pull">自动拉取</option><option value="push">推送接收</option></select></div>
           </div>
-          <div class="field"><label>认证信息</label><input v-model="sourceForm.authConfig" maxlength="200" placeholder="Token 或认证参数"></div>
+          <div class="field"><label>认证信息<span v-if="sourceForm.authType !== 'none'"> *</span></label><input v-model.trim="sourceForm.authConfig" maxlength="200" :required="sourceForm.authType !== 'none'" :disabled="sourceForm.authType === 'none'" :placeholder="sourceForm.authType==='basic' ? 'username:password' : sourceForm.authType==='token' ? '访问 Token' : '无需认证'"></div>
           <div class="field"><label>描述</label><input v-model.trim="sourceForm.remark" maxlength="60" placeholder="生产环境数据集管理池"></div>
           <div class="modal-foot">
             <button class="btn-ghost" type="button" @click="sourceVisible = false">取消</button>
@@ -256,6 +256,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   activateIndex,
   adjudicateDataset,
@@ -268,11 +269,13 @@ import {
   testDatasource,
   rebuildDataset,
 } from '../../api'
-import type { DatasetDetailVO, DatasetVO, DatasourceTestVO, DatasourceVO, IndexVO } from '../../api/types'
+import type { DatasetDetailVO, DatasetVO, DatasourceTestVO, DatasourceVO, IndexVO, TaskVO } from '../../api/types'
 import { useDictStore } from '../../stores/dict'
 
+const router = useRouter()
 const dictStore = useDictStore()
 const rows = ref<DatasetVO[]>([])
+const lastBuildTask = ref<TaskVO | null>(null)
 const datasources = ref<DatasourceVO[]>([])
 const detail = ref<DatasetDetailVO | null>(null)
 const currentDataset = ref<DatasetVO | null>(null)
@@ -337,10 +340,6 @@ function datasourceName(id: number | null) {
   return datasources.value.find(item => item.id === id)?.name || '未知数据源'
 }
 
-function datasourceCount(id: number) {
-  return rows.value.filter(item => item.datasourceId === id).length
-}
-
 function statusLabel(status: string) {
   return statusDict.value.find(item => item.alias === status)?.label || status
 }
@@ -369,35 +368,59 @@ async function testSource(source: DatasourceVO) {
   }
 }
 
+function sourceTestResult(source: DatasourceVO): DatasourceTestVO | null {
+  const current = sourceTestResults.value[source.id]
+  if (current) return current
+  if (!source.lastTestTime) return null
+  return {
+    connected: source.lastTestConnected,
+    statusCode: source.lastTestStatusCode,
+    latencyMs: source.lastTestLatencyMs,
+    message: source.lastTestMessage || '最近测试结果未记录说明',
+    testedAt: source.lastTestTime,
+  }
+}
+
 function sourceDotClass(source: DatasourceVO) {
-  const result = sourceTestResults.value[source.id]
-  if (!result) return 'on'
+  const result = sourceTestResult(source)
+  if (!result) return ''
   if (result.connected === null) return 'wait'
   return result.connected ? 'on' : 'off'
 }
 
 function sourceTestText(source: DatasourceVO) {
-  const result = sourceTestResults.value[source.id]
-  if (!result) return ''
+  const result = sourceTestResult(source)
+  if (!result) return '未测试'
   if (result.connected === null) return '待推送验证'
   return result.connected ? '连接成功' : '连接失败'
 }
 
-function sourceTestMessage(source: DatasourceVO, result: DatasourceTestVO) {
+function sourceTestMessage(source: DatasourceVO, result?: DatasourceTestVO | null) {
+  const current = result || sourceTestResult(source)
+  if (!current) return `${source.name} 尚未测试`
   const parts = [`${source.name} ${sourceTestText(source)}`]
-  if (result.statusCode != null) parts.push(`HTTP ${result.statusCode}`)
-  if (result.latencyMs != null) parts.push(`${result.latencyMs}ms`)
-  parts.push(result.message)
+  if (current.statusCode != null) parts.push(`HTTP ${current.statusCode}`)
+  if (current.latencyMs != null) parts.push(`${current.latencyMs}ms`)
+  if (current.testedAt) parts.push(new Date(current.testedAt).toLocaleString())
+  parts.push(current.message)
   return parts.join(' · ')
 }
 
 function sourceTitle(source: DatasourceVO) {
   const base = `${source.endpoint} · ${source.protocol || '自动拉取'} · ${source.authType || 'none'}`
-  const result = sourceTestResults.value[source.id]
+  const result = sourceTestResult(source)
   return result ? `${base} · ${sourceTestMessage(source, result)}` : base
 }
 
 async function submitSource() {
+  if (sourceForm.authType !== 'none' && !sourceForm.authConfig) {
+    showToast('请填写认证信息', 'err')
+    return
+  }
+  if (sourceForm.authType === 'basic' && !sourceForm.authConfig.includes(':')) {
+    showToast('Basic 认证格式必须为 username:password', 'err')
+    return
+  }
   sourceSubmitting.value = true
   try {
     await createDatasource({ ...sourceForm })
@@ -426,7 +449,9 @@ async function submitDataset() {
     datasetVisible.value = false
     datasetForm.name = ''; datasetForm.version = ''; datasetForm.datasetPath = ''; datasetFile.value = undefined
     await reload(false)
-    showToast(`建库任务已启动：${created.bizNo}`, 'ok')
+    const detail = await datasetDetail(created.id)
+    lastBuildTask.value = detail.tasks.find(task => task.type === 'build') || null
+    showToast(lastBuildTask.value ? `建库任务已启动：${lastBuildTask.value.bizNo}` : `数据集已登记：${created.bizNo}`, 'ok')
   } catch (error) { showToast((error as Error).message, 'err') }
   finally { datasetSubmitting.value = false }
 }
@@ -449,8 +474,11 @@ async function confirmProductionRow(row: DatasetVO) {
 }
 
 async function rebuild(row: DatasetVO) {
-  try { const task = await rebuildDataset(row.id); showToast(`重建任务已启动：${task.bizNo}`, 'ok') }
-  catch (error) { showToast((error as Error).message, 'err') }
+  try {
+    const task = await rebuildDataset(row.id)
+    lastBuildTask.value = task
+    showToast(`重建任务已启动：${task.bizNo}`, 'ok')
+  } catch (error) { showToast((error as Error).message, 'err') }
 }
 
 async function openDetail(row: DatasetVO) {
@@ -583,6 +611,8 @@ button{font-family:inherit;cursor:pointer}
 .btn-link{border:0;border-left:1px solid #e6edf8;background:transparent;color:var(--system-blue);font-size:11px;font-weight:600;padding:0 6px;margin-left:2px;white-space:nowrap}
 .btn-link:hover{text-decoration:underline}
 .btn-link:disabled{color:#9aa6bd;cursor:default}
+.task-entry{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:11.5px;color:#667085}
+.task-entry b{color:#1f2a44}
 
 /* 状态流转说明条 */
 .flowline{display:flex;flex-wrap:wrap;align-items:center;gap:4px 5px;border:1px dashed #e2e9f5;border-radius:6px;background:#f8fbff;padding:5px 9px;font-size:11px;color:#8a96ad;line-height:1.6}

@@ -4,6 +4,7 @@ import com.hsmty.cmr.common.api.PageQuery;
 import com.hsmty.cmr.common.api.PageResult;
 import com.hsmty.cmr.common.exception.BizException;
 import com.hsmty.cmr.common.id.BizNoGenerator;
+import com.hsmty.cmr.config.CmrProperties;
 import com.hsmty.cmr.common.id.SnowflakeIdWorker;
 import com.hsmty.cmr.common.util.JsonUtils;
 import com.hsmty.cmr.domain.dataset.entity.CmrIndex;
@@ -50,6 +51,7 @@ public class StrategyService {
     private final IndexMapper indexMapper;
     private final SnowflakeIdWorker idWorker;
     private final BizNoGenerator bizNoGenerator;
+    private final CmrProperties properties;
 
     public PageResult<StrategyVO> page(PageQuery query, String scene, String status) {
         QueryWrapper qw = QueryWrapper.create().from(CMR_STRATEGY);
@@ -64,6 +66,47 @@ public class StrategyService {
                 Math.max(query.getPageNum(), 1), Math.max(query.getPageSize(), 1), qw);
         return PageResult.of(page.getRecords().stream().map(this::toVO).toList(),
                 page.getTotalRow(), query.getPageNum(), query.getPageSize());
+    }
+
+    /** 向量模型选项：白名单优先；未配置时回退展示当前索引模型 */
+    public Map<String, Object> modelOptions() {
+        String activeModel = activeModelVersion();
+        List<String> whitelist = properties.getModel().getWhitelist();
+        List<String> options = whitelist == null ? List.of() : whitelist;
+        if ((options.isEmpty()) && activeModel != null && !activeModel.isBlank()) {
+            options = List.of(activeModel);
+        }
+        boolean whitelistEnabled = whitelist != null && !whitelist.isEmpty();
+        boolean activeAllowed = activeModel != null && !activeModel.isBlank()
+                && (options.isEmpty() || options.contains(activeModel));
+        return Map.of(
+                "models", options,
+                "activeModel", activeModel == null ? "" : activeModel,
+                "whitelistEnabled", whitelistEnabled,
+                "activeAllowed", activeAllowed);
+    }
+
+    /** 策略一致性检查：激活索引模型、生效参数与草稿参数完整性 */
+    public Map<String, Object> consistency(Long id) {
+        CmrStrategy strategy = requireStrategy(id);
+        CmrStrategyVersion current = versionMapper.selectOneByQuery(QueryWrapper.create()
+                .where(CMR_STRATEGY_VERSION.STRATEGY_ID.eq(id)
+                        .and(CMR_STRATEGY_VERSION.VERSION_NO.eq(strategy.getCurrentVersion()))));
+        CmrStrategyVersion draft = draftOf(id);
+        Map<String, Object> model = modelOptions();
+        boolean currentValid = current == null || readWeights(current).values().stream().mapToInt(Integer::intValue).sum() == 100;
+        boolean draftValid = draft == null || readWeights(draft).values().stream().mapToInt(Integer::intValue).sum() == 100;
+        boolean topKValid = (current == null || current.getTopK() != null && current.getTopK() >= 1 && current.getTopK() <= 100)
+                && (draft == null || draft.getTopK() != null && draft.getTopK() >= 1 && draft.getTopK() <= 100);
+        boolean modelAllowed = Boolean.TRUE.equals(model.get("activeAllowed"));
+        return Map.of(
+                "passed", currentValid && draftValid && topKValid && modelAllowed,
+                "model", model,
+                "currentValid", currentValid,
+                "draftValid", draftValid,
+                "topKValid", topKValid,
+                "currentVersion", strategy.getCurrentVersion() == null ? 0 : strategy.getCurrentVersion(),
+                "hasDraft", draft != null);
     }
 
     /** 新建：存草稿（version_no=0 占位，发布时生成 v1） */
