@@ -267,15 +267,18 @@ public class SearchService {
         resultItemMapper.update(item);
     }
 
-    /** 检索历史分页（P9：query 模糊/模态/采用状态/零结果） */
+    /** 检索历史分页（P9：query 模糊/查询与目标模态/采用状态/零结果） */
     public PageResult<HistoryVO> page(PageQuery query, String keyword, String modality,
-                                      String adoptStatus, Boolean zeroResult) {
+                                      String targetModality, String adoptStatus, Boolean zeroResult) {
         QueryWrapper qw = QueryWrapper.create().from(CMR_SEARCH_HISTORY);
         if (!blank(keyword)) {
             qw.where(CMR_SEARCH_HISTORY.QUERY_TEXT.like(keyword));
         }
         if (!blank(modality)) {
             qw.where(CMR_SEARCH_HISTORY.QUERY_MODALITY.eq(modality));
+        }
+        if (!blank(targetModality)) {
+            qw.where(CMR_SEARCH_HISTORY.TARGET_MODALITY.eq(targetModality));
         }
         if (!blank(adoptStatus)) {
             qw.where(CMR_SEARCH_HISTORY.ADOPT_STATUS.eq(adoptStatus));

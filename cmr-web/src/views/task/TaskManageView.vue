@@ -40,20 +40,27 @@
         </section>
 
         <section class="panel" aria-label="失败任务">
-          <div class="panel-head"><div class="sec-head"><span class="sec-title">失败任务</span></div><span class="hint">{{ failedRows.length }} 条</span></div>
+          <div class="panel-head"><div class="sec-head"><span class="sec-title">失败任务</span></div><span class="hint">共 {{ failedTotal }} 条</span></div>
           <p class="auto-note">失败由系统自动处理：引擎侧失败自动重试，数据侧失败自动转隔离；此处只展示处理结果。</p>
           <div class="dtable">
             <table class="dt">
-              <thead><tr><th>任务ID</th><th>关联对象</th><th>失败原因</th><th>失败类型</th><th>系统处理</th><th>状态</th></tr></thead>
+              <thead><tr><th>任务ID</th><th>关联对象</th><th>失败原因</th><th>失败类型</th><th>系统处理</th><th>状态</th><th>操作</th></tr></thead>
               <tbody>
-                <tr v-if="!failedRows.length"><td colspan="6" class="table-empty">暂无失败任务</td></tr>
+                <tr v-if="failedLoading"><td colspan="7" class="table-empty">加载中…</td></tr>
+                <tr v-else-if="!failedRows.length"><td colspan="7" class="table-empty">暂无失败任务</td></tr>
                 <tr v-for="task in failedRows" :key="task.id">
                   <td><span class="mono">{{ task.bizNo }}</span></td><td><span class="mono">{{ task.refBizNo || '—' }}</span></td>
                   <td>{{ task.errorMsg || '—' }}</td><td>{{ task.failType === 'engine' ? '引擎侧' : '数据侧' }}</td>
                   <td>{{ task.failDisposal || '待系统处理' }}</td><td><span class="badge fail">失败</span></td>
+                  <td><router-link class="link" :to="`/tasks/${task.id}`">详情</router-link></td>
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div class="pager-bar">
+            <button class="page-btn" type="button" :disabled="failedPage<=1" @click="changeFailedPage(failedPage-1)">上一页</button>
+            <span>第 {{ failedPage }} 页 / 共 {{ failedPageCount }} 页</span>
+            <button class="page-btn" type="button" :disabled="failedPage>=failedPageCount" @click="changeFailedPage(failedPage+1)">下一页</button>
           </div>
         </section>
       </div>
@@ -106,14 +113,6 @@
   </div>
 </div>
 
-<!-- 演示角色切换（左下角） -->
-<div class="demo-float" id="roleFloat" aria-label="演示角色切换">
-  <span class="df-tag">角色</span>
-  <button type="button" class="demo-btn active" id="roleAdmin" onclick="setRole('admin')">管理员</button>
-  <button type="button" class="demo-btn" id="roleGuest" onclick="setRole('guest')">只读</button>
-</div>
-
-<div class="toast" id="toast"></div>
   </div>
 </template>
 
@@ -127,10 +126,10 @@ const dictStore=useDictStore()
 const rows=ref<TaskVO[]>([]); const total=ref(0); const pageNum=ref(1); const pageSize=ref(10)
 const keyword=ref(''); const statusFilter=ref(''); const loading=ref(false)
 const statusDict=ref<{alias:string;label:string}[]>([]); const typeDict=ref<{alias:string;label:string}[]>([]); const disposalDict=ref<{alias:string;label:string}[]>([])
-const timer=ref(false)
+const failedRows=ref<TaskVO[]>([]); const failedTotal=ref(0); const failedPage=ref(1); const failedPageSize=ref(10); const failedLoading=ref(false)
 const states=[{key:'',label:'全部'},{key:'ready',label:'就绪'},{key:'running',label:'执行中'},{key:'done',label:'完成'},{key:'failed',label:'失败'}]
 const pageCount=computed(()=>Math.max(1,Math.ceil(total.value/pageSize.value)))
-const failedRows=computed(()=>rows.value.filter(item=>item.status==='failed'))
+const failedPageCount=computed(()=>Math.max(1,Math.ceil(failedTotal.value/failedPageSize.value)))
 const devOpen=ref(false); const toastVisible=ref(false); const toastMessage=ref(''); const toastType=ref<'info'|'ok'|'err'>('info')
 let toastTimer:ReturnType<typeof setTimeout>|undefined
 
@@ -142,15 +141,28 @@ onMounted(async()=>{
 })
 onBeforeUnmount(()=>clearTimeout(toastTimer))
 async function reload(showMessage=true){
-  loading.value=true
+  loading.value=true; failedLoading.value=true
   try{
-    const page=await pageTasks({pageNum:pageNum.value,pageSize:pageSize.value,status:statusFilter.value,keyword:keyword.value})
+    const [page]=await Promise.all([
+      pageTasks({pageNum:pageNum.value,pageSize:pageSize.value,status:statusFilter.value,keyword:keyword.value}),
+      loadFailedTasks(false),
+    ])
     rows.value=page.records; total.value=page.total
     if(showMessage)showToast('任务列表已刷新','ok')
-  }catch(e){showToast((e as Error).message,'err')}finally{loading.value=false}
+  }catch(e){showToast((e as Error).message,'err')}finally{loading.value=false;failedLoading.value=false}
+}
+async function loadFailedTasks(showLoading=true){
+  if(showLoading)failedLoading.value=true
+  try{
+    const page=await pageTasks({pageNum:failedPage.value,pageSize:failedPageSize.value,status:'failed'})
+    failedRows.value=page.records; failedTotal.value=page.total
+  }finally{
+    if(showLoading)failedLoading.value=false
+  }
 }
 function selectState(state:string){statusFilter.value=state;pageNum.value=1;void reload(false)}
 function changePage(page:number){pageNum.value=page;void reload(false)}
+function changeFailedPage(page:number){failedPage.value=page;void loadFailedTasks().catch(e=>showToast((e as Error).message,'err'))}
 function statusLabel(status:string){return statusDict.value.find(item=>item.alias===status)?.label||status}
 function typeLabel(type:string){return typeDict.value.find(item=>item.alias===type)?.label||type}
 function statusClass(status:string){return({ready:'run',running:'run',done:'ok',failed:'fail'}as Record<string,string>)[status]||'run'}
@@ -391,13 +403,6 @@ table.dt td.tq{max-width:230px;overflow:hidden;text-overflow:ellipsis;white-spac
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.err{background:#c0392b}
 .toast.ok{background:#1e8e4a}
-
-/* 演示角色切换（左下角） */
-.demo-float{position:fixed;left:24px;bottom:24px;z-index:90;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #d5dfef;border-radius:8px;padding:6px 10px;box-shadow:0 2px 8px rgba(31,41,55,.08);flex-wrap:wrap}
-.demo-float .df-tag{font-size:10px;font-weight:700;color:#8c98ad;border-radius:3px;padding:2px 6px;letter-spacing:1px;background:#f2f4f8}
-.demo-float .demo-btn{height:24px;padding:0 10px;border:1px solid #d7e0f0;border-radius:12px;background:#fff;color:#667085;font-size:11px;cursor:pointer}
-.demo-float .demo-btn:hover{border-color:var(--system-blue);color:var(--system-blue)}
-.demo-float .demo-btn.active{background:var(--system-blue);border-color:var(--system-blue);color:#fff;font-weight:600}
 
 @media (max-width:1100px){
   .content{padding:14px 14px 28px}

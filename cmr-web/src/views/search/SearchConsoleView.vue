@@ -238,11 +238,12 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { executeSearch, pageHistory, suggestWords, understand, uploadFile } from '../../api'
 import { useDictStore } from '../../stores/dict'
 import type { DictItem } from '../../api/types'
 
+const route = useRoute()
 const router = useRouter()
 const dictStore = useDictStore()
 
@@ -332,6 +333,10 @@ let modeTimer: ReturnType<typeof setTimeout> | undefined
 let toastTimer: ReturnType<typeof setTimeout> | undefined
 
 onMounted(async () => {
+  const routeQuery = route.query.q
+  if (typeof routeQuery === 'string' && routeQuery.trim()) {
+    query.value = routeQuery.trim().slice(0, 512)
+  }
   scenes.value = await dictStore.ensure('cmr_scene')
   if (!scenes.value.some(item => item.alias === scene.value) && scenes.value[0]) {
     scene.value = scenes.value[0].alias
@@ -342,6 +347,9 @@ onMounted(async () => {
     historySuggestions.value = [...new Set(page.records.map(item => item.queryText || '').filter(Boolean))].slice(0, 3)
   } catch {
     historySuggestions.value = []
+  }
+  if (query.value.trim().length >= 4) {
+    onQueryInput()
   }
   window.addEventListener('keydown', onKeydown)
 })

@@ -223,7 +223,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import {
   createDictItem,
   createStrategy,
@@ -298,6 +298,12 @@ const editorStatus = computed(() => editorDetail.value?.strategy.status === 'act
 const editorModelVersion = computed(() => editorDetail.value?.modelVersion || '')
 const editorReadonlyPreset = computed(() => editorDetail.value?.strategy.name?.includes('系统默认') || false)
 const relatedStrategies = computed(() => selectedScene.value ? strategies.value.filter(item => item.scene === selectedScene.value?.alias) : [])
+watch(activeTab, tab => {
+  if (tab === 'ops' && opsStrategyId.value && !opsDetail.value) {
+    void loadOpsDetail()
+  }
+})
+
 const opsDiffRows = computed(() => {
   if (!opsDetail.value?.draft) return []
   const current = opsDetail.value.current

@@ -6,7 +6,7 @@
         <div class="sec-head"><span class="sec-title">历史记录</span><span class="sec-sub">共 {{total}} 条</span></div>
         <div class="filter-bar">
           <input v-model="keyword" class="fb-search" type="text" placeholder="关键词筛选历史 query（如：发票 / 作业 / 窗口）…" @keyup.enter="load(1)">
-          <select v-model="modalityFilter" class="fb-sel" title="模态筛选" @change="load(1)"><option value="">全部模态</option><option value="text">文本</option><option value="image">图像</option><option value="audio">音频</option><option value="video">视频</option></select>
+          <select v-model="modalityFilter" class="fb-sel" title="模态对筛选" @change="load(1)"><option value="">全部模态对</option><option v-for="item in modalityPairOptions" :key="item.value" :value="item.value">{{item.label}}</option></select>
           <select v-model="adoptFilter" class="fb-sel" title="采用状态筛选" @change="load(1)"><option value="">全部状态</option><option value="adopted">已采用</option><option value="discarded">已废弃</option><option value="unadopted">未采用</option></select>
           <button class="btn-ghost" type="button" @click="resetFilters">清空筛选</button>
         </div>
@@ -48,8 +48,15 @@
 import{computed,onMounted,ref}from'vue';import{useRouter}from'vue-router';import{historyDetail,pageHistory,rerunHistory}from'../../api';import type{HistoryDetailVO,HistoryVO}from'../../api/types'
 const router=useRouter();const rows=ref<HistoryVO[]>([]);const total=ref(0);const pageNum=ref(1);const pageSize=10;const keyword=ref('');const modalityFilter=ref('');const adoptFilter=ref('');const loading=ref(false);const error=ref('');const detail=ref<HistoryDetailVO|null>(null);const detailVisible=ref(false);const devOpen=ref(false);const toastVisible=ref(false);const toastMessage=ref('');const toastType=ref<'info'|'ok'|'err'>('info');let toastTimer:ReturnType<typeof setTimeout>|undefined
 const pageCount=computed(()=>Math.max(1,Math.ceil(total.value/pageSize)))
+const modalityPairOptions=[
+  {value:'text:text',label:'文搜文'},{value:'text:image',label:'文搜图'},{value:'text:audio',label:'文搜音'},{value:'text:video',label:'文搜视频'},
+  {value:'image:text',label:'图搜文'},{value:'image:image',label:'图搜图'},{value:'image:audio',label:'图搜音'},{value:'image:video',label:'图搜视频'},
+  {value:'audio:text',label:'音搜文'},{value:'audio:image',label:'音搜图'},{value:'audio:audio',label:'音搜音'},{value:'audio:video',label:'音搜视频'},
+  {value:'video:text',label:'视频搜文'},{value:'video:image',label:'视频搜图'},{value:'video:audio',label:'视频搜音'},{value:'video:video',label:'视频搜视频'},
+]
+function historyFilterParams(){const[modality,targetModality]=modalityFilter.value.split(':');return{modality:modality||'',targetModality:targetModality||''}}
 onMounted(()=>load(1))
-async function load(page:number){pageNum.value=page;loading.value=true;error.value='';try{const data=await pageHistory({pageNum:page,pageSize,keyword:keyword.value});rows.value=data.records.filter(x=>(!modalityFilter.value||x.queryModality===modalityFilter.value)&&(!adoptFilter.value||x.adoptStatus===adoptFilter.value));total.value=data.total}catch(e){error.value=(e as Error).message}finally{loading.value=false}}
+async function load(page:number){pageNum.value=page;loading.value=true;error.value='';try{const data=await pageHistory({pageNum:page,pageSize,keyword:keyword.value,adoptStatus:adoptFilter.value,...historyFilterParams()});rows.value=data.records;total.value=data.total}catch(e){error.value=(e as Error).message}finally{loading.value=false}}
 function resetFilters(){keyword.value='';modalityFilter.value='';adoptFilter.value='';void load(1)}
 function modalityLabel(value?:string|null){return({text:'文本',image:'图像',audio:'音频',video:'视频'}as Record<string,string>)[value||'']||value||'—'}
 function adoptLabel(value?:string|null){return({adopted:'已采用',discarded:'已废弃',unadopted:'未采用'}as Record<string,string>)[value||'']||'未采用'}
