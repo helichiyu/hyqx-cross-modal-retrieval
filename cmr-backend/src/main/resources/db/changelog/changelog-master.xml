@@ -7,4 +7,5 @@
     <include file="db/changelog/002_cmr_dict_init.xml"/>
     <include file="db/changelog/003_cmr_search_target_modality.xml"/>
     <include file="db/changelog/004_cmr_datasource_test_result.xml"/>
+    <include file="db/changelog/005_cmr_search_log_id_snapshot.xml"/>
 </databaseChangeLog>

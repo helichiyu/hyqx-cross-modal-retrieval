@@ -21,6 +21,9 @@ public class ResultItemVO {
 
     private String itemId;
 
+    /** 实时回查的展示名；条目缺失时为“已删除” */
+    private String name;
+
     private String modality;
 
     private BigDecimal score;
@@ -32,4 +35,7 @@ public class ResultItemVO {
     private String text;
 
     private Boolean clicked;
+
+    /** true=检索时索引元数据或条目已不存在 */
+    private Boolean deleted;
 }

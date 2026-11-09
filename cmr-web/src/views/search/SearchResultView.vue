@@ -108,17 +108,17 @@
                     v-for="item in filteredItems"
                     :key="item.id"
                     class="rcard"
-                    :class="{ checked: selectedIds.has(item.id), clicked: clickedIds.has(item.id) }"
+                    :class="{ checked: selectedIds.has(item.id), clicked: clickedIds.has(item.id), deleted: item.deleted }"
                     @click="onCardClick(item, $event)"
                   >
-                    <input type="checkbox" :checked="selectedIds.has(item.id)" aria-label="选择{{ item.itemId }}" @click.stop @change="toggleSelect(item, $event)">
+                    <input type="checkbox" :checked="selectedIds.has(item.id)" :disabled="item.deleted" aria-label="选择{{ item.name || item.itemId }}" @click.stop @change="toggleSelect(item, $event)">
                     <div class="rc-info">
-                      <div class="rc-line1"><b>{{ item.itemId }}</b><span class="badge" :class="`q${qualityLevel(item.score)}`">质量 {{ qualityText(item.score) }}</span></div>
+                      <div class="rc-line1"><b>{{ item.name || item.itemId }}</b><span v-if="item.deleted" class="badge deleted-badge">已删除</span><span v-else class="badge" :class="`q${qualityLevel(item.score)}`">质量 {{ qualityText(item.score) }}</span></div>
                       <div class="rc-src">来源：{{ itemSource(item) }} · {{ itemExtra(item) }}</div>
                       <div v-if="heatMap" class="rc-align">
                         对齐分 <i class="al-chip" :style="{ background: heatColor(item.score) }">语 {{ item.score.toFixed(2) }}</i>
                       </div>
-                      <div v-if="expandedId === item.id" class="rc-media">
+                      <div v-if="expandedId === item.id && !item.deleted" class="rc-media">
                         <MediaPreview :path="item.sourceFile" />
                       </div>
                     </div>
@@ -388,7 +388,8 @@ async function load() {
     void loadFeedbackProgress()
     actualView.value = items.value.length ? 'result' : 'empty'
   } catch (error) {
-    errorMessage.value = (error as Error).message || '结果集加载失败'
+    const message = (error as Error).message || '结果集加载失败'
+    errorMessage.value = message.includes('结果集不存在') ? '结果已过期清理，请重新检索' : message
     actualView.value = 'error'
   }
 }
@@ -488,7 +489,7 @@ function clearSelection() {
 }
 
 async function onCardClick(item: ResultItemVO, event: MouseEvent) {
-  if ((event.target as HTMLElement).tagName === 'INPUT') return
+  if (item.deleted || (event.target as HTMLElement).tagName === 'INPUT') return
   try {
     await clickResult(resultSetId.value, item.rank)
     const next = new Set(clickedIds.value)
@@ -511,7 +512,7 @@ async function setAdopted(adopted: boolean) {
 }
 
 async function downloadSelected() {
-  const selected = items.value.filter(item => selectedIds.value.has(item.id) && item.sourceFile)
+  const selected = items.value.filter(item => !item.deleted && selectedIds.value.has(item.id) && item.sourceFile)
   if (!selected.length) {
     showToast('所选条目没有可回源文件', 'err')
     return
@@ -1176,4 +1177,6 @@ button{font-family:inherit;cursor:pointer}
 .fp-item{align-items:flex-start}
 .fp-time{color:#98a2b3}
 .fp-note{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rcard.deleted{background:#fafafa;border-style:dashed}
+.deleted-badge{background:#f2f4f8;color:#7a8493}
 .fp-more:hover{text-decoration:underline}

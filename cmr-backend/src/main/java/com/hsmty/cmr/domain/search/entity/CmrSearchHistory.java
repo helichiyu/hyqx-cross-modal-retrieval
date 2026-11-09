@@ -28,6 +28,9 @@ public class CmrSearchHistory extends BaseEntity {
 
     private Long taskId;
 
+    /** 检索时激活索引（名称/预览回查锚点） */
+    private Long indexId;
+
     private String queryText;
 
     /** 查询文件逻辑路径（可 null） */
