@@ -273,7 +273,8 @@ public class SearchService {
 
     /** 检索历史分页（P9：query 模糊/查询与目标模态/采用状态/零结果） */
     public PageResult<HistoryVO> page(PageQuery query, String keyword, String modality,
-                                      String targetModality, String adoptStatus, Boolean zeroResult) {
+                                      String targetModality, String adoptStatus, String taskStatus,
+                                      Boolean zeroResult) {
         QueryWrapper qw = QueryWrapper.create().from(CMR_SEARCH_HISTORY);
         if (!blank(keyword)) {
             qw.where(CMR_SEARCH_HISTORY.QUERY_TEXT.like(keyword));
@@ -286,6 +287,9 @@ public class SearchService {
         }
         if (!blank(adoptStatus)) {
             qw.where(CMR_SEARCH_HISTORY.ADOPT_STATUS.eq(adoptStatus));
+        }
+        if (!blank(taskStatus)) {
+            qw.where("task_id IN (SELECT id FROM cmr_task WHERE status = ? AND del_flag = 'F')", taskStatus);
         }
         if (Boolean.TRUE.equals(zeroResult)) {
             qw.where(CMR_SEARCH_HISTORY.ITEM_COUNT.eq(0));

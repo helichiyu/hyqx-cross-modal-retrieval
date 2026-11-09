@@ -41,8 +41,10 @@ public class SearchHistoryController {
                                                  @RequestParam(required = false) String modality,
                                                  @RequestParam(required = false) String targetModality,
                                                  @RequestParam(required = false) String adoptStatus,
+                                                 @RequestParam(required = false) String taskStatus,
                                                  @RequestParam(required = false) Boolean zeroResult) {
-        return ApiPageResult.success(searchService.page(query, keyword, modality, targetModality, adoptStatus, zeroResult));
+        return ApiPageResult.success(searchService.page(query, keyword, modality, targetModality,
+                adoptStatus, taskStatus, zeroResult));
     }
 
     @Operation(summary = "检索历史详情（含结果集条目）")
