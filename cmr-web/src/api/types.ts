@@ -54,6 +54,13 @@ export interface HistoryVO {
   elapsedMs: number | null
   adoptStatus: string | null
   userId: Id | null
+  operatorId: Id | null
+  operatorName: string | null
+  strategyNo: string | null
+  strategyVersion: number | null
+  threshold: number | null
+  sealed: string | null
+  replayOfTaskNo: string | null
   createTime: string | null
 }
 
@@ -64,6 +71,14 @@ export interface ResultItemVO {
   name: string | null
   modality: string
   score: number
+  /** 来源名（摘要展示） */
+  source: string | null
+  /** 对齐分 */
+  alignScore: number | null
+  /** 当前用户赞踩：up/down/null */
+  vote: 'up' | 'down' | null
+  /** 当前用户是否收藏 */
+  favorited: boolean | null
   sourceFile: string | null
   locatorJson: string | null
   text: string | null
@@ -177,6 +192,14 @@ export interface DatasourceVO {
   authType: string | null
   remark: string | null
   datasetCount: number
+  /** unconnected/connected/failed */
+  connectStatus: 'unconnected' | 'connected' | 'failed' | string
+  /** 上游 4 项必填是否齐全 */
+  requiredOk: boolean
+  upstreamDatasetId: string | null
+  vectorizedCount: number
+  totalCount: number
+  lastSyncTime: string | null
   lastTestConnected: boolean | null
   lastTestStatusCode: number | null
   lastTestLatencyMs: number | null
@@ -199,7 +222,13 @@ export interface StrategyVO {
   name: string
   scene: string
   status: string
+  /** 系统预置（兜底），不可下线 */
+  preset: boolean
+  offlineReason: string | null
+  offlineTime: string | null
   currentVersion: number | null
+  /** 参数摘要，如 “阈值 0.60 · 重排开” */
+  paramSummary: string | null
   remark: string | null
   createTime: string | null
   updateTime: string | null
@@ -212,6 +241,7 @@ export interface StrategyVersionVO {
   weightsJson: string
   rerank: boolean
   topK: number
+  threshold: number | null
   status: string
   source: string | null
   publishedTime: string | null
@@ -281,19 +311,35 @@ export interface EvalRecordVO {
 export interface FeedbackStatsVO {
   total: number
   pending: number
-  processing: number
-  closed: number
+  handled: number
+  blocked: number
+  strategy: number
+  supplement: number
+}
+
+export interface MismatchItem {
+  itemId: string
+  name: string | null
+  source: string | null
 }
 
 export interface FeedbackVO {
   id: Id
   bizNo: string
-  searchId: Id
-  searchBizNo: string | null
-  type: string
+  searchId: Id | null
+  sourceTaskNo: string | null
+  sourceQuery: string | null
+  /** mismatch/zero */
+  entryType: string
+  items: MismatchItem[]
   description: string | null
+  /** pending/handled */
   status: string
-  target: string | null
+  /** data_bad/match_bad/need_data */
+  judgment: string | null
+  /** block/strategy/supplement */
+  disposition: string | null
+  blocked: boolean
   resultNote: string | null
   handlerId: Id | null
   createTime: string
@@ -307,4 +353,134 @@ export interface WordVO {
   scene: string
   enabled: boolean
   sort: number
+}
+
+// ---------- 原型 v5 新增 ----------
+
+/** P1 策略下拉选项 */
+export interface StrategyOptionVO {
+  id: Id
+  bizNo: string
+  name: string
+  scene: string
+  preset: boolean
+  versionNo: number | null
+  threshold: number
+  rerank: boolean
+  topK: number
+  paramSummary: string
+}
+
+/** P6 搜索行为流水 */
+export interface BehaviorVO {
+  id: Id
+  taskNo: string
+  resultSetId: string
+  taskId: Id | null
+  taskBizNo: string | null
+  taskStatus: string | null
+  queryText: string | null
+  queryModality: string | null
+  targetModality: string | null
+  operatorName: string | null
+  strategyNo: string | null
+  strategyVersion: number | null
+  threshold: number | null
+  itemCount: number | null
+  elapsedMs: number | null
+  sealed: boolean
+  zeroResult: boolean
+  upCount: number
+  downCount: number
+  createTime: string | null
+}
+
+/** P3 搜索结果摘要 */
+export interface SearchSummaryVO {
+  taskNo: string
+  searchId: Id
+  resultSetId: string
+  queryText: string | null
+  queryModality: string | null
+  targetModality: string | null
+  operatorName: string | null
+  strategyNo: string | null
+  strategyVersion: number | null
+  threshold: number | null
+  itemCount: number | null
+  sealed: boolean
+  createTime: string | null
+  expireTime: string | null
+  expired: boolean
+  upCount: number
+  downCount: number
+  items: ResultItemVO[]
+}
+
+/** P8 评测列表行 */
+export interface EvaluationRowVO {
+  id: Id
+  bizNo: string
+  query: string
+  baseTaskNo: string
+  baseTime: string | null
+  baseN: number | null
+  baseDown: number | null
+  replayCount: number
+  conclusion: 'degraded' | 'normal' | 'unevaluated' | string
+  reasons?: string[]
+  latestTaskNo: string | null
+  latestTime: string | null
+}
+
+/** P8 评测详情 */
+export interface EvaluationDetailVO {
+  id: Id
+  bizNo: string
+  query: string
+  base: Record<string, unknown>
+  replays: Record<string, unknown>[]
+  latest?: Record<string, unknown>
+  conclusion: string
+  reasons: string[]
+  downRateDelta?: number
+  resultDropRatio?: number
+}
+
+/** P4 屏蔽/黑名单 */
+export interface BlockedItemVO {
+  id: Id
+  itemId: string
+  itemName: string | null
+  source: string | null
+  reason: string | null
+  feedbackId: Id | null
+  createTime: string | null
+}
+
+export interface DatasourceBlacklistVO {
+  id: Id
+  datasetId: string | null
+  name: string | null
+  sourceName: string
+  endpoint: string | null
+  createTime: string | null
+}
+
+/** P4 上游数据集摘要 */
+export interface RemoteDatasetVO {
+  datasetId: string | null
+  name: string | null
+  itemCount: number | null
+  modalTypes: unknown
+  requiredOk: boolean
+}
+
+export interface RemoteDatasetsVO {
+  datasetCount: number
+  datasets: RemoteDatasetVO[]
+  requiredOk: boolean
+  firstDatasetId: string | null
+  totalItems: number
+  itemIssue: string | null
 }

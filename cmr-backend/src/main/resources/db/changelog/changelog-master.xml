@@ -8,4 +8,9 @@
     <include file="db/changelog/003_cmr_search_target_modality.xml"/>
     <include file="db/changelog/004_cmr_datasource_test_result.xml"/>
     <include file="db/changelog/005_cmr_search_log_id_snapshot.xml"/>
+    <include file="db/changelog/006_cmr_datasource_sync.xml"/>
+    <include file="db/changelog/007_cmr_vote_favorite.xml"/>
+    <include file="db/changelog/008_cmr_feedback_rework.xml"/>
+    <include file="db/changelog/009_cmr_evaluation.xml"/>
+    <include file="db/changelog/010_cmr_dict_v5.xml"/>
 </databaseChangeLog>

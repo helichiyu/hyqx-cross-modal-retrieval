@@ -1,10 +1,14 @@
 package com.hsmty.cmr.domain.operation.vo;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.hsmty.cmr.common.util.JsonUtils;
+import com.hsmty.cmr.domain.operation.dto.FeedbackCreateDTO;
 import com.hsmty.cmr.domain.operation.entity.CmrFeedback;
 import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 反馈单视图（P7）
@@ -22,16 +26,29 @@ public class FeedbackVO {
 
     private Long searchId;
 
-    /** 关联检索的 SRH 编号（跳转用） */
-    private String searchBizNo;
+    /** 来源任务号 */
+    private String sourceTaskNo;
 
-    private String type;
+    private String sourceQuery;
+
+    /** 入口类型：mismatch/zero */
+    private String entryType;
+
+    /** 勾选的不匹配条目 */
+    private List<FeedbackCreateDTO.MismatchItem> items;
 
     private String description;
 
+    /** pending/handled */
     private String status;
 
-    private String target;
+    /** data_bad/match_bad/need_data */
+    private String judgment;
+
+    /** block/strategy/supplement */
+    private String disposition;
+
+    private Boolean blocked;
 
     private String resultNote;
 
@@ -40,11 +57,21 @@ public class FeedbackVO {
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 
-    public static FeedbackVO from(CmrFeedback e, String searchBizNo) {
+    public static FeedbackVO from(CmrFeedback e) {
+        List<FeedbackCreateDTO.MismatchItem> items = e.getMismatchItemsJson() == null
+                ? List.of()
+                : JsonUtils.read(e.getMismatchItemsJson(),
+                        new TypeReference<List<FeedbackCreateDTO.MismatchItem>>() {
+                        });
         return FeedbackVO.builder()
-                .id(e.getId()).bizNo(e.getBizNo()).searchId(e.getSearchId()).searchBizNo(searchBizNo)
-                .type(e.getType()).description(e.getDescription()).status(e.getStatus())
-                .target(e.getTarget()).resultNote(e.getResultNote()).handlerId(e.getHandlerId())
+                .id(e.getId()).bizNo(e.getBizNo()).searchId(e.getSearchId())
+                .sourceTaskNo(e.getSourceTaskNo()).sourceQuery(e.getSourceQuery())
+                .entryType(e.getEntryType() != null ? e.getEntryType() : e.getType())
+                .items(items == null ? List.of() : items)
+                .description(e.getDescription()).status(e.getStatus())
+                .judgment(e.getJudgment()).disposition(e.getDisposition())
+                .blocked(Boolean.TRUE.equals(e.getBlocked()))
+                .resultNote(e.getResultNote()).handlerId(e.getHandlerId())
                 .createTime(e.getCreateTime()).updateTime(e.getUpdateTime())
                 .build();
     }

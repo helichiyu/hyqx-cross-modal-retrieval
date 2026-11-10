@@ -30,9 +30,18 @@ public class CmrResultItem extends BaseEntity {
 
     private String itemId;
 
+    /** 条目名称快照（摘要 30 天内可直接展示，不必回查） */
+    private String itemName;
+
     private String modality;
 
+    /** 来源名快照 */
+    private String source;
+
     private BigDecimal score;
+
+    /** 对齐分（算子返回时） */
+    private BigDecimal alignScore;
 
     /** 冗余：是否被点击（维护自事件表） */
     private Boolean clicked;

@@ -5,7 +5,7 @@ import com.hsmty.cmr.common.api.ApiResult;
 import com.hsmty.cmr.common.api.PageQuery;
 import com.hsmty.cmr.common.api.PageResult;
 import com.hsmty.cmr.domain.operation.dto.FeedbackCreateDTO;
-import com.hsmty.cmr.domain.operation.dto.FeedbackProcessDTO;
+import com.hsmty.cmr.domain.operation.dto.FeedbackHandleDTO;
 import com.hsmty.cmr.domain.operation.service.FeedbackService;
 import com.hsmty.cmr.domain.operation.vo.FeedbackStatsVO;
 import com.hsmty.cmr.domain.operation.vo.FeedbackVO;
@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 运营接口（P7）：反馈单四类型 + 去向流转
+ * 结果运营接口（P7）：两个入口 + 判断 + 三个去向
  *
  * @author cmr
  * @since 2026-11-03
@@ -36,43 +36,35 @@ public class FeedbackController {
 
     private final FeedbackService feedbackService;
 
-    @Operation(summary = "登记反馈（从检索结果页发起）")
+    @Operation(summary = "登记反馈（标记不匹配 / 零结果分析）")
     @PreAuthorize("hasAnyAuthority('cmr:feedback:create')")
     @PostMapping
     public ApiResult<FeedbackVO> create(@Valid @RequestBody FeedbackCreateDTO dto) {
         return ApiResult.success(feedbackService.create(dto));
     }
 
-    @Operation(summary = "反馈全量状态统计")
+    @Operation(summary = "反馈统计（待处理/已处理/三去向）")
     @PreAuthorize("hasAnyAuthority('cmr:feedback:page')")
     @GetMapping("stats")
     public ApiResult<FeedbackStatsVO> stats() {
         return ApiResult.success(feedbackService.stats());
     }
 
-    @Operation(summary = "反馈分页（类型/状态筛选）")
+    @Operation(summary = "反馈分页（入口/状态/来源任务筛选）")
     @PreAuthorize("hasAnyAuthority('cmr:feedback:page')")
     @GetMapping
     public ApiResult<PageResult<FeedbackVO>> page(PageQuery query,
-                                                  @RequestParam(required = false) String type,
+                                                  @RequestParam(required = false) String entryType,
                                                   @RequestParam(required = false) String status,
-                                                  @RequestParam(required = false) Long searchId) {
-        return ApiPageResult.success(feedbackService.page(query, type, status, searchId));
+                                                  @RequestParam(required = false) String sourceTaskNo) {
+        return ApiPageResult.success(feedbackService.page(query, entryType, status, sourceTaskNo));
     }
 
-    @Operation(summary = "开始处理（回填去向）")
+    @Operation(summary = "处置（判断 + 去向；屏蔽数据同步写屏蔽列表）")
     @PreAuthorize("hasAnyAuthority('cmr:feedback:update')")
-    @PostMapping("{id}/process")
-    public ApiResult<Void> process(@PathVariable Long id, @RequestBody(required = false) FeedbackProcessDTO dto) {
-        feedbackService.process(id, dto == null ? null : dto.getTarget());
-        return ApiResult.success();
-    }
-
-    @Operation(summary = "处理闭环（终态）")
-    @PreAuthorize("hasAnyAuthority('cmr:feedback:update')")
-    @PostMapping("{id}/close")
-    public ApiResult<Void> close(@PathVariable Long id, @RequestBody(required = false) FeedbackProcessDTO dto) {
-        feedbackService.close(id, dto == null ? null : dto.getResultNote());
+    @PostMapping("{id}/handle")
+    public ApiResult<Void> handle(@PathVariable Long id, @Valid @RequestBody FeedbackHandleDTO dto) {
+        feedbackService.handle(id, dto);
         return ApiResult.success();
     }
 }

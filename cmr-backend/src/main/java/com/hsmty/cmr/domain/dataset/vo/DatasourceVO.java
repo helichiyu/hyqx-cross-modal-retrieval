@@ -32,6 +32,20 @@ public class DatasourceVO {
 
     private Long datasetCount;
 
+    /** unconnected/connected/failed */
+    private String connectStatus;
+
+    /** 上游 4 项必填是否齐全 */
+    private Boolean requiredOk;
+
+    private String upstreamDatasetId;
+
+    private Integer vectorizedCount;
+
+    private Integer totalCount;
+
+    private LocalDateTime lastSyncTime;
+
     private Boolean lastTestConnected;
 
     private Integer lastTestStatusCode;
@@ -49,6 +63,12 @@ public class DatasourceVO {
                 .id(e.getId()).bizNo(e.getBizNo()).name(e.getName())
                 .endpoint(e.getEndpoint()).protocol(e.getProtocol()).authType(e.getAuthType())
                 .remark(e.getRemark()).datasetCount(e.getDatasetCount())
+                .connectStatus(e.getConnectStatus() == null ? "unconnected" : e.getConnectStatus())
+                .requiredOk(Boolean.TRUE.equals(e.getRequiredOk()))
+                .upstreamDatasetId(e.getUpstreamDatasetId())
+                .vectorizedCount(e.getVectorizedCount() == null ? 0 : e.getVectorizedCount())
+                .totalCount(e.getTotalCount() == null ? 0 : e.getTotalCount())
+                .lastSyncTime(e.getLastSyncTime())
                 .lastTestConnected(e.getLastTestConnected()).lastTestStatusCode(e.getLastTestStatusCode())
                 .lastTestLatencyMs(e.getLastTestLatencyMs()).lastTestMessage(e.getLastTestMessage())
                 .lastTestTime(e.getLastTestTime()).createTime(e.getCreateTime())

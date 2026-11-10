@@ -50,6 +50,21 @@ public class HistoryVO {
 
     private Long userId;
 
+    private Long operatorId;
+
+    private String operatorName;
+
+    private String strategyNo;
+
+    private Integer strategyVersion;
+
+    private java.math.BigDecimal threshold;
+
+    /** T=已封存（赞/踩锁定） */
+    private String sealed;
+
+    private String replayOfTaskNo;
+
     private LocalDateTime createTime;
 
     public static HistoryVO from(CmrSearchHistory e, String taskBizNo, String taskStatus) {
@@ -60,7 +75,12 @@ public class HistoryVO {
                 .targetModality(e.getTargetModality())
                 .clarified(e.getClarified()).scene(e.getScene()).itemCount(e.getItemCount())
                 .elapsedMs(e.getElapsedMs()).adoptStatus(e.getAdoptStatus())
-                .userId(e.getUserId()).createTime(e.getCreateTime())
+                .userId(e.getUserId())
+                .operatorId(e.getOperatorId()).operatorName(e.getOperatorName())
+                .strategyNo(e.getStrategyNo()).strategyVersion(e.getStrategyVersion())
+                .threshold(e.getThreshold()).sealed(e.getSealed())
+                .replayOfTaskNo(e.getReplayOfTaskNo())
+                .createTime(e.getCreateTime())
                 .build();
     }
 }

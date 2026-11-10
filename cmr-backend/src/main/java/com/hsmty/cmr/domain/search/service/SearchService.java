@@ -17,7 +17,10 @@ import com.hsmty.cmr.domain.search.dto.UnderstandDTO;
 import com.hsmty.cmr.domain.search.entity.CmrClickEvent;
 import com.hsmty.cmr.domain.search.entity.CmrResultItem;
 import com.hsmty.cmr.domain.search.entity.CmrSearchHistory;
+import com.hsmty.cmr.domain.operation.mapper.BlockedItemMapper;
 import com.hsmty.cmr.domain.search.mapper.ClickEventMapper;
+import com.hsmty.cmr.domain.search.mapper.FavoriteMapper;
+import com.hsmty.cmr.domain.search.mapper.ItemVoteMapper;
 import com.hsmty.cmr.domain.search.mapper.ResultItemMapper;
 import com.hsmty.cmr.domain.search.mapper.SearchHistoryMapper;
 import com.hsmty.cmr.domain.search.vo.HistoryDetailVO;
@@ -48,6 +51,9 @@ import java.util.Set;
 import java.util.UUID;
 
 import static com.hsmty.cmr.domain.dataset.entity.table.CmrIndexTableDef.CMR_INDEX;
+import static com.hsmty.cmr.domain.operation.entity.table.CmrBlockedItemTableDef.CMR_BLOCKED_ITEM;
+import static com.hsmty.cmr.domain.search.entity.table.CmrFavoriteTableDef.CMR_FAVORITE;
+import static com.hsmty.cmr.domain.search.entity.table.CmrItemVoteTableDef.CMR_ITEM_VOTE;
 import static com.hsmty.cmr.domain.search.entity.table.CmrResultItemTableDef.CMR_RESULT_ITEM;
 import static com.hsmty.cmr.domain.search.entity.table.CmrSearchHistoryTableDef.CMR_SEARCH_HISTORY;
 
@@ -63,9 +69,15 @@ import static com.hsmty.cmr.domain.search.entity.table.CmrSearchHistoryTableDef.
 @RequiredArgsConstructor
 public class SearchService {
 
+    /** 摘要保留 30 天（数据流 4.x 检索日志口径） */
+    private static final int SUMMARY_KEEP_DAYS = 30;
+
     private final SearchHistoryMapper historyMapper;
     private final ResultItemMapper resultItemMapper;
     private final ClickEventMapper clickEventMapper;
+    private final ItemVoteMapper itemVoteMapper;
+    private final FavoriteMapper favoriteMapper;
+    private final BlockedItemMapper blockedItemMapper;
     private final IndexMapper indexMapper;
     private final DatasetMapper datasetMapper;
     private final StrategyService strategyService;
@@ -111,8 +123,10 @@ public class SearchService {
         List<String> targetModalities = normalizedTargetModalities(dto.getTargetModalities());
         String targetModality = targetModalities == null ? null : targetModalities.get(0);
 
-        // 策略：显式参数覆盖场景生效策略
-        StrategyService.EffectiveStrategy effective = strategyService.effectiveOf(dto.getScene());
+        // 策略：显式选定策略 > 场景生效策略；显式参数再覆盖策略参数
+        StrategyService.EffectiveStrategy effective = dto.getStrategyId() != null
+                ? strategyService.effectiveById(dto.getStrategyId())
+                : strategyService.effectiveOf(dto.getScene());
         Map<String, Integer> weights = dto.getWeights() != null && !dto.getWeights().isEmpty()
                 ? dto.getWeights() : effective.weights();
         if (dto.getWeights() != null && !dto.getWeights().isEmpty()) {
@@ -121,6 +135,8 @@ public class SearchService {
         }
         boolean rerank = Boolean.TRUE.equals(dto.getRerank() != null ? dto.getRerank() : effective.rerank());
         int topK = dto.getTopK() != null ? dto.getTopK() : effective.topK();
+        BigDecimal threshold = dto.getThreshold() != null ? dto.getThreshold() : effective.threshold();
+        BizException.assertTrue(threshold == null, "阈值不能为空");
 
         // 索引：场景匹配的 active 索引，兜底最新 active
         CmrIndex index = activeIndexOf(dto.getScene());
@@ -140,14 +156,24 @@ public class SearchService {
         history.setClarified(Boolean.TRUE.equals(dto.getClarified()));
         history.setScene(dto.getScene());
         history.setStrategyVersionId(effective.versionId());
+        history.setStrategyNo(effective.strategyNo());
+        history.setStrategyVersion(effective.versionNo());
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("weights", weights);
         snapshot.put("rerank", rerank);
         snapshot.put("topK", topK);
+        snapshot.put("threshold", threshold);
+        snapshot.put("strategyNo", effective.strategyNo());
+        snapshot.put("strategyVersion", effective.versionNo());
         history.setStrategySnapshotJson(JsonUtils.write(snapshot));
+        history.setThreshold(threshold);
         history.setItemCount(0);
         history.setAdoptStatus(CmrSearchHistory.ADOPT_UNADOPTED);
+        history.setSealed("F");
+        history.setSummaryExpireTime(LocalDateTime.now().plusDays(SUMMARY_KEEP_DAYS));
         history.setUserId(AuthContext.userId());
+        history.setOperatorId(AuthContext.userId());
+        history.setOperatorName(currentOperatorName());
         history.setDelFlag("F");
         history.setCreateTime(LocalDateTime.now());
         historyMapper.insert(history, true);
@@ -158,7 +184,7 @@ public class SearchService {
         history.setTaskId(task.getId());
         historyMapper.update(history);
 
-        taskExecutor.runSyncWithRetry(task, t -> doSearch(t, history, index, targetModalities, weights, rerank, topK));
+        taskExecutor.runSyncWithRetry(task, t -> doSearch(t, history, index, targetModalities, weights, rerank, topK, threshold));
         // 任务已按失败处置落库；检索历史保留零结果记录，向用户返回原因
         CmrTask done = taskService.requireTask(task.getId());
         if (!CmrTask.STATUS_DONE.equals(done.getStatus())) {
@@ -170,7 +196,7 @@ public class SearchService {
 
     private void doSearch(CmrTask task, CmrSearchHistory history, CmrIndex index,
                           List<String> targetModalities, Map<String, Integer> weights,
-                          boolean rerank, int topK) {
+                          boolean rerank, int topK, BigDecimal threshold) {
         taskService.updateStep(task, "search");
         Map<String, Object> payload = new LinkedHashMap<>();
         if (!blank(history.getQueryText())) {
@@ -186,6 +212,7 @@ public class SearchService {
         payload.put("topK", topK);
         payload.put("weights", weights);
         payload.put("rerank", rerank);
+        payload.put("threshold", threshold);
         try {
             long start = System.currentTimeMillis();
             JsonNode data = operatorClient.search(payload);
@@ -201,8 +228,12 @@ public class SearchService {
                 item.setResultSetId(history.getResultSetId());
                 item.setRank(node.path("rank").asInt(items.size() + 1));
                 item.setItemId(textOrNull(node.path("itemId").asText(null)));
+                item.setItemName(textOrNull(node.path("name").asText(null)));
+                item.setSource(textOrNull(node.path("source").asText(null)));
                 item.setModality(textOrNull(node.path("modality").asText(null)));
                 item.setScore(node.path("score").isNumber() ? node.path("score").decimalValue() : BigDecimal.ZERO);
+                item.setAlignScore(node.path("alignScore").isNumber()
+                        ? node.path("alignScore").decimalValue() : null);
                 item.setClicked(false);
                 item.setDelFlag("F");
                 item.setCreateTime(LocalDateTime.now());
@@ -323,9 +354,17 @@ public class SearchService {
 
     /** 再次执行：原参数重放（新 SRH，不复用旧结果） */
     public SearchResultVO rerun(Long id) {
+        return rerun(id, null, null);
+    }
+
+    /** 评测重放：可指定策略并归属评测 */
+    public SearchResultVO rerun(Long id, Long strategyId, Long evalId) {
         CmrSearchHistory history = historyMapper.selectOneById(id);
         BizException.assertNull(history, "检索历史不存在");
         SearchExecuteDTO dto = new SearchExecuteDTO();
+        if (strategyId != null) {
+            dto.setStrategyId(strategyId);
+        }
         dto.setQuery(history.getQueryText());
         dto.setQueryFile(history.getQueryFile());
         dto.setScene(history.getScene());
@@ -354,7 +393,18 @@ public class SearchService {
                 dto.setWeights(weights);
             }
         }
-        return execute(dto);
+        if (snapshot.get("threshold") instanceof Number number) {
+            dto.setThreshold(new BigDecimal(number.toString()));
+        }
+        SearchResultVO result = execute(dto);
+        // 标记重放来源，供评测与复盘串链
+        CmrSearchHistory replay = historyMapper.selectOneById(result.getId());
+        if (replay != null) {
+            replay.setReplayOfTaskNo(history.getBizNo());
+            replay.setEvalId(evalId);
+            historyMapper.update(replay);
+        }
+        return result;
     }
 
     /** 按场景取激活索引：场景匹配优先，兜底最新激活 */
@@ -408,23 +458,319 @@ public class SearchService {
                 .map(CmrResultItem::getItemId)
                 .filter(id -> id != null && !id.isBlank())
                 .toList();
+        // 屏蔽条目不再下发给检索端（屏蔽列表只影响展示，不影响历史快照）
+        Set<String> blocked = blockedItemIds(itemIds);
         Map<String, ItemMetaService.ItemMeta> metas = itemMetaService.lookup(history.getIndexId(), itemIds);
+        Map<String, String> votes = votesOf(history.getBizNo());
+        Set<String> favorites = favoriteItemIds();
         return entities.stream()
-                .map(item -> toItemVO(item, metas.get(item.getItemId())))
+                .filter(item -> item.getItemId() == null || !blocked.contains(item.getItemId()))
+                .map(item -> toItemVO(item, metas.get(item.getItemId()),
+                        votes.get(item.getItemId()), favorites.contains(item.getItemId())))
                 .toList();
     }
 
-    private ResultItemVO toItemVO(CmrResultItem e, ItemMetaService.ItemMeta meta) {
+    private Set<String> blockedItemIds(List<String> itemIds) {
+        if (itemIds.isEmpty()) {
+            return Set.of();
+        }
+        return blockedItemMapper.selectListByQuery(QueryWrapper.create()
+                        .where(CMR_BLOCKED_ITEM.ITEM_ID.in(itemIds)))
+                .stream().map(com.hsmty.cmr.domain.operation.entity.CmrBlockedItem::getItemId)
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    private Map<String, String> votesOf(String taskNo) {
+        if (blank(taskNo)) {
+            return Map.of();
+        }
+        Long userId = AuthContext.userId();
+        if (userId == null) {
+            return Map.of();
+        }
+        Map<String, String> result = new LinkedHashMap<>();
+        itemVoteMapper.selectListByQuery(QueryWrapper.create()
+                        .where(CMR_ITEM_VOTE.TASK_NO.eq(taskNo).and(CMR_ITEM_VOTE.USER_ID.eq(userId))))
+                .forEach(v -> result.put(v.getItemId(), v.getVote()));
+        return result;
+    }
+
+    private Set<String> favoriteItemIds() {
+        Long userId = AuthContext.userId();
+        if (userId == null) {
+            return Set.of();
+        }
+        return favoriteMapper.selectListByQuery(QueryWrapper.create()
+                        .where(CMR_FAVORITE.USER_ID.eq(userId)))
+                .stream().map(com.hsmty.cmr.domain.search.entity.CmrFavorite::getItemId)
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    private ResultItemVO toItemVO(CmrResultItem e, ItemMetaService.ItemMeta meta,
+                                  String vote, boolean favorited) {
         boolean deleted = meta == null;
+        String name = e.getItemName() != null ? e.getItemName()
+                : (deleted ? "已删除" : meta.name());
         return ResultItemVO.builder()
                 .id(e.getId()).rank(e.getRank()).itemId(e.getItemId())
-                .name(deleted ? "已删除" : meta.name())
-                .modality(e.getModality()).score(e.getScore())
+                .name(name)
+                .source(e.getSource() != null ? e.getSource() : (deleted ? null : meta.sourceFile()))
+                .modality(e.getModality()).score(e.getScore()).alignScore(e.getAlignScore())
+                .vote(vote).favorited(favorited)
                 .sourceFile(deleted ? null : meta.sourceFile())
                 .locatorJson(deleted ? null : meta.locatorJson())
                 .text(deleted ? null : meta.text())
                 .clicked(e.getClicked()).deleted(deleted)
                 .build();
+    }
+
+    /** 赞/踩：同一用户对同一任务同一条目只保留一条，重复同向即取消 */
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> vote(String taskNo, String itemId, String vote) {
+        BizException.assertTrue(blank(taskNo) || blank(itemId), "任务号与条目不能为空");
+        BizException.assertTrue(!Set.of("up", "down", "none").contains(vote),
+                "投票只能是 up/down/none");
+        CmrSearchHistory history = requireHistoryByBizNo(taskNo);
+        BizException.assertTrue("T".equals(history.getSealed()), "任务已封存，赞/踩不可再改");
+        Long userId = AuthContext.userId();
+        BizException.assertNull(userId, "未登录");
+
+        com.hsmty.cmr.domain.search.entity.CmrItemVote existing = itemVoteMapper.selectOneByQuery(
+                QueryWrapper.create().where(CMR_ITEM_VOTE.TASK_NO.eq(taskNo)
+                        .and(CMR_ITEM_VOTE.ITEM_ID.eq(itemId))
+                        .and(CMR_ITEM_VOTE.USER_ID.eq(userId))));
+        String effectiveVote = vote;
+        if ("none".equals(vote)) {
+            if (existing != null) {
+                itemVoteMapper.deleteById(existing.getId());
+            }
+            effectiveVote = null;
+        } else if (existing == null) {
+            com.hsmty.cmr.domain.search.entity.CmrItemVote entity =
+                    new com.hsmty.cmr.domain.search.entity.CmrItemVote();
+            entity.setId(idWorker.next());
+            entity.setTaskNo(taskNo);
+            entity.setSearchId(history.getId());
+            entity.setItemId(itemId);
+            entity.setVote(vote);
+            entity.setUserId(userId);
+            entity.setDelFlag("F");
+            entity.setCreateTime(LocalDateTime.now());
+            itemVoteMapper.insert(entity, true);
+        } else if (!vote.equals(existing.getVote())) {
+            existing.setVote(vote);
+            itemVoteMapper.update(existing);
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("vote", effectiveVote);
+        result.put("upCount", countVotes(history.getId(), "up"));
+        result.put("downCount", countVotes(history.getId(), "down"));
+        return result;
+    }
+
+    private long countVotes(Long searchId, String vote) {
+        Long count = itemVoteMapper.selectCountByQuery(QueryWrapper.create()
+                .where(CMR_ITEM_VOTE.SEARCH_ID.eq(searchId).and(CMR_ITEM_VOTE.VOTE.eq(vote))));
+        return count == null ? 0 : count;
+    }
+
+    /** 收藏/取消收藏（按 用户+条目 唯一） */
+    @Transactional(rollbackFor = Exception.class)
+    public boolean toggleFavorite(String itemId, String itemName, String source, String taskNo) {
+        BizException.assertTrue(blank(itemId), "条目不能为空");
+        Long userId = AuthContext.userId();
+        BizException.assertNull(userId, "未登录");
+        com.hsmty.cmr.domain.search.entity.CmrFavorite existing = favoriteMapper.selectOneByQuery(
+                QueryWrapper.create().where(CMR_FAVORITE.USER_ID.eq(userId)
+                        .and(CMR_FAVORITE.ITEM_ID.eq(itemId))));
+        if (existing != null) {
+            favoriteMapper.deleteById(existing.getId());
+            return false;
+        }
+        com.hsmty.cmr.domain.search.entity.CmrFavorite entity =
+                new com.hsmty.cmr.domain.search.entity.CmrFavorite();
+        entity.setId(idWorker.next());
+        entity.setUserId(userId);
+        entity.setItemId(itemId);
+        entity.setItemName(itemName);
+        entity.setSource(source);
+        entity.setTaskNo(taskNo);
+        entity.setDelFlag("F");
+        entity.setCreateTime(LocalDateTime.now());
+        favoriteMapper.insert(entity, true);
+        return true;
+    }
+
+    /** 我的收藏 */
+    public List<Map<String, Object>> favorites() {
+        Long userId = AuthContext.userId();
+        if (userId == null) {
+            return List.of();
+        }
+        return favoriteMapper.selectListByQuery(QueryWrapper.create()
+                        .where(CMR_FAVORITE.USER_ID.eq(userId))
+                        .orderBy(CMR_FAVORITE.ID.desc()))
+                .stream().map(f -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("id", f.getId());
+                    item.put("itemId", f.getItemId());
+                    item.put("itemName", f.getItemName());
+                    item.put("source", f.getSource());
+                    item.put("taskNo", f.getTaskNo());
+                    item.put("createTime", f.getCreateTime());
+                    return item;
+                }).toList();
+    }
+
+    /** 封存：锁定赞/踩，作为评测与复盘的固定样本 */
+    @Transactional(rollbackFor = Exception.class)
+    public void seal(String taskNo) {
+        CmrSearchHistory history = requireHistoryByBizNo(taskNo);
+        BizException.assertTrue("T".equals(history.getSealed()), "任务已封存");
+        history.setSealed("T");
+        historyMapper.update(history);
+        log.info("检索任务封存: {}", taskNo);
+    }
+
+    /** 搜索结果摘要（P3）：Top-20 条目 + 赞/踩，30 天后过期 */
+    public Map<String, Object> summary(String taskNo) {
+        CmrSearchHistory history = requireHistoryByBizNo(taskNo);
+        List<ResultItemVO> items = itemsOf(history).stream().limit(20).toList();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("taskNo", history.getBizNo());
+        result.put("searchId", history.getId());
+        result.put("resultSetId", history.getResultSetId());
+        result.put("queryText", history.getQueryText());
+        result.put("queryModality", history.getQueryModality());
+        result.put("targetModality", history.getTargetModality());
+        result.put("operatorName", history.getOperatorName());
+        result.put("strategyNo", history.getStrategyNo());
+        result.put("strategyVersion", history.getStrategyVersion());
+        result.put("threshold", history.getThreshold());
+        result.put("itemCount", history.getItemCount());
+        result.put("sealed", "T".equals(history.getSealed()));
+        result.put("createTime", history.getCreateTime());
+        result.put("expireTime", history.getSummaryExpireTime());
+        result.put("expired", history.getSummaryExpireTime() != null
+                && history.getSummaryExpireTime().isBefore(LocalDateTime.now()));
+        result.put("createId", history.getCreateId());
+        result.put("upCount", countVotes(history.getId(), "up"));
+        result.put("downCount", countVotes(history.getId(), "down"));
+        result.put("items", items);
+        return result;
+    }
+
+    /** 搜索行为流水（P6）：任务级分页，含赞踩计数与失败状态 */
+    public PageResult<Map<String, Object>> behaviors(PageQuery query, String keyword,
+                                                     String operatorName, Boolean zeroResult,
+                                                     LocalDateTime from, LocalDateTime to) {
+        QueryWrapper qw = QueryWrapper.create().from(CMR_SEARCH_HISTORY);
+        if (!blank(keyword)) {
+            qw.where(CMR_SEARCH_HISTORY.QUERY_TEXT.like(keyword));
+        }
+        if (!blank(operatorName)) {
+            qw.where(CMR_SEARCH_HISTORY.OPERATOR_NAME.like(operatorName));
+        }
+        if (Boolean.TRUE.equals(zeroResult)) {
+            qw.where(CMR_SEARCH_HISTORY.ITEM_COUNT.eq(0));
+        }
+        if (from != null) {
+            qw.where(CMR_SEARCH_HISTORY.CREATE_TIME.ge(from));
+        }
+        if (to != null) {
+            qw.where(CMR_SEARCH_HISTORY.CREATE_TIME.le(to));
+        }
+        qw.orderBy(CMR_SEARCH_HISTORY.ID.desc());
+        Page<CmrSearchHistory> page = historyMapper.paginate(
+                Math.max(query.getPageNum(), 1), Math.max(query.getPageSize(), 1), qw);
+        List<Map<String, Object>> records = page.getRecords().stream().map(h -> {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", h.getId());
+            item.put("taskNo", h.getBizNo());
+            item.put("resultSetId", h.getResultSetId());
+            item.put("taskId", h.getTaskId());
+            item.put("taskBizNo", taskService.bizNoOf(h.getTaskId()));
+            item.put("taskStatus", taskService.statusOf(h.getTaskId()));
+            item.put("queryText", h.getQueryText());
+            item.put("queryModality", h.getQueryModality());
+            item.put("targetModality", h.getTargetModality());
+            item.put("operatorName", h.getOperatorName());
+            item.put("strategyNo", h.getStrategyNo());
+            item.put("strategyVersion", h.getStrategyVersion());
+            item.put("threshold", h.getThreshold());
+            item.put("itemCount", h.getItemCount());
+            item.put("elapsedMs", h.getElapsedMs());
+            item.put("sealed", "T".equals(h.getSealed()));
+            item.put("zeroResult", h.getItemCount() != null && h.getItemCount() == 0);
+            item.put("upCount", countVotes(h.getId(), "up"));
+            item.put("downCount", countVotes(h.getId(), "down"));
+            item.put("createTime", h.getCreateTime());
+            return item;
+        }).toList();
+        return PageResult.of(records, page.getTotalRow(), query.getPageNum(), query.getPageSize());
+    }
+
+    /** 屏蔽列表（P4/P7）：登记后不再下发给检索端 */
+    public List<Map<String, Object>> blockedItems() {
+        return blockedItemMapper.selectListByQuery(QueryWrapper.create()
+                        .orderBy(CMR_BLOCKED_ITEM.ID.desc()))
+                .stream().map(b -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("id", b.getId());
+                    item.put("itemId", b.getItemId());
+                    item.put("itemName", b.getItemName());
+                    item.put("source", b.getSource());
+                    item.put("reason", b.getReason());
+                    item.put("feedbackId", b.getFeedbackId());
+                    item.put("createTime", b.getCreateTime());
+                    return item;
+                }).toList();
+    }
+
+    /** 解除屏蔽 */
+    @Transactional(rollbackFor = Exception.class)
+    public void unblock(Long blockedId) {
+        com.hsmty.cmr.domain.operation.entity.CmrBlockedItem entity = blockedItemMapper.selectOneById(blockedId);
+        BizException.assertNull(entity, "屏蔽记录不存在");
+        blockedItemMapper.deleteById(blockedId);
+    }
+
+    /** 登记屏蔽（供反馈处置与结果页直接屏蔽复用） */
+    @Transactional(rollbackFor = Exception.class)
+    public void blockItem(String itemId, String itemName, String source, String reason, Long feedbackId) {
+        BizException.assertTrue(blank(itemId), "条目不能为空");
+        Long exists = blockedItemMapper.selectCountByQuery(QueryWrapper.create()
+                .where(CMR_BLOCKED_ITEM.ITEM_ID.eq(itemId)));
+        if (exists != null && exists > 0) {
+            return;
+        }
+        com.hsmty.cmr.domain.operation.entity.CmrBlockedItem entity =
+                new com.hsmty.cmr.domain.operation.entity.CmrBlockedItem();
+        entity.setId(idWorker.next());
+        entity.setItemId(itemId);
+        entity.setItemName(itemName);
+        entity.setSource(source);
+        entity.setReason(blank(reason) ? "运营屏蔽" : reason);
+        entity.setFeedbackId(feedbackId);
+        entity.setDelFlag("F");
+        entity.setCreateTime(LocalDateTime.now());
+        blockedItemMapper.insert(entity, true);
+    }
+
+    private CmrSearchHistory requireHistoryByBizNo(String taskNo) {
+        CmrSearchHistory history = historyMapper.selectOneByQuery(QueryWrapper.create()
+                .where(CMR_SEARCH_HISTORY.BIZ_NO.eq(taskNo)));
+        BizException.assertNull(history, "检索任务不存在: " + taskNo);
+        return history;
+    }
+
+    private String currentOperatorName() {
+        com.hsmty.cmr.common.auth.LoginUser user = AuthContext.get();
+        if (user == null) {
+            return null;
+        }
+        return user.nickname() != null && !user.nickname().isBlank()
+                ? user.nickname() : user.username();
     }
 
     private List<String> normalizedTargetModalities(List<String> targetModalities) {

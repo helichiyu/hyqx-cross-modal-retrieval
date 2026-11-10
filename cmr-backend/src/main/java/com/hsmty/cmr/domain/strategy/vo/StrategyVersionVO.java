@@ -27,6 +27,8 @@ public class StrategyVersionVO {
 
     private Integer topK;
 
+    private java.math.BigDecimal threshold;
+
     private String status;
 
     private String source;

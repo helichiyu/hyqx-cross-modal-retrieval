@@ -19,6 +19,7 @@ public class CmrStrategy extends BaseEntity {
 
     public static final String STATUS_DRAFT = "draft";
     public static final String STATUS_ACTIVE = "active";
+    public static final String STATUS_OFFLINE = "offline";
 
     private String bizNo;
 
@@ -28,6 +29,14 @@ public class CmrStrategy extends BaseEntity {
     private String scene;
 
     private String status;
+
+    /** 系统预置（兜底）：不可下线 */
+    private Boolean preset;
+
+    /** 下线原因：tuning/poor/replaced/other */
+    private String offlineReason;
+
+    private java.time.LocalDateTime offlineTime;
 
     private Integer currentVersion;
 

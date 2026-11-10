@@ -28,6 +28,18 @@ public class ResultItemVO {
 
     private BigDecimal score;
 
+    /** 来源名（摘要/导出展示） */
+    private String source;
+
+    /** 对齐分 */
+    private BigDecimal alignScore;
+
+    /** 当前用户赞踩：up/down/null */
+    private String vote;
+
+    /** 当前用户是否收藏 */
+    private Boolean favorited;
+
     private String sourceFile;
 
     private String locatorJson;

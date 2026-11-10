@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 策略：系统预置、下线原因/时间、阈值 -->
+    <changeSet id="cmr-strategy-offline-20261110" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="cmr_strategy" columnName="preset"/></not>
+        </preConditions>
+        <sql>
+            ALTER TABLE cmr_strategy
+                ADD COLUMN preset TINYINT(1) NOT NULL DEFAULT 0 COMMENT '系统预置（不可下线）' AFTER status,
+                ADD COLUMN offline_reason VARCHAR(32) COMMENT '下线原因 tuning/poor/replaced/other',
+                ADD COLUMN offline_time DATETIME COMMENT '下线时间';
+            UPDATE cmr_strategy SET preset = 1 WHERE scene = 'all';
+        </sql>
+    </changeSet>
+
+    <changeSet id="cmr-strategy-version-threshold-20261110" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="cmr_strategy_version" columnName="threshold"/></not>
+        </preConditions>
+        <sql>
+            ALTER TABLE cmr_strategy_version
+                ADD COLUMN threshold DECIMAL(4,2) NOT NULL DEFAULT 0.60 COMMENT '相似度阈值 0.30-0.99' AFTER top_k;
+        </sql>
+    </changeSet>
+
+    <!-- 效果评测：一条 query 一条评测，基准取历史检索，重放按 query 归集 -->
+    <changeSet id="cmr-evaluation-20261110" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="cmr_evaluation"/></not>
+        </preConditions>
+        <sql>
+            CREATE TABLE cmr_evaluation (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                biz_no VARCHAR(32) NOT NULL COMMENT 'EVL 编号',
+                query VARCHAR(1024) NOT NULL COMMENT '评测 query（同一 query 只留一条）',
+                base_search_id BIGINT COMMENT '基准检索历史 id',
+                base_task_no VARCHAR(32) COMMENT '基准任务号',
+                base_time DATETIME COMMENT '基准时间',
+                base_n INT DEFAULT 0 COMMENT '基准结果数',
+                base_down INT DEFAULT 0 COMMENT '基准踩数',
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                UNIQUE KEY uk_biz_no (biz_no), UNIQUE KEY uk_query (query(255))
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 效果评测';
+        </sql>
+    </changeSet>
+</databaseChangeLog>

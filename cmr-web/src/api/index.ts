@@ -1,9 +1,18 @@
 import { http } from './http'
 import type {
+  BehaviorVO,
+  BlockedItemVO,
   DatasetDetailVO,
   DatasetVO,
+  DatasourceBlacklistVO,
   DatasourceTestVO,
   DatasourceVO,
+  EvaluationDetailVO,
+  EvaluationRowVO,
+  RemoteDatasetsVO,
+  SearchSummaryVO,
+  StrategyOptionVO,
+  MismatchItem,
   DictItem,
   EvalItemVO,
   EvalPreviewVO,
@@ -77,6 +86,19 @@ export const createDatasource = (body: Record<string, unknown>) =>
 
 export const testDatasource = (id: Id) => http.post<DatasourceTestVO>(`datasources/${id}/test`)
 
+export const syncDatasource = (id: Id) => http.post<RemoteDatasetsVO>(`datasources/${id}/sync`)
+
+export const datasourceDatasets = (id: Id) => http.get<RemoteDatasetsVO>(`datasources/${id}/datasets`)
+
+export const datasourceContract = () => http.get<Record<string, unknown>>('datasources/contract')
+
+export const listBlacklist = () => http.get<DatasourceBlacklistVO[]>('datasource-blacklist')
+
+export const addBlacklist = (body: Record<string, unknown>) =>
+  http.post<DatasourceBlacklistVO>('datasource-blacklist', body)
+
+export const removeBlacklist = (id: Id) => http.delete<void>(`datasource-blacklist/${id}`)
+
 export const listIndexes = (datasetId: Id) =>
   http.get<IndexVO[]>('indexes', { datasetId })
 
@@ -122,6 +144,13 @@ export const strategyDiff = (id: Id, from: number, to: number) =>
 export const rollbackStrategy = (id: Id, versionNo: number) =>
   http.post<StrategyVersionVO>(`strategies/${id}/rollback`, { versionNo })
 
+export const strategyOptions = () => http.get<StrategyOptionVO[]>('strategies/options')
+
+export const offlineStrategy = (id: Id, reason: string) =>
+  http.post<void>(`strategies/${id}/offline`, { reason })
+
+export const onlineStrategy = (id: Id) => http.post<void>(`strategies/${id}/online`)
+
 // ---------- 检索 ----------
 
 export const suggestWords = (scene: string | undefined, prefix: string) =>
@@ -153,7 +182,46 @@ export const historyDetail = (id: Id) => http.get<HistoryDetailVO>(`search-histo
 export const rerunHistory = (id: Id) =>
   http.post<SearchResultVO>(`search-history/${id}/rerun`)
 
-// ---------- 评测 ----------
+// ---------- 搜索行为 / 摘要（P3/P6） ----------
+
+export const pageBehaviors = (params: Record<string, unknown> = {}) =>
+  http.get<PageResult<BehaviorVO>>('search-behaviors', params)
+
+export const searchSummary = (taskNo: string) =>
+  http.get<SearchSummaryVO>(`search-summary/${taskNo}`)
+
+export const sealTask = (taskNo: string) => http.post<void>(`search-summary/${taskNo}/seal`)
+
+export const voteItem = (taskNo: string, itemId: string, vote: 'up' | 'down' | 'none') =>
+  http.post<{ vote: string | null; upCount: number; downCount: number }>(
+    `search/tasks/${taskNo}/vote`,
+    { itemId, vote },
+  )
+
+export const toggleFavorite = (body: Record<string, unknown>) =>
+  http.post<boolean>('search/favorites', body)
+
+export const myFavorites = () => http.get<Record<string, unknown>[]>('search/favorites')
+
+export const listBlockedItems = () => http.get<BlockedItemVO[]>('search-behaviors/blocked-items')
+
+export const unblockItem = (id: Id) =>
+  http.post<void>(`search-behaviors/blocked-items/${id}/unblock`)
+
+// ---------- 效果评测（P8） ----------
+
+export const pageEvaluations = (params: Record<string, unknown> = {}) =>
+  http.get<PageResult<EvaluationRowVO>>('evaluations', params)
+
+export const createEvaluation = (baseTaskNo: string) =>
+  http.post<Record<string, unknown>>('evaluations', { baseTaskNo })
+
+export const evaluationDetail = (id: Id) => http.get<EvaluationDetailVO>(`evaluations/${id}`)
+
+export const replayEvaluation = (id: Id, strategyId?: Id) =>
+  http.post<SearchResultVO>(`evaluations/${id}/replay`, strategyId ? { strategyId } : {})
+
+// ---------- 评测集（历史能力，逐步下线） ----------
 
 export const pageEvalSets = (params: Record<string, unknown> = {}) =>
   http.get<PageResult<EvalSetVO>>('eval-sets', params)
@@ -188,14 +256,16 @@ export const pageFeedbacks = (params: Record<string, unknown> = {}) =>
 
 export const feedbackStats = () => http.get<FeedbackStatsVO>('feedbacks/stats')
 
-export const createFeedback = (body: Record<string, unknown>) =>
-  http.post<FeedbackVO>('feedbacks', body)
+export const createFeedback = (body: {
+  entryType: 'mismatch' | 'zero'
+  sourceTaskNo?: string
+  sourceQuery?: string
+  items?: MismatchItem[]
+  description?: string
+}) => http.post<FeedbackVO>('feedbacks', body)
 
-export const processFeedback = (id: Id, target?: string) =>
-  http.post<void>(`feedbacks/${id}/process`, target ? { target } : {})
-
-export const closeFeedback = (id: Id, resultNote?: string) =>
-  http.post<void>(`feedbacks/${id}/close`, resultNote ? { resultNote } : {})
+export const handleFeedback = (id: Id, body: Record<string, unknown>) =>
+  http.post<void>(`feedbacks/${id}/handle`, body)
 
 export const pageWords = (params: Record<string, unknown> = {}) =>
   http.get<PageResult<WordVO>>('recommend-words', params)

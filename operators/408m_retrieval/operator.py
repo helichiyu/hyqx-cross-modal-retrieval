@@ -121,6 +121,8 @@ class Operator(OperatorBase):
         top_k = int(payload.get("topK", self.rt.get("top_k", 20)))
         rerank = bool(payload.get("rerank", self.rt.get("rerank", False)))
         word_weight = float(payload.get("wordWeight", self.rt.get("word_weight", 2.0)))
+        threshold = payload.get("threshold")
+        threshold = None if threshold is None else float(threshold)
 
         unique_id = payload.get("uniqueId") or f"anon_{uuid.uuid4().hex[:8]}"
         started = time.time()
@@ -148,19 +150,23 @@ class Operator(OperatorBase):
                 raise OperatorError(f"无法识别查询文件模态: {Path(p).name}")
 
         if not candidates:
-            return self._result(payload, query_text, query_modality, [], weights, rerank, started)
+            return self._result(payload, query_text, query_modality, [], weights, rerank, threshold, started)
 
         # 2. 融合：z-score 加权 + 精确词加成
         fused = self._fuse(list(candidates.values()), weights, word_weight, query_text)
 
+        # 2.1 相似度阈值：按原始余弦（alignScore）过滤，低于策略阈值的不下发
+        if threshold is not None:
+            fused = [it for it in fused if it.get("alignScore", 0.0) >= threshold]
+
         # 3. 可选精排：bge-reranker 只对含文本的条目打分（reranker 是文本模型）
-        if rerank:
+        if rerank and fused:
             fused = self._rerank(fused[: int(self.rt.get("rerank_top_n", 50))], query_text) + fused[int(self.rt.get("rerank_top_n", 50)):]
         fused.sort(key=lambda x: x["score"], reverse=True)
         items = fused[:top_k]
         for i, it in enumerate(items):
             it["rank"] = i + 1
-        return self._result(payload, query_text, query_modality, items, weights, rerank, started)
+        return self._result(payload, query_text, query_modality, items, weights, rerank, threshold, started)
 
     # ---- 内部 ----
 
@@ -200,7 +206,8 @@ class Operator(OperatorBase):
             z = max((s - mean) / std, 0.0)
             item_id = meta["itemId"]
             if item_id not in candidates or z > candidates[item_id]["z"]:
-                candidates[item_id] = {"meta": meta, "z": z}
+                # sim 保留原始余弦（0~1），供 similarity 阈值过滤与对齐分展示
+                candidates[item_id] = {"meta": meta, "z": z, "sim": float(s)}
 
     def _fuse(self, cands: list[dict], weights: dict, word_weight: float,
               query_text: str) -> list[dict]:
@@ -213,8 +220,12 @@ class Operator(OperatorBase):
             if tokens and meta.get("text"):
                 coverage = sum(1 for t in tokens if t in meta["text"]) / len(tokens)
                 score += word_weight * (coverage ** 1.5)
-            out.append({"score": round(score, 6), **{k: meta[k] for k in
-                        ("itemId", "modality", "sourceFile", "locator", "text")}})
+            out.append({
+                "score": round(score, 6),
+                **{k: meta[k] for k in ("itemId", "modality", "sourceFile", "locator", "text")},
+                "source": _source_of(meta.get("sourceFile")),
+                "alignScore": round(c.get("sim", 0.0), 6),
+            })
         return out
 
     def _rerank(self, cands: list[dict], query_text: str) -> list[dict]:
@@ -233,7 +244,8 @@ class Operator(OperatorBase):
             c["score"] = scores[text_idx.index(i)] if i in text_idx else (c["score"] - lo) / span
         return cands
 
-    def _result(self, payload, query_text, query_modality, items, weights, rerank, started) -> dict:
+    def _result(self, payload, query_text, query_modality, items, weights, rerank,
+                threshold, started) -> dict:
         return {
             "resultSetId": "RST" + time.strftime("%Y%m%d%H%M%S") + uuid.uuid4().hex[:6].upper(),
             "query": query_text or None,
@@ -242,7 +254,16 @@ class Operator(OperatorBase):
             "count": len(items),
             "items": items,
             "strategy": {"weights": weights, "rerank": rerank,
-                         "topK": payload.get("topK", self.rt.get("top_k", 20))},
+                         "topK": payload.get("topK", self.rt.get("top_k", 20)),
+                         "threshold": threshold},
             "modelVersion": self.model_version,
             "elapsedMs": round((time.time() - started) * 1000, 1),
         }
+
+
+def _source_of(source_file: str | None) -> str | None:
+    """从源文件路径推导来源名（父目录名），与前端展示口径一致。"""
+    if not source_file:
+        return None
+    parts = [p for p in str(source_file).replace("\\", "/").split("/") if p]
+    return parts[-2] if len(parts) > 1 else None

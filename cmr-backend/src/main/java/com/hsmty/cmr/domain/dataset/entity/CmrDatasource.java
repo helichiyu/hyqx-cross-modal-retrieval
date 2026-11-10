@@ -34,6 +34,21 @@ public class CmrDatasource extends BaseEntity {
     /** AES 加密存储 */
     private String authConfig;
 
+    /** unconnected/connected/failed */
+    private String connectStatus;
+
+    /** 上游 4 项必填是否齐全 */
+    private Boolean requiredOk;
+
+    /** 上游 dataset_id */
+    private String upstreamDatasetId;
+
+    private Integer vectorizedCount;
+
+    private Integer totalCount;
+
+    private LocalDateTime lastSyncTime;
+
     private Boolean lastTestConnected;
 
     private Integer lastTestStatusCode;

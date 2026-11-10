@@ -22,16 +22,28 @@ export const routes = [
         meta: { title: '检索结果', icon: 'Document', permission: 'cmr:search:create', hidden: true },
       },
       {
+        path: 'summary/:taskNo',
+        name: 'search-summary',
+        component: () => import('../views/search/SearchSummaryView.vue'),
+        meta: { title: '搜索结果摘要', icon: 'Tickets', permission: 'cmr:search:page', hidden: true },
+      },
+      {
         path: 'library',
         name: 'library',
         component: () => import('../views/dataset/LibraryView.vue'),
-        meta: { title: '库管理', icon: 'FolderOpened', permission: 'cmr:dataset:page' },
+        meta: { title: '数据源库管理', icon: 'FolderOpened', permission: 'cmr:dataset:page' },
+      },
+      {
+        path: 'behaviors',
+        name: 'behaviors',
+        component: () => import('../views/search/BehaviorView.vue'),
+        meta: { title: '搜索行为', icon: 'Clock', permission: 'cmr:search:page' },
       },
       {
         path: 'tasks',
         name: 'tasks',
         component: () => import('../views/task/TaskManageView.vue'),
-        meta: { title: '任务管理', icon: 'List', permission: 'cmr:task:page' },
+        meta: { title: '任务管理', icon: 'List', permission: 'cmr:task:page', hidden: true },
       },
       {
         path: 'tasks/:id',
@@ -49,7 +61,7 @@ export const routes = [
         path: 'evaluation',
         name: 'evaluation',
         component: () => import('../views/evaluation/EvaluationView.vue'),
-        meta: { title: '评测', icon: 'DataAnalysis', permission: 'cmr:eval:page' },
+        meta: { title: '效果评测', icon: 'DataAnalysis', permission: 'cmr:eval:page' },
       },
       {
         path: 'operation',
@@ -59,9 +71,7 @@ export const routes = [
       },
       {
         path: 'history',
-        name: 'history',
-        component: () => import('../views/history/SearchHistoryView.vue'),
-        meta: { title: '检索历史', icon: 'Clock', permission: 'cmr:search:page' },
+        redirect: '/behaviors',
       },
     ],
   },

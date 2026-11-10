@@ -88,7 +88,14 @@
               <select id="sceneSelect" v-model="scene" class="scene-select">
                 <option v-for="item in sceneOptions" :key="item.alias" :value="item.alias">{{ item.label }}</option>
               </select>
-              <router-link class="scene-cfg" to="/strategies" title="场景在策略管理中维护：策略绑定场景后此处可选">
+              <label class="sp-label" for="strategySelect">策略</label>
+              <select id="strategySelect" v-model="strategyId" class="scene-select strategy-select">
+                <option value="">按场景生效策略</option>
+                <option v-for="item in strategyList" :key="item.id" :value="item.id">
+                  {{ item.name }}{{ item.preset ? '（系统默认）' : '' }} · {{ item.paramSummary }}
+                </option>
+              </select>
+              <router-link class="scene-cfg" to="/strategies" title="场景与策略在策略管理中维护">
                 配置<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
               </router-link>
             </div>
@@ -239,7 +246,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { executeSearch, pageHistory, suggestWords, understand, uploadFile } from '../../api'
+import { executeSearch, pageHistory, strategyOptions, suggestWords, understand, uploadFile } from '../../api'
+import type { StrategyOptionVO } from '../../api/types'
 import { useDictStore } from '../../stores/dict'
 import type { DictItem } from '../../api/types'
 
@@ -272,6 +280,10 @@ const queryFileName = ref('')
 const queryMode = ref<Target | null>(null)
 const selectedPair = ref('')
 const scene = ref('general')
+
+/** 检索台策略下拉：空=按场景取生效策略 */
+const strategyId = ref('')
+const strategyList = ref<StrategyOptionVO[]>([])
 const searching = ref(false)
 const recognizing = ref(false)
 const uploadState = ref<UploadState>('default')
@@ -347,6 +359,11 @@ onMounted(async () => {
     historySuggestions.value = [...new Set(page.records.map(item => item.queryText || '').filter(Boolean))].slice(0, 3)
   } catch {
     historySuggestions.value = []
+  }
+  try {
+    strategyList.value = await strategyOptions()
+  } catch {
+    strategyList.value = []
   }
   if (query.value.trim().length >= 4) {
     onQueryInput()
@@ -568,6 +585,7 @@ async function runSearch(clarifiedQuery?: string) {
     if (queryFile.value) body.queryFile = queryFile.value
     if (query.value.trim()) body.query = query.value.trim()
     if (scene.value) body.scene = scene.value
+    if (strategyId.value) body.strategyId = strategyId.value
     if (selectedTarget.value) body.targetModalities = [targetValues[selectedTarget.value]]
     if (clarifiedQuery) {
       body.query = clarifiedQuery

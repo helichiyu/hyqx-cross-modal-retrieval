@@ -53,4 +53,25 @@ public class DatasourceController {
     public ApiResult<DatasourceTestVO> test(@PathVariable Long id) {
         return ApiResult.success(datasourceService.test(id));
     }
+
+    @Operation(summary = "拉取上游数据集列表（含 4 项必填校验）")
+    @PreAuthorize("hasAnyAuthority('cmr:dataset:page')")
+    @GetMapping("{id}/datasets")
+    public ApiResult<java.util.Map<String, Object>> datasets(@PathVariable Long id) {
+        return ApiResult.success(datasourceService.remoteDatasets(id));
+    }
+
+    @Operation(summary = "同步元数据（回写连接状态/必填校验/条目总数）")
+    @PreAuthorize("hasAnyAuthority('cmr:dataset:create')")
+    @PostMapping("{id}/sync")
+    public ApiResult<java.util.Map<String, Object>> sync(@PathVariable Long id) {
+        return ApiResult.success(datasourceService.sync(id));
+    }
+
+    @Operation(summary = "数据源接入契约（只读面板）")
+    @PreAuthorize("hasAnyAuthority('cmr:dataset:page')")
+    @GetMapping("contract")
+    public ApiResult<java.util.Map<String, Object>> contract() {
+        return ApiResult.success(datasourceService.contract());
+    }
 }

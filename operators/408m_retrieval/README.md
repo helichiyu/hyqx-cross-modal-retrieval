@@ -24,6 +24,7 @@
   "weights": { "text": 25, "image": 25, "audio": 25, "video": 25 },
   "rerank": false,
   "wordWeight": 2.0,
+  "threshold": 0.60,
   "targetModalities": ["text", "image", "audio", "video"]
 }
 ```
@@ -31,6 +32,7 @@
 - `query` 与 `queryFile` 二选一（文本查询或图片/音频/视频文件路径）。
 - `indexDir` 省略时用 `config.yaml` 的 `retrieval.active_index`。
 - `weights` 合计必须为 100，否则业务失败。
+- `threshold` 为相似度阈值（0.30–0.99），按原始余弦 `alignScore` 过滤，低于阈值不下发；省略则不过滤。
 - 其余参数均可省略，省略时用 `retrieval` 配置默认值。
 
 ### search 响应 data
@@ -43,9 +45,11 @@
   "count": 10,
   "items": [
     { "rank": 1, "score": 0.528178, "modality": "image",
-      "itemId": "img_000002", "sourceFile": "dog_beach.jpg", "locator": null, "text": null }
+      "itemId": "img_000002", "sourceFile": "dataset/images/dog_beach.jpg",
+      "source": "images", "alignScore": 0.316742,
+      "locator": null, "text": null }
   ],
-  "strategy": { "weights": {}, "rerank": false, "topK": 10 },
+  "strategy": { "weights": {}, "rerank": false, "topK": 10, "threshold": 0.6 },
   "modelVersion": "cmr-embed-v1",
   "elapsedMs": 727.5
 }
@@ -59,7 +63,7 @@
 | 图片/视频 | clip |
 | 音频 | clap |
 
-融合：各通道召回 topK×5，通道内 z-score 归一取非负，按四模态权重加权；精确词命中按覆盖率加 `wordWeight × coverage^1.5`（保护发票号、错误码）。精排开启时前 `rerank_top_n` 条含文本条目由 bge-reranker-v2-m3 联合打分重排。
+融合：各通道召回 topK×5，通道内 z-score 归一取非负，按四模态权重加权；精确词命中按覆盖率加 `wordWeight × coverage^1.5`（保护发票号、错误码）。`alignScore` 为条目在召回通道上的原始余弦相似度（用于阈值过滤与前端对齐热力图），`source` 为源文件父目录名。精排开启时前 `rerank_top_n` 条含文本条目由 bge-reranker-v2-m3 联合打分重排。
 
 ## 本地验证
 

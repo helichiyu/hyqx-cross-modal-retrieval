@@ -52,6 +52,199 @@ public class DatasourceService {
     private final BizNoGenerator bizNoGenerator;
     private final CmrProperties properties;
 
+    /** 上游数据源契约（P4 只读面板）：数据集与条目两级必填字段 */
+    public java.util.Map<String, Object> contract() {
+        java.util.Map<String, Object> dataset = new java.util.LinkedHashMap<>();
+        dataset.put("required", List.of("dataset_id", "name", "item_count"));
+        dataset.put("optional", List.of("modal_types"));
+        java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+        item.put("required", List.of("item_id", "modals"));
+        item.put("modalRule", "modals 1-4 个，每项为 {type,url} 或 {type,content}，type ∈ text/image/audio/video");
+        return java.util.Map.of(
+                "endpoints", List.of("GET {base}/datasets", "GET {base}/datasets/{dataset_id}",
+                        "GET {base}/datasets/{dataset_id}/items?page=1&size=20"),
+                "dataset", dataset,
+                "item", item,
+                "pushMode", "不支持 push；数据源只拉元数据，文件仍在来源方，检索按 ID 引用");
+    }
+
+    /** 拉取上游数据集列表（P4 数据源库列表 + 4 项必填校验） */
+    public java.util.Map<String, Object> remoteDatasets(Long id) {
+        CmrDatasource datasource = datasourceMapper.selectOneById(id);
+        BizException.assertNull(datasource, "数据源不存在");
+        BizException.assertTrue(!isPullProtocol(datasource.getProtocol()), "仅接口协议支持拉取上游数据集");
+        BizException.assertNull(datasource.getEndpoint(), "数据源未配置接口地址");
+        return fetchDatasets(datasource);
+    }
+
+    /** 同步：拉元数据并回写连接状态、必填校验、数据集总数 */
+    public java.util.Map<String, Object> sync(Long id) {
+        CmrDatasource datasource = datasourceMapper.selectOneById(id);
+        BizException.assertNull(datasource, "数据源不存在");
+        java.util.Map<String, Object> result;
+        try {
+            result = fetchDatasets(datasource);
+        } catch (BizException e) {
+            datasource.setConnectStatus("failed");
+            datasource.setRequiredOk(false);
+            datasource.setLastTestConnected(false);
+            datasource.setLastTestMessage(e.getMessage());
+            datasource.setLastTestTime(LocalDateTime.now());
+            datasourceMapper.update(datasource, false);
+            throw e;
+        }
+        datasource.setConnectStatus("connected");
+        datasource.setRequiredOk(Boolean.TRUE.equals(result.get("requiredOk")));
+        datasource.setUpstreamDatasetId((String) result.get("firstDatasetId"));
+        datasource.setTotalCount((Integer) result.get("totalItems"));
+        datasource.setLastSyncTime(LocalDateTime.now());
+        datasource.setLastTestConnected(true);
+        datasource.setLastTestMessage("同步成功，数据集 " + result.get("datasetCount") + " 个");
+        datasource.setLastTestTime(LocalDateTime.now());
+        datasourceMapper.update(datasource, false);
+        return result;
+    }
+
+    private java.util.Map<String, Object> fetchDatasets(CmrDatasource datasource) {
+        String base = trimBase(datasource.getEndpoint());
+        String body = getJson(datasource, base + "/datasets");
+        java.util.List<java.util.Map<String, Object>> datasets = unwrapList(body);
+        BizException.assertTrue(datasets.isEmpty(), "上游未返回任何数据集");
+
+        java.util.List<java.util.Map<String, Object>> briefs = new java.util.ArrayList<>();
+        boolean requiredOk = true;
+        Integer totalItems = 0;
+        String firstDatasetId = null;
+        for (java.util.Map<String, Object> ds : datasets) {
+            String datasetId = str(ds.get("dataset_id"));
+            String name = str(ds.get("name"));
+            Integer itemCount = intOf(ds.get("item_count"));
+            boolean ok = datasetId != null && name != null && itemCount != null;
+            requiredOk = requiredOk && ok;
+            if (firstDatasetId == null) {
+                firstDatasetId = datasetId;
+            }
+            totalItems += itemCount == null ? 0 : itemCount;
+            java.util.Map<String, Object> brief = new java.util.LinkedHashMap<>();
+            brief.put("datasetId", datasetId);
+            brief.put("name", name);
+            brief.put("itemCount", itemCount);
+            brief.put("modalTypes", ds.get("modal_types"));
+            brief.put("requiredOk", ok);
+            briefs.add(brief);
+        }
+        // 抽样校验条目契约：item_id + modals（1-4 项）
+        String itemIssue = sampleItemCheck(datasource, base, firstDatasetId);
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("datasetCount", briefs.size());
+        result.put("datasets", briefs);
+        result.put("requiredOk", requiredOk && itemIssue == null);
+        result.put("firstDatasetId", firstDatasetId);
+        result.put("totalItems", totalItems);
+        result.put("itemIssue", itemIssue);
+        return result;
+    }
+
+    private String sampleItemCheck(CmrDatasource datasource, String base, String datasetId) {
+        if (datasetId == null) {
+            return "缺少 dataset_id，无法校验条目契约";
+        }
+        try {
+            String body = getJson(datasource, base + "/datasets/" + datasetId + "/items?page=1&size=1");
+            java.util.List<java.util.Map<String, Object>> items = unwrapList(body);
+            if (items.isEmpty()) {
+                return null;
+            }
+            java.util.Map<String, Object> item = items.get(0);
+            if (str(item.get("item_id")) == null) {
+                return "条目缺少 item_id";
+            }
+            Object modals = item.get("modals");
+            if (!(modals instanceof java.util.List<?> list) || list.isEmpty() || list.size() > 4) {
+                return "条目 modals 必须为 1-4 项";
+            }
+            return null;
+        } catch (BizException e) {
+            return e.getMessage();
+        }
+    }
+
+    private String getJson(CmrDatasource datasource, String url) {
+        String authConfig = decryptAuth(datasource);
+        try {
+            HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(Duration.ofSeconds(8))
+                    .header("Accept", "application/json")
+                    .GET();
+            if ("token".equals(datasource.getAuthType()) && authConfig != null && !authConfig.isBlank()) {
+                request.header("Authorization", "Bearer " + authConfig);
+            } else if ("basic".equals(datasource.getAuthType()) && authConfig != null && !authConfig.isBlank()) {
+                String credential = authConfig.contains(":") ? authConfig : authConfig + ":";
+                request.header("Authorization", "Basic " + Base64.getEncoder()
+                        .encodeToString(credential.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            }
+            HttpResponse<String> response = HTTP_CLIENT.send(request.build(),
+                    HttpResponse.BodyHandlers.ofString(java.nio.charset.StandardCharsets.UTF_8));
+            BizException.assertTrue(response.statusCode() < 200 || response.statusCode() >= 300,
+                    "上游返回 HTTP " + response.statusCode());
+            return response.body();
+        } catch (IllegalArgumentException e) {
+            throw new BizException("接口地址格式无效");
+        } catch (IOException e) {
+            throw new BizException("数据源不可达或连接超时");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BizException("同步被中断");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private java.util.List<java.util.Map<String, Object>> unwrapList(String body) {
+        Object parsed = com.hsmty.cmr.common.util.JsonUtils.read(body, Object.class);
+        Object listNode = parsed;
+        if (parsed instanceof java.util.Map<?, ?> map) {
+            listNode = map.get("data") != null ? map.get("data") : map.get("datasets");
+        }
+        BizException.assertTrue(!(listNode instanceof java.util.List<?>), "上游响应不是数据集列表");
+        java.util.List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        for (Object node : (java.util.List<?>) listNode) {
+            if (node instanceof java.util.Map<?, ?> m) {
+                result.add((java.util.Map<String, Object>) m);
+            }
+        }
+        return result;
+    }
+
+    private String trimBase(String endpoint) {
+        String base = endpoint.trim();
+        while (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        return base;
+    }
+
+    private String str(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value);
+        return text.isBlank() ? null : text;
+    }
+
+    private Integer intOf(Object value) {
+        if (value instanceof Number n) {
+            return n.intValue();
+        }
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(String.valueOf(value));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     public List<DatasourceVO> list() {
         List<DatasourceVO> sources = datasourceMapper.selectListByQuery(
                         QueryWrapper.create().orderBy(CMR_DATASOURCE.ID.desc()))
@@ -84,6 +277,8 @@ public class DatasourceService {
         ds.setProtocol(dto.getProtocol());
         ds.setAuthType(dto.getAuthType());
         ds.setAuthConfig(encryptAuth(dto));
+        ds.setConnectStatus("unconnected");
+        ds.setRequiredOk(false);
         ds.setRemark(dto.getRemark());
         ds.setDelFlag("F");
         ds.setCreateTime(LocalDateTime.now());

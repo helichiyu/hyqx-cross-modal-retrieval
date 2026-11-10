@@ -5,6 +5,7 @@ import com.hsmty.cmr.common.api.ApiResult;
 import com.hsmty.cmr.common.api.PageQuery;
 import com.hsmty.cmr.common.api.PageResult;
 import com.hsmty.cmr.domain.strategy.dto.RollbackDTO;
+import com.hsmty.cmr.domain.strategy.dto.StrategyOfflineDTO;
 import com.hsmty.cmr.domain.strategy.dto.StrategySaveDTO;
 import com.hsmty.cmr.domain.strategy.service.StrategyService;
 import com.hsmty.cmr.domain.strategy.vo.StrategyDetailVO;
@@ -122,6 +123,29 @@ public class StrategyController {
     @PostMapping("{id}/rollback")
     public ApiResult<StrategyVersionVO> rollback(@PathVariable Long id, @Valid @RequestBody RollbackDTO dto) {
         return ApiResult.success(strategyService.rollback(id, dto.getVersionNo()));
+    }
+
+    @Operation(summary = "检索台策略下拉（生效策略+参数摘要）")
+    @PreAuthorize("hasAnyAuthority('cmr:search:create')")
+    @GetMapping("options")
+    public ApiResult<List<Map<String, Object>>> options() {
+        return ApiResult.success(strategyService.options());
+    }
+
+    @Operation(summary = "策略下线（系统预置不可下线）")
+    @PreAuthorize("hasAnyAuthority('cmr:strategy:update')")
+    @PostMapping("{id}/offline")
+    public ApiResult<Void> offline(@PathVariable Long id, @Valid @RequestBody StrategyOfflineDTO dto) {
+        strategyService.offline(id, dto.getReason());
+        return ApiResult.success();
+    }
+
+    @Operation(summary = "策略重新上线（转草稿，需重新发布生效）")
+    @PreAuthorize("hasAnyAuthority('cmr:strategy:update')")
+    @PostMapping("{id}/online")
+    public ApiResult<Void> online(@PathVariable Long id) {
+        strategyService.online(id);
+        return ApiResult.success();
     }
 
     @Operation(summary = "场景生效策略（检索台回显）")

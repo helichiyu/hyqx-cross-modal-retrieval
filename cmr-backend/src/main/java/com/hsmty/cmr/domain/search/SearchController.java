@@ -3,7 +3,9 @@ package com.hsmty.cmr.domain.search;
 import com.hsmty.cmr.common.api.ApiResult;
 import com.hsmty.cmr.domain.operation.service.WordService;
 import com.hsmty.cmr.domain.search.dto.ClickDTO;
+import com.hsmty.cmr.domain.search.dto.FavoriteDTO;
 import com.hsmty.cmr.domain.search.dto.SearchExecuteDTO;
+import com.hsmty.cmr.domain.search.dto.VoteDTO;
 import com.hsmty.cmr.domain.search.dto.UnderstandDTO;
 import com.hsmty.cmr.domain.search.service.SearchService;
 import com.hsmty.cmr.domain.search.vo.SearchResultVO;
@@ -97,4 +99,26 @@ public class SearchController {
         return ApiResult.success();
     }
 
+    @Operation(summary = "赞/踩（封存后只读；重复同向即取消）")
+    @PreAuthorize("hasAnyAuthority('cmr:search:page')")
+    @PostMapping("tasks/{taskNo}/vote")
+    public ApiResult<java.util.Map<String, Object>> vote(@PathVariable String taskNo,
+                                                         @Valid @RequestBody VoteDTO dto) {
+        return ApiResult.success(searchService.vote(taskNo, dto.getItemId(), dto.getVote()));
+    }
+
+    @Operation(summary = "收藏/取消收藏")
+    @PreAuthorize("hasAnyAuthority('cmr:search:page')")
+    @PostMapping("favorites")
+    public ApiResult<Boolean> toggleFavorite(@Valid @RequestBody FavoriteDTO dto) {
+        return ApiResult.success(searchService.toggleFavorite(
+                dto.getItemId(), dto.getItemName(), dto.getSource(), dto.getTaskNo()));
+    }
+
+    @Operation(summary = "我的收藏")
+    @PreAuthorize("hasAnyAuthority('cmr:search:page')")
+    @GetMapping("favorites")
+    public ApiResult<java.util.List<java.util.Map<String, Object>>> favorites() {
+        return ApiResult.success(searchService.favorites());
+    }
 }

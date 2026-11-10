@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 检索流水扩展：操作人、策略快照、阈值、封存、重放/评测归集、摘要过期 -->
+    <changeSet id="cmr-search-history-summary-20261110" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="cmr_search_history" columnName="sealed"/></not>
+        </preConditions>
+        <sql>
+            ALTER TABLE cmr_search_history
+                ADD COLUMN operator_id BIGINT COMMENT '操作人' AFTER user_id,
+                ADD COLUMN operator_name VARCHAR(64) COMMENT '操作人显示名',
+                ADD COLUMN strategy_no VARCHAR(32) COMMENT '策略业务编号 STG',
+                ADD COLUMN strategy_version INT COMMENT '策略版本号',
+                ADD COLUMN threshold DECIMAL(4,2) COMMENT '本次相似度阈值',
+                ADD COLUMN sealed CHAR(1) NOT NULL DEFAULT 'T' COMMENT '本次运行是否封存（历史记录默认封存）',
+                ADD COLUMN replay_of_task_no VARCHAR(32) COMMENT '重放自原任务号',
+                ADD COLUMN eval_id BIGINT COMMENT '归属评测 id',
+                ADD COLUMN summary_expire_time DATETIME COMMENT 'Top-20 摘要过期时间（30 天）';
+        </sql>
+    </changeSet>
+
+    <!-- 摘要条目展示字段：名称/来源/对齐分（数据流 3.4：摘要存 ID+名称+分数） -->
+    <changeSet id="cmr-result-item-summary-fields-20261110" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="cmr_result_item" columnName="item_name"/></not>
+        </preConditions>
+        <sql>
+            ALTER TABLE cmr_result_item
+                ADD COLUMN item_name VARCHAR(512) COMMENT '条目名称快照' AFTER item_id,
+                ADD COLUMN source VARCHAR(256) COMMENT '来源名快照' AFTER modality,
+                ADD COLUMN align_score DECIMAL(10,6) COMMENT '对齐分（算子返回时）' AFTER score;
+        </sql>
+    </changeSet>
+
+    <!-- 单条赞/踩：任务号 + 条目号 + 用户唯一 -->
+    <changeSet id="cmr-item-vote-20261110" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="cmr_item_vote"/></not>
+        </preConditions>
+        <sql>
+            CREATE TABLE cmr_item_vote (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                task_no VARCHAR(32) NOT NULL COMMENT '任务号',
+                search_id BIGINT NOT NULL COMMENT '检索历史 id',
+                item_id VARCHAR(64) NOT NULL COMMENT '条目 ID',
+                vote VARCHAR(8) NOT NULL COMMENT 'up/down',
+                user_id BIGINT COMMENT '评价人',
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                UNIQUE KEY uk_vote (task_no, item_id, user_id),
+                KEY idx_search (search_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 单条赞踩';
+        </sql>
+    </changeSet>
+
+    <!-- 收藏：只记条目 ID 与元数据，不复制文件本体 -->
+    <changeSet id="cmr-favorite-20261110" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="cmr_favorite"/></not>
+        </preConditions>
+        <sql>
+            CREATE TABLE cmr_favorite (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                user_id BIGINT NOT NULL COMMENT '收藏人',
+                item_id VARCHAR(64) NOT NULL COMMENT '条目 ID',
+                item_name VARCHAR(512) COMMENT '条目名称',
+                source VARCHAR(256) COMMENT '来源名',
+                task_no VARCHAR(32) COMMENT '来源任务号',
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                UNIQUE KEY uk_user_item (user_id, item_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 收藏';
+        </sql>
+    </changeSet>
+</databaseChangeLog>

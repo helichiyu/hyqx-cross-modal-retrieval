@@ -25,7 +25,17 @@ public class StrategyVO {
 
     private String status;
 
+    /** 系统预置（兜底），不可下线 */
+    private Boolean preset;
+
+    private String offlineReason;
+
+    private LocalDateTime offlineTime;
+
     private Integer currentVersion;
+
+    /** 参数摘要，如 “阈值 0.60 · 重排开” */
+    private String paramSummary;
 
     private String remark;
 

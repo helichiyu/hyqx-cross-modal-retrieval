@@ -55,8 +55,33 @@ public class CmrSearchHistory extends BaseEntity {
 
     private Integer elapsedMs;
 
-    /** unadopted/adopted/discarded，一次性终态 */
+    /** 兼容字段：原型 v5 起由赞/踩替代采用/废弃 */
     private String adoptStatus;
 
     private Long userId;
+
+    /** 操作人（搜索行为流水展示） */
+    private Long operatorId;
+
+    private String operatorName;
+
+    /** 策略业务编号与版本快照 */
+    private String strategyNo;
+
+    private Integer strategyVersion;
+
+    /** 本次相似度阈值 */
+    private java.math.BigDecimal threshold;
+
+    /** 本次运行是否封存：封存后赞/踩不可改 */
+    private String sealed;
+
+    /** 重放自原任务号 */
+    private String replayOfTaskNo;
+
+    /** 归属评测 id（效果评测按 query 归集重放） */
+    private Long evalId;
+
+    /** Top-20 摘要过期时间（30 天） */
+    private java.time.LocalDateTime summaryExpireTime;
 }

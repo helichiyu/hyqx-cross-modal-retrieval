@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 数据源同步状态：连接状态、4 项必填、向量化计数、上次同步 -->
+    <changeSet id="cmr-datasource-sync-20261110" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="cmr_datasource" columnName="connect_status"/></not>
+        </preConditions>
+        <sql>
+            ALTER TABLE cmr_datasource
+                ADD COLUMN connect_status VARCHAR(16) NOT NULL DEFAULT 'unconnected' COMMENT 'unconnected/connected/failed' AFTER auth_config,
+                ADD COLUMN required_ok TINYINT(1) DEFAULT 0 COMMENT '上游 4 项必填是否齐全',
+                ADD COLUMN upstream_dataset_id VARCHAR(64) COMMENT '上游 dataset_id',
+                ADD COLUMN vectorized_count INT DEFAULT 0 COMMENT '已完成向量化条目数',
+                ADD COLUMN total_count INT DEFAULT 0 COMMENT '上游条目总数',
+                ADD COLUMN last_sync_time DATETIME COMMENT '上次同步完成时间';
+        </sql>
+    </changeSet>
+
+    <!-- 数据源黑名单：按来源名匹配整源排除（与条目屏蔽独立） -->
+    <changeSet id="cmr-datasource-blacklist-20261110" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="cmr_datasource_blacklist"/></not>
+        </preConditions>
+        <sql>
+            CREATE TABLE cmr_datasource_blacklist (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                dataset_id VARCHAR(64) COMMENT '上游数据集 ID',
+                name VARCHAR(128) COMMENT '数据集名称',
+                source_name VARCHAR(128) NOT NULL COMMENT '来源名（结果页按此匹配排除）',
+                endpoint VARCHAR(512) COMMENT '数据源地址',
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F' COMMENT '逻辑删除',
+                KEY idx_source_name (source_name)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 数据源黑名单';
+        </sql>
+    </changeSet>
+</databaseChangeLog>

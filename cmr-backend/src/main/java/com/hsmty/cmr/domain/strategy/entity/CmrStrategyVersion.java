@@ -34,6 +34,9 @@ public class CmrStrategyVersion extends BaseEntity {
 
     private Integer topK;
 
+    /** 相似度阈值 0.30-0.99，默认 0.60 */
+    private java.math.BigDecimal threshold;
+
     private String status;
 
     /** new/rollback */

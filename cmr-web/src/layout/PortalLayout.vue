@@ -37,16 +37,15 @@ const navGroups = [
     divider: true,
     items: [
       { path: '/search', title: '检索台', icon: 'Search' },
-      { path: '/history', title: '检索历史', icon: 'Clock' },
+      { path: '/behaviors', title: '搜索行为', icon: 'Clock' },
     ],
   },
   {
     title: '',
     divider: false,
     items: [
-      { path: '/library', title: '库管理', icon: 'FolderOpened' },
+      { path: '/library', title: '数据源库管理', icon: 'FolderOpened' },
       { path: '/strategies', title: '策略管理', icon: 'SetUp' },
-      { path: '/tasks', title: '任务管理', icon: 'List' },
       { path: '/operation', title: '结果运营', icon: 'Service' },
       { path: '/evaluation', title: '效果评测', icon: 'DataAnalysis' },
     ],

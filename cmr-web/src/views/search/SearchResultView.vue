@@ -33,12 +33,14 @@
         <section class="rs-bar">
           <span class="rs-line">结果集 {{ resultSetId }} · {{ items.length }} 条</span>
           <span class="rs-state">
+            <span v-if="sealed" class="rs-badge sealed">已封存</span>
             <span class="rs-badge" :class="{ adopt: adoptStatus === 'adopted' }">{{ adoptLabel }}</span>
             <template v-if="adoptStatus === 'unadopted'">
               <button type="button" class="rs-act" @click="setAdopted(true)">采用</button>
               <button type="button" class="rs-act" @click="setAdopted(false)">废弃</button>
             </template>
-            <button type="button" class="rs-act" @click="feedbackVisible = true">结果反馈</button>
+            <button v-if="!sealed" type="button" class="rs-act" @click="sealCurrentTask">封存</button>
+            <button type="button" class="rs-act" @click="openFeedback">结果反馈</button>
           </span>
         </section>
 
@@ -124,6 +126,11 @@
                     </div>
                     <div class="rc-right">
                       <div class="rc-sim">{{ item.score.toFixed(2) }}<small>相似度</small></div>
+                      <div class="rc-vote" @click.stop>
+                        <button type="button" class="rc-vbtn" :class="{ on: item.vote === 'up' }" :disabled="sealed" title="赞" @click="voteItemAction(item, 'up')">▲</button>
+                        <button type="button" class="rc-vbtn down" :class="{ on: item.vote === 'down' }" :disabled="sealed" title="踩" @click="voteItemAction(item, 'down')">▼</button>
+                        <button type="button" class="rc-vbtn fav" :class="{ on: item.favorited }" title="收藏" @click="favoriteItem(item)">{{ item.favorited ? '★' : '☆' }}</button>
+                      </div>
                     </div>
                   </label>
                 </div>
@@ -204,20 +211,23 @@
       <div class="modal-box" style="width:560px">
         <div class="modal-head"><h3>结果反馈</h3><button class="modal-close" type="button" @click="feedbackVisible = false">×</button></div>
         <div class="modal-body">
-          <div class="mb-tip">反馈会进入结果运营页处理，用于修正策略、来源标注或补库。</div>
-          <div class="cm-row"><label>反馈类型</label>
-            <select v-model="feedbackForm.type">
-              <option value="inaccurate">结果不准确</option>
-              <option value="ranking">排序不合理</option>
-              <option value="wrong_source">来源错误</option>
-              <option value="zero_result">零结果</option>
-            </select>
+          <div class="mb-tip">勾选与实际 query 不匹配的条目提交，进入结果运营待处置；处置去向为屏蔽数据 / 调策略 / 补数据。</div>
+          <div class="fb-pick-head">
+            <span>不匹配条目（已选 {{ feedbackForm.items.length }} 条）</span>
+            <button type="button" class="fb-pick-all" @click="togglePickAll">{{ allPicked ? '取消全选' : '全选' }}</button>
           </div>
-          <div class="cm-row textarea"><label>说明</label><textarea v-model="feedbackForm.description" placeholder="补充说明（哪个条目、期望结果等）"></textarea></div>
+          <div class="fb-pick-list">
+            <label v-for="item in filteredItems" :key="item.id" class="fb-pick">
+              <input v-model="feedbackForm.items" type="checkbox" :value="{ itemId: item.itemId, name: item.name, source: item.source }">
+              <span class="fb-pick-name">{{ item.name || item.itemId }}</span>
+              <span class="fb-pick-src">{{ itemSource(item) }}</span>
+            </label>
+          </div>
+          <div class="cm-row textarea"><label>说明</label><textarea v-model="feedbackForm.description" placeholder="补充说明（期望结果、判断依据等）"></textarea></div>
         </div>
         <div class="modal-foot">
           <button class="btn-ghost" type="button" @click="feedbackVisible = false">取消</button>
-          <button class="btn-primary" type="button" :disabled="feedbackSubmitting" @click="submitFeedback">{{ feedbackSubmitting ? '提交中…' : '提交反馈' }}</button>
+          <button class="btn-primary" type="button" :disabled="feedbackSubmitting || !feedbackForm.items.length" @click="submitFeedback">{{ feedbackSubmitting ? '提交中…' : '提交反馈' }}</button>
         </div>
       </div>
     </div>
@@ -286,10 +296,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { adoptResults, clickResult, createFeedback, pageFeedbacks, rerunSearchResults, searchResults } from '../../api'
+import { adoptResults, clickResult, createFeedback, pageFeedbacks, rerunSearchResults, searchResults, sealTask, toggleFavorite, voteItem } from '../../api'
 import { http } from '../../api/http'
 import MediaPreview from '../../components/MediaPreview.vue'
-import type { FeedbackVO, HistoryDetailVO, Id, ResultItemVO } from '../../api/types'
+import type { FeedbackVO, HistoryDetailVO, Id, MismatchItem, ResultItemVO } from '../../api/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -315,7 +325,8 @@ const clickedIds = ref(new Set<Id>())
 const expandedId = ref<Id | null>(null)
 const feedbackVisible = ref(false)
 const feedbackSubmitting = ref(false)
-const feedbackForm = reactive({ type: 'inaccurate', description: '' })
+const feedbackForm = reactive<{ items: MismatchItem[]; description: string }>({ items: [], description: '' })
+const sealed = ref(false)
 
 const zeroCauseVisible = ref(false)
 const zeroPlanVisible = ref(false)
@@ -361,6 +372,7 @@ const adoptLabel = computed(() => adoptStatus.value === 'adopted' ? '已采用' 
 const qualityLabel = computed(() => `${['D', 'C', 'B', 'A'][qualityMin.value]} ~ ${['D', 'C', 'B', 'A'][qualityMax.value]}${qualityMin.value === 0 && qualityMax.value === 3 ? '（全部）' : ''}`)
 const rangeFillStyle = computed(() => ({ left: `${qualityMin.value / 3 * 100}%`, width: `${(qualityMax.value - qualityMin.value) / 3 * 100}%` }))
 const selectedCount = computed(() => selectedIds.value.size)
+const allPicked = computed(() => filteredItems.value.length > 0 && feedbackForm.items.length === filteredItems.value.length)
 const sourceOptions = computed(() => ['全部来源', ...new Set(items.value.map(item => itemSource(item)))])
 const groupTotal = computed(() => activeGroup.value === 'all' ? items.value.length : groupCount(activeGroup.value))
 const similarQueries = computed(() => [`${contextQuery.value} 高清`, `${contextQuery.value} 位置示意`, contextQuery.value])
@@ -385,6 +397,7 @@ async function load() {
     detail.value = data
     items.value = data.items || []
     adoptStatus.value = data.history.adoptStatus || 'unadopted'
+    sealed.value = data.history.sealed === 'T'
     void loadFeedbackProgress()
     actualView.value = items.value.length ? 'result' : 'empty'
   } catch (error) {
@@ -395,12 +408,12 @@ async function load() {
 }
 
 async function loadFeedbackProgress() {
-  if (!detail.value?.history.id) {
+  if (!detail.value?.history.bizNo) {
     feedbacks.value = []
     return
   }
   try {
-    const page = await pageFeedbacks({ pageNum: 1, pageSize: 20, searchId: detail.value.history.id })
+    const page = await pageFeedbacks({ pageNum: 1, pageSize: 20, sourceTaskNo: detail.value.history.bizNo })
     feedbacks.value = page.records
   } catch {
     feedbacks.value = []
@@ -408,11 +421,11 @@ async function loadFeedbackProgress() {
 }
 
 function feedbackStatus(feedback: FeedbackVO) {
-  return ({ pending: '待处理', processing: '处理中', closed: '已闭环' } as Record<string, string>)[feedback.status] || feedback.status
+  return ({ pending: '待处理', handled: '已处理' } as Record<string, string>)[feedback.status] || feedback.status
 }
 
 function feedbackTarget(feedback: FeedbackVO) {
-  return ({ strategy: '策略调优', datasource: '数据源补充', backfill: '数据回填' } as Record<string, string>)[feedback.target || ''] || '待定去向'
+  return ({ block: '屏蔽数据', strategy: '调策略', supplement: '补数据' } as Record<string, string>)[feedback.disposition || ''] || '待定去向'
 }
 
 function groupCount(key: string) {
@@ -533,47 +546,134 @@ async function downloadSelected() {
   }
 }
 
-function runCauseAnalysis() {
+async function runCauseAnalysis() {
   const count = selectedCauseOptions.value.length
-  zeroLog.value = count ? `已完成 ${count} 项分析：建议优先复核过滤阈值与库覆盖。` : '请至少选择一个分析维度'
-  zeroCauseVisible.value = false
+  if (!count) {
+    zeroLog.value = '请至少选择一个分析维度'
+    return
+  }
+  try {
+    await createFeedback({
+      entryType: 'zero',
+      sourceTaskNo: detail.value?.history.bizNo,
+      sourceQuery: detail.value?.history.queryText || undefined,
+      description: `原因分析维度：${selectedCauseOptions.value.join('；')}`,
+    })
+    zeroLog.value = `${new Date().toLocaleTimeString()} · 已发起原因分析（${count} 项），可在结果运营处置`
+    zeroCauseVisible.value = false
+    await loadFeedbackProgress()
+    showToast('原因分析已登记', 'ok')
+  } catch (error) {
+    showToast((error as Error).message, 'err')
+  }
 }
 
 async function saveZeroPlan() {
   try {
     await createFeedback({
-      type: 'zero_result',
+      entryType: 'zero',
+      sourceTaskNo: detail.value?.history.bizNo,
+      sourceQuery: detail.value?.history.queryText || undefined,
       description: `[${zeroPlan.way}] ${zeroPlan.note || '零结果处置方案'}`,
-      searchId: detail.value?.history.id,
     })
     zeroLog.value = `${new Date().toLocaleTimeString()} · ${zeroPlan.way} · 已登记`
     zeroPlanVisible.value = false
+    await loadFeedbackProgress()
     showToast('处置方案已登记', 'ok')
   } catch (error) {
     showToast((error as Error).message, 'err')
   }
 }
 
+function openFeedback() {
+  feedbackForm.items = items.value
+    .filter(item => !item.deleted && selectedIds.value.has(item.id))
+    .map(item => ({ itemId: item.itemId, name: item.name, source: item.source }))
+  feedbackForm.description = ''
+  feedbackVisible.value = true
+}
+
+function togglePickAll() {
+  feedbackForm.items = allPicked.value
+    ? []
+    : filteredItems.value.map(item => ({ itemId: item.itemId, name: item.name, source: item.source }))
+}
+
 async function submitFeedback() {
-  if (!detail.value?.history.id) {
+  const history = detail.value?.history
+  if (!history) {
     showToast('缺少关联检索历史', 'err')
+    return
+  }
+  if (!feedbackForm.items.length) {
+    showToast('请勾选不匹配条目', 'err')
     return
   }
   feedbackSubmitting.value = true
   try {
     await createFeedback({
-      searchId: detail.value.history.id,
-      type: feedbackForm.type,
+      entryType: 'mismatch',
+      sourceTaskNo: history.bizNo,
+      sourceQuery: history.queryText || undefined,
+      items: feedbackForm.items,
       description: feedbackForm.description,
     })
     feedbackVisible.value = false
+    feedbackForm.items = []
     feedbackForm.description = ''
     await loadFeedbackProgress()
-    showToast('反馈已登记，可在结果运营页跟踪', 'ok')
+    showToast('反馈已登记，可在结果运营页处置', 'ok')
   } catch (error) {
     showToast((error as Error).message, 'err')
   } finally {
     feedbackSubmitting.value = false
+  }
+}
+
+async function voteItemAction(item: ResultItemVO, vote: 'up' | 'down') {
+  const taskNo = detail.value?.history.bizNo
+  if (!taskNo) {
+    return
+  }
+  if (sealed.value) {
+    showToast('任务已封存，赞踩已锁定', 'err')
+    return
+  }
+  const next = item.vote === vote ? 'none' : vote
+  try {
+    const result = await voteItem(taskNo, item.itemId, next)
+    item.vote = result.vote as 'up' | 'down' | null
+  } catch (error) {
+    showToast((error as Error).message, 'err')
+  }
+}
+
+async function favoriteItem(item: ResultItemVO) {
+  try {
+    item.favorited = await toggleFavorite({
+      itemId: item.itemId,
+      itemName: item.name,
+      source: item.source,
+      taskNo: detail.value?.history.bizNo,
+    })
+    showToast(item.favorited ? '已收藏' : '已取消收藏', 'ok')
+  } catch (error) {
+    showToast((error as Error).message, 'err')
+  }
+}
+
+async function sealCurrentTask() {
+  const taskNo = detail.value?.history.bizNo
+  if (!taskNo) {
+    showToast('缺少任务号，无法封存', 'err')
+    return
+  }
+  try {
+    await sealTask(taskNo)
+    sealed.value = true
+    showToast('已封存，赞踩锁定', 'ok')
+  } catch (error) {
+    showToast((error as Error).message, 'err')
   }
 }
 
@@ -627,6 +727,22 @@ function closeDev() { devOpen.value = false }
 .p2-main-col { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .rc-media { width: 100%; margin-top: 8px; border-top: 1px dashed #eef2f8; padding-top: 8px; }
 .rc-media :deep(.media) { max-height: 220px; }
+.rc-vote { display: flex; gap: 4px; margin-top: 6px; justify-content: flex-end; }
+.rc-vbtn {
+  border: 1px solid var(--content-line); background: #fff; border-radius: 6px;
+  width: 26px; height: 24px; cursor: pointer; color: #8a94a6; font-size: 12px; line-height: 1;
+}
+.rc-vbtn.on { color: #1b7f3b; border-color: #9fd6ae; background: #f0fbf3; }
+.rc-vbtn.down.on { color: #c0392b; border-color: #f0b6b0; background: #fdf3f2; }
+.rc-vbtn.fav.on { color: #d99a00; border-color: #f2d79b; background: #fffaf0; }
+.rc-vbtn:disabled { opacity: .45; cursor: not-allowed; }
+.rs-badge.sealed { color: #6b7280; background: #f1f3f6; }
+.fb-pick-head { display: flex; align-items: center; justify-content: space-between; margin: 10px 0 6px; font-size: 13px; color: #4b5563; }
+.fb-pick-all { border: none; background: none; color: #4169f6; cursor: pointer; font-size: 12px; }
+.fb-pick-list { max-height: 240px; overflow: auto; border: 1px solid var(--content-line); border-radius: 8px; padding: 6px 10px; display: flex; flex-direction: column; gap: 2px; }
+.fb-pick { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; }
+.fb-pick-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-pick-src { color: #8a94a6; font-size: 12px; }
 
 .ghost-link { display: inline-flex; align-items: center; text-decoration: none; color: #4169f6; border-color: #aebdf5; }
 .cm-row.textarea { align-items: start; }

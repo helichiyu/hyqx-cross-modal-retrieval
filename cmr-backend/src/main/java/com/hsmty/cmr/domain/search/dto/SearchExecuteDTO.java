@@ -25,6 +25,9 @@ public class SearchExecuteDTO {
 
     private String scene;
 
+    /** 检索台选定的策略（不传则按场景取生效策略） */
+    private Long strategyId;
+
     /** 407 澄清选定后的改写 query */
     private String clarifiedQuery;
 
@@ -42,4 +45,7 @@ public class SearchExecuteDTO {
     @Min(1)
     @Max(100)
     private Integer topK;
+
+    /** 显式覆盖阈值（0.30-0.99），不传用策略阈值 */
+    private java.math.BigDecimal threshold;
 }
