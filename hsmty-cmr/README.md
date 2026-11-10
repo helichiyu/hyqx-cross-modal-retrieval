@@ -99,6 +99,9 @@ java -jar hsmty-module-cmr-start/target/hsmty-module-cmr-start.jar --spring.liqu
 
 目前已接入 407 查询理解（`/hs-api/cmr/search/understand`），并用本地 6300 真实算子验证了歧义命中、过短提示、正常查询三类响应；算子不可用时返回 `C9999` 与明确文案。408 检索需要数据集/索引/结果集落库，随检索域迁移接入。
 
+算子返回自有信封（`{code:0,msg,data}`），因此 `CmrOperatorFeignClient` 使用专用 `CmrOperatorFeignConfig`
+（标准 Spring 编解码器），不复用平台的 `FeignResultDecoder`；原因见 `docs/对齐偏差登记.md`。
+
 ## 5. 数据库
 
 - 库：`sd_data_engineering`（与其它模块共用，按表前缀隔离）
@@ -144,8 +147,8 @@ docker compose -p cmr-line --env-file deploy/.env -f deploy/docker-compose.yml u
 
 | 范围 | 命令 | 结果 |
 | --- | --- | --- |
-| 后端测试 | `mvn -s settings.xml -DskipTests=false -pl hsmty-module-cmr-start -am test` | 13/13 通过（core 2、start 11） |
-| 407 真实算子联调 | `POST http://127.0.0.1:6300/407m_query_understand/predict` | 歧义命中/过短提示/正常查询三类响应已核对 |
+| 后端测试 | `mvn -s settings.xml -DskipTests=false -pl hsmty-module-cmr-start -am test` | 12/12 通过（core 2、start 10），另有 1 个算子联调用例默认 `@Disabled` |
+| 407 真实算子联调 | 本地 6300 算子启动后执行 `OperatorLiveSmokeTest` | 通过：歧义命中/过短提示/正常查询三类响应已核对 |
 | 前端类型检查 + 构建 | `corepack pnpm@10.17.1 build` | 通过 |
 | 前端测试 | `corepack pnpm@10.17.1 test` | 4/4 通过 |
 | 前端静态检查 | `corepack pnpm@10.17.1 lint` | 0 error |

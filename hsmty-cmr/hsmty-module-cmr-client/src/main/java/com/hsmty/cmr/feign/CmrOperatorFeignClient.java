@@ -4,7 +4,6 @@ import com.hsmty.cmr.feign.fallback.CmrOperatorFeignClientFallbackFactory;
 import com.hsmty.cmr.pojo.dto.QueryUnderstandDTO;
 import com.hsmty.cmr.pojo.vo.OperatorResult;
 import com.hsmty.cmr.pojo.vo.QueryUnderstandVO;
-import com.hsmty.core.feign.FeignConfig;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 @FeignClient(name = "cmr-operator", url = "${cmr.operator.base-url}",
         contextId = "CmrOperatorFeignClient",
         fallbackFactory = CmrOperatorFeignClientFallbackFactory.class,
-        configuration = FeignConfig.class)
+        configuration = CmrOperatorFeignConfig.class)
 public interface CmrOperatorFeignClient {
 
     @Operation(summary = "407m 查询理解")
