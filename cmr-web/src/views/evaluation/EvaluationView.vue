@@ -18,7 +18,7 @@
       <section class="panel">
         <div class="panel-head"><div class="sec-head"><h2 class="sec-title">② 评测工作台</h2></div></div>
         <div class="run-bar">
-          <label class="field">评测集<select v-model.number="benchSetId" @change="loadRuns(1)"><option :value="0" disabled>选择评测集</option><option v-for="row in doneSets" :key="row.id" :value="row.id">{{ row.name }} · {{ row.queryCount }} 条</option></select></label>
+          <label class="field">评测集<select v-model="benchSetId" @change="loadRuns(1)"><option value="" disabled>选择评测集</option><option v-for="row in doneSets" :key="row.id" :value="row.id">{{ row.name }} · {{ row.queryCount }} 条</option></select></label>
           <label class="field">评测对象（策略版本）<select v-model="benchVersionId"><option value="">当前生效策略</option><option v-for="v in allStrategyVersions" :key="v.id" :value="v.id">{{ versionLabel(v.id) }}</option></select></label>
           <button class="btn-primary" type="button" :disabled="runSubmitting" @click="runBench">{{ runSubmitting?(evaluating?'评测中…':'提交中…'):'开始评测' }}</button>
           <div class="base-chip">对比基线 <b>{{ previousRun ? runMetric(previousRun,'recall','—') : '—' }}</b></div>
@@ -105,13 +105,13 @@
 <script setup lang="ts">
 import{computed,onBeforeUnmount,onMounted,reactive,ref}from'vue'
 import{completeEvalSet,createEvalSet,evalRunDetail,evalSetDetail,labelEvalItem,pageEvalRuns,pageEvalSets,pageStrategies,previewEvalSet,runEval,strategyVersions as fetchStrategyVersions}from'../../api'
-import type{EvalItemVO,EvalPreviewVO,EvalRecordVO,EvalSetVO,StrategyVO,StrategyVersionVO}from'../../api/types'
+import type{EvalItemVO,EvalPreviewVO,EvalRecordVO,EvalSetVO,Id,StrategyVO,StrategyVersionVO}from'../../api/types'
 import{useDictStore}from'../../stores/dict'
 const dictStore=useDictStore()
 const sets=ref<EvalSetVO[]>([]);const runs=ref<EvalRecordVO[]>([]);const setsLoading=ref(false);const runsLoading=ref(false);const setStatusDict=ref<{alias:string;label:string}[]>([]);const setsPage=ref(1);const setsPageSize=10;const setsTotal=ref(0);const runsPage=ref(1);const runsPageSize=10;const runsTotal=ref(0);const labelPage=ref(1);const labelPageSize=10;const labelTotal=ref(0);const strategies=ref<StrategyVO[]>([])
 const createVisible=ref(false);const creating=ref(false);const createPreview=ref<EvalPreviewVO|null>(null);const previewing=ref(false);const createForm=reactive({name:'',remark:'',filters:['zeroResult'] as string[]})
-const labelVisible=ref(false);const labelSet=ref<EvalSetVO|null>(null);const labelItems=ref<EvalItemVO[]>([]);const labelAnswers=reactive<Record<number,string>>({})
-const labelPageCount=computed(()=>Math.max(1,Math.ceil(labelTotal.value/labelPageSize)));const evalSetNames=ref<Record<number,string>>({});const setsPageCount=computed(()=>Math.max(1,Math.ceil(setsTotal.value/setsPageSize)));const runsPageCount=computed(()=>Math.max(1,Math.ceil(runsTotal.value/runsPageSize)));const benchSetId=ref(0);const benchVersionId=ref<number|string>('');const strategyVersionsList=ref<StrategyVersionVO[]>([]);const runSubmitting=ref(false);const evaluating=ref(false);const evalPollingActive=ref(false)
+const labelVisible=ref(false);const labelSet=ref<EvalSetVO|null>(null);const labelItems=ref<EvalItemVO[]>([]);const labelAnswers=reactive<Record<Id,string>>({})
+const labelPageCount=computed(()=>Math.max(1,Math.ceil(labelTotal.value/labelPageSize)));const evalSetNames=ref<Record<Id,string>>({});const setsPageCount=computed(()=>Math.max(1,Math.ceil(setsTotal.value/setsPageSize)));const runsPageCount=computed(()=>Math.max(1,Math.ceil(runsTotal.value/runsPageSize)));const benchSetId=ref<Id|''>('');const benchVersionId=ref<Id|''>('');const strategyVersionsList=ref<StrategyVersionVO[]>([]);const runSubmitting=ref(false);const evaluating=ref(false);const evalPollingActive=ref(false)
 const reportVisible=ref(false);const report=ref<EvalRecordVO|null>(null);const strategyAdjustRoute=computed(()=>report.value?.strategyVersionId?{path:'/strategies',query:{strategyVersionId:report.value.strategyVersionId}}:'/strategies')
 const devOpen=ref(false);const toastVisible=ref(false);const toastMessage=ref('');const toastType=ref<'info'|'ok'|'err'>('info');let toastTimer:ReturnType<typeof setTimeout>|undefined
 const filterOptions=[{key:'zeroResult',label:'零结果'},{key:'noClick',label:'无点击'},{key:'reSearch',label:'复搜'}]
@@ -125,9 +125,9 @@ function parseRecord(raw?:string|null){try{return JSON.parse(raw||'{}')as Record
 function comparisonText(raw?:string|null){const record=parseRecord(raw);const entries=Object.entries(record);return entries.length?entries.map(([k,v])=>`${k}: ${typeof v==='object'?JSON.stringify(v):String(v)}`).join('；'):'—'}
 function runMetric(row:EvalRecordVO|null,key:string,fallback:string){const metricKey=key.includes('@')?key:`${key}@10`;const value=parseMetrics(row?.metricsJson)[metricKey];return value==null?fallback:Number(value).toFixed(3)}
 function metricPass(row:EvalRecordVO|null|undefined,key:string){const metricKey=key.includes('@')?key:`${key}@10`;const actual=parseMetrics(row?.metricsJson)[metricKey];if(actual==null)return false;const line=parseMetrics(row?.linesJson)[metricKey];return line==null||actual>=line}
-function setLabel(id:number){return evalSetNames.value[id]||sets.value.find(x=>x.id===id)?.name||String(id)}
-function strategyName(id:number){return strategies.value.find(x=>x.id===id)?.name||`策略 ${id}`}
-function versionLabel(id?:number|null){if(!id)return '当前生效策略';const version=strategyVersionsList.value.find(x=>x.id===id);return version?`${strategyName(version.strategyId)} · v${version.versionNo}`:`版本 ${id}`}
+function setLabel(id:Id){return evalSetNames.value[id]||sets.value.find(x=>x.id===id)?.name||String(id)}
+function strategyName(id:Id){return strategies.value.find(x=>x.id===id)?.name||`策略 ${id}`}
+function versionLabel(id?:Id|null){if(!id)return '当前生效策略';const version=strategyVersionsList.value.find(x=>x.id===id);return version?`${strategyName(version.strategyId)} · v${version.versionNo}`:`版本 ${id}`}
 function reportText(row:EvalRecordVO){const metrics=parseMetrics(row.metricsJson);const lines=parseMetrics(row.linesJson);return ['结论：'+(row.taskStatus==='failed'?'任务失败':row.conclusion==='pass'?'达标':'未达标'),'任务：'+(row.taskBizNo||'—'),'评测对象：'+versionLabel(row.strategyVersionId),'评测集：'+setLabel(row.evalSetId),'对比：'+comparisonText(row.comparisonJson),'',...Object.entries(metrics).map(([k,v])=>`${k}: 实测 ${Number(v).toFixed(4)} / 线值 ${lines[k]??'—'}`)].join('\n')}
 async function loadSets(pageNo=setsPage.value){setsPage.value=pageNo;setsLoading.value=true;try{const page=await pageEvalSets({pageNum:pageNo,pageSize:setsPageSize});sets.value=page.records;setsTotal.value=page.total;for(const item of page.records)evalSetNames.value[item.id]=item.name;if(!benchSetId.value&&doneSets.value[0]){benchSetId.value=doneSets.value[0].id;await loadRuns(1)}}catch(e){showToast((e as Error).message,'err')}finally{setsLoading.value=false}}
 async function loadRuns(pageNo=runsPage.value){runsPage.value=pageNo;runsLoading.value=true;try{const page=await pageEvalRuns({pageNum:pageNo,pageSize:runsPageSize,evalSetId:benchSetId.value||undefined});runs.value=page.records;runsTotal.value=page.total}catch(e){showToast((e as Error).message,'err')}finally{runsLoading.value=false}}
@@ -149,7 +149,7 @@ async function runBench(){
   if(!benchSetId.value){showToast('请选择评测集','err');return}
   runSubmitting.value=true;evaluating.value=true
   try{
-    const record=await runEval(benchSetId.value,typeof benchVersionId.value==='number'?benchVersionId.value:undefined)
+    const record=await runEval(benchSetId.value,benchVersionId.value||undefined)
     report.value=record;showToast('评测已提交，等待评测任务完成','info');await loadRuns(1)
     const completed=await waitForEvaluation(record)
     if(completed){await loadRuns(1);reportVisible.value=true;showToast(completed.taskStatus==='failed'?'评测任务失败':'评测完成',completed.taskStatus==='failed'?'err':'ok')}

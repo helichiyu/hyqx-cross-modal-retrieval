@@ -289,7 +289,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { adoptResults, clickResult, createFeedback, pageFeedbacks, rerunSearchResults, searchResults } from '../../api'
 import { http } from '../../api/http'
 import MediaPreview from '../../components/MediaPreview.vue'
-import type { FeedbackVO, HistoryDetailVO, ResultItemVO } from '../../api/types'
+import type { FeedbackVO, HistoryDetailVO, Id, ResultItemVO } from '../../api/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -310,9 +310,9 @@ const qualityMin = ref(0)
 const qualityMax = ref(3)
 const similarityThreshold = ref(0.5)
 const sourceFilter = ref('全部来源')
-const selectedIds = ref(new Set<number>())
-const clickedIds = ref(new Set<number>())
-const expandedId = ref<number | null>(null)
+const selectedIds = ref(new Set<Id>())
+const clickedIds = ref(new Set<Id>())
+const expandedId = ref<Id | null>(null)
 const feedbackVisible = ref(false)
 const feedbackSubmitting = ref(false)
 const feedbackForm = reactive({ type: 'inaccurate', description: '' })
@@ -485,7 +485,7 @@ function toggleSelect(item: ResultItemVO, event: Event) {
 }
 
 function clearSelection() {
-  selectedIds.value = new Set<number>()
+  selectedIds.value = new Set<Id>()
 }
 
 async function onCardClick(item: ResultItemVO, event: MouseEvent) {
@@ -582,8 +582,8 @@ async function retrySearch() {
   retrying.value = true
   try {
     const result = await rerunSearchResults(resultSetId.value)
-    selectedIds.value = new Set<number>()
-    clickedIds.value = new Set<number>()
+    selectedIds.value = new Set<Id>()
+    clickedIds.value = new Set<Id>()
     expandedId.value = null
     await router.replace(`/search/results/${result.resultSetId}`)
     await load()

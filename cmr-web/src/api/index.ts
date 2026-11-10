@@ -13,6 +13,7 @@ import type {
   FeedbackVO,
   HistoryDetailVO,
   HistoryVO,
+  Id,
   IndexVO,
   LoginVO,
   PageResult,
@@ -59,34 +60,34 @@ export const pageDatasets = (params: Record<string, unknown>) =>
 
 export const createDataset = (form: FormData) => http.post<DatasetVO>('datasets', form)
 
-export const datasetDetail = (id: number) => http.get<DatasetDetailVO>(`datasets/${id}`)
+export const datasetDetail = (id: Id) => http.get<DatasetDetailVO>(`datasets/${id}`)
 
-export const adjudicateDataset = (id: number, pass: boolean, note?: string) =>
+export const adjudicateDataset = (id: Id, pass: boolean, note?: string) =>
   http.post<void>(`datasets/${id}/adjudicate`, { pass, note })
 
-export const confirmProduction = (id: number) =>
+export const confirmProduction = (id: Id) =>
   http.post<void>(`datasets/${id}/confirm-production`)
 
-export const rebuildDataset = (id: number) => http.post<TaskVO>(`datasets/${id}/rebuild`)
+export const rebuildDataset = (id: Id) => http.post<TaskVO>(`datasets/${id}/rebuild`)
 
 export const listDatasources = () => http.get<DatasourceVO[]>('datasources')
 
 export const createDatasource = (body: Record<string, unknown>) =>
   http.post<DatasourceVO>('datasources', body)
 
-export const testDatasource = (id: number) => http.post<DatasourceTestVO>(`datasources/${id}/test`)
+export const testDatasource = (id: Id) => http.post<DatasourceTestVO>(`datasources/${id}/test`)
 
-export const listIndexes = (datasetId: number) =>
+export const listIndexes = (datasetId: Id) =>
   http.get<IndexVO[]>('indexes', { datasetId })
 
-export const activateIndex = (id: number) => http.post<IndexVO>(`indexes/${id}/activate`)
+export const activateIndex = (id: Id) => http.post<IndexVO>(`indexes/${id}/activate`)
 
 // ---------- 任务 ----------
 
 export const pageTasks = (params: Record<string, unknown>) =>
   http.get<PageResult<TaskVO>>('tasks', params)
 
-export const taskDetail = (id: number) => http.get<TaskDetailVO>(`tasks/${id}`)
+export const taskDetail = (id: Id) => http.get<TaskDetailVO>(`tasks/${id}`)
 
 // ---------- 策略 ----------
 
@@ -95,30 +96,30 @@ export const pageStrategies = (params: Record<string, unknown> = {}) =>
 
 export const strategyModelOptions = () => http.get<Record<string, unknown>>('strategies/model-options')
 
-export const strategyConsistency = (id: number) => http.get<Record<string, unknown>>(`strategies/${id}/consistency`)
+export const strategyConsistency = (id: Id) => http.get<Record<string, unknown>>(`strategies/${id}/consistency`)
 
-export const strategyDetail = (id: number) => http.get<StrategyDetailVO>(`strategies/${id}`)
+export const strategyDetail = (id: Id) => http.get<StrategyDetailVO>(`strategies/${id}`)
 
 export const createStrategy = (body: Record<string, unknown>) =>
   http.post<StrategyVO>('strategies', body)
 
-export const updateDraft = (id: number, body: Record<string, unknown>) =>
+export const updateDraft = (id: Id, body: Record<string, unknown>) =>
   http.put<void>(`strategies/${id}`, body)
 
-export const publishStrategy = (id: number) =>
+export const publishStrategy = (id: Id) =>
   http.post<StrategyVersionVO>(`strategies/${id}/publish`)
 
-export const discardDraft = (id: number) =>
+export const discardDraft = (id: Id) =>
   http.post<void>(`strategies/${id}/discard-draft`)
 
-export const strategyVersions = (id: number) =>
+export const strategyVersions = (id: Id) =>
   http.get<StrategyVersionVO[]>(`strategies/${id}/versions`)
 
 /** from/to 为版本号（versionNo） */
-export const strategyDiff = (id: number, from: number, to: number) =>
+export const strategyDiff = (id: Id, from: number, to: number) =>
   http.get<Record<string, unknown>>(`strategies/${id}/diff`, { from, to })
 
-export const rollbackStrategy = (id: number, versionNo: number) =>
+export const rollbackStrategy = (id: Id, versionNo: number) =>
   http.post<StrategyVersionVO>(`strategies/${id}/rollback`, { versionNo })
 
 // ---------- 检索 ----------
@@ -147,9 +148,9 @@ export const clickResult = (resultSetId: string, rank: number) =>
 export const pageHistory = (params: Record<string, unknown>) =>
   http.get<PageResult<HistoryVO>>('search-history', params)
 
-export const historyDetail = (id: number) => http.get<HistoryDetailVO>(`search-history/${id}`)
+export const historyDetail = (id: Id) => http.get<HistoryDetailVO>(`search-history/${id}`)
 
-export const rerunHistory = (id: number) =>
+export const rerunHistory = (id: Id) =>
   http.post<SearchResultVO>(`search-history/${id}/rerun`)
 
 // ---------- 评测 ----------
@@ -157,7 +158,7 @@ export const rerunHistory = (id: number) =>
 export const pageEvalSets = (params: Record<string, unknown> = {}) =>
   http.get<PageResult<EvalSetVO>>('eval-sets', params)
 
-export const evalSetDetail = (id: number, page?: Record<string, unknown>) =>
+export const evalSetDetail = (id: Id, page?: Record<string, unknown>) =>
   http.get<{ evalSet: EvalSetVO; items: PageResult<EvalItemVO> }>(`eval-sets/${id}`, page)
 
 export const previewEvalSet = (filters: Record<string, boolean>) =>
@@ -166,19 +167,19 @@ export const previewEvalSet = (filters: Record<string, boolean>) =>
 export const createEvalSet = (body: Record<string, unknown>) =>
   http.post<EvalSetVO>('eval-sets', body)
 
-export const labelEvalItem = (setId: number, itemId: number, answers: string[]) =>
+export const labelEvalItem = (setId: Id, itemId: Id, answers: string[]) =>
   http.put<void>(`eval-sets/${setId}/items/${itemId}`, { answers })
 
-export const completeEvalSet = (setId: number) =>
+export const completeEvalSet = (setId: Id) =>
   http.post<void>(`eval-sets/${setId}/complete`)
 
-export const runEval = (evalSetId: number, targetStrategyVersionId?: number) =>
+export const runEval = (evalSetId: Id, targetStrategyVersionId?: Id) =>
   http.post<EvalRecordVO>('eval-runs', { evalSetId, targetStrategyVersionId })
 
 export const pageEvalRuns = (params: Record<string, unknown> = {}) =>
   http.get<PageResult<EvalRecordVO>>('eval-runs', params)
 
-export const evalRunDetail = (id: number) => http.get<EvalRecordVO>(`eval-runs/${id}`)
+export const evalRunDetail = (id: Id) => http.get<EvalRecordVO>(`eval-runs/${id}`)
 
 // ---------- 运营 ----------
 
@@ -190,10 +191,10 @@ export const feedbackStats = () => http.get<FeedbackStatsVO>('feedbacks/stats')
 export const createFeedback = (body: Record<string, unknown>) =>
   http.post<FeedbackVO>('feedbacks', body)
 
-export const processFeedback = (id: number, target?: string) =>
+export const processFeedback = (id: Id, target?: string) =>
   http.post<void>(`feedbacks/${id}/process`, target ? { target } : {})
 
-export const closeFeedback = (id: number, resultNote?: string) =>
+export const closeFeedback = (id: Id, resultNote?: string) =>
   http.post<void>(`feedbacks/${id}/close`, resultNote ? { resultNote } : {})
 
 export const pageWords = (params: Record<string, unknown> = {}) =>
@@ -202,7 +203,7 @@ export const pageWords = (params: Record<string, unknown> = {}) =>
 export const createWord = (body: Record<string, unknown>) =>
   http.post<WordVO>('recommend-words', body)
 
-export const updateWord = (id: number, body: Record<string, unknown>) =>
+export const updateWord = (id: Id, body: Record<string, unknown>) =>
   http.put<WordVO>(`recommend-words/${id}`, body)
 
-export const removeWord = (id: number) => http.delete<void>(`recommend-words/${id}`)
+export const removeWord = (id: Id) => http.delete<void>(`recommend-words/${id}`)

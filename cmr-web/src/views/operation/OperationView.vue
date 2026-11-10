@@ -212,19 +212,19 @@
 <script setup lang="ts">
 import {computed,onBeforeUnmount,onMounted,reactive,ref} from 'vue'
 import{closeFeedback,createFeedback,createWord,feedbackStats,pageFeedbacks,pageHistory,pageWords,processFeedback,removeWord,updateWord}from'../../api'
-import type{DictItem,FeedbackStatsVO,FeedbackVO,HistoryVO,WordVO}from'../../api/types'
+import type{DictItem,FeedbackStatsVO,FeedbackVO,HistoryVO,Id,WordVO}from'../../api/types'
 import{useDictStore}from'../../stores/dict'
 const dictStore=useDictStore()
 const feedbacks=ref<FeedbackVO[]>([]);const fbLoading=ref(false);const fbTotal=ref(0);const fbPage=ref(1);const fbPageSize=10
 const fbTypeFilter=ref('');const fbStatusFilter=ref('');const fbTypeDict=ref<DictItem[]>([]);const fbStatusDict=ref<DictItem[]>([]);const fbTargetDict=ref<DictItem[]>([])
 const words=ref<WordVO[]>([]);const wordLoading=ref(false);const scenes=ref<DictItem[]>([])
-const histories=ref<HistoryVO[]>([]);const historyKeyword=ref('');const historyPage=ref(1);const historyPageSize=10;const historyTotal=ref(0);const historyLoading=ref(false);const selectedHistoryId=ref<number|null>(null);const selectedHistoryRecord=ref<HistoryVO|null>(null);const selectedHistory=computed(()=>selectedHistoryRecord.value);const historyPageCount=computed(()=>Math.max(1,Math.ceil(historyTotal.value/historyPageSize)))
+const histories=ref<HistoryVO[]>([]);const historyKeyword=ref('');const historyPage=ref(1);const historyPageSize=10;const historyTotal=ref(0);const historyLoading=ref(false);const selectedHistoryId=ref<Id|null>(null);const selectedHistoryRecord=ref<HistoryVO|null>(null);const selectedHistory=computed(()=>selectedHistoryRecord.value);const historyPageCount=computed(()=>Math.max(1,Math.ceil(historyTotal.value/historyPageSize)))
 const registerVisible=ref(false);const registerSubmitting=ref(false);const registerForm=reactive({type:'inaccurate',description:''})
 const processVisible=ref(false);const processing=ref(false);const processRow=ref<FeedbackVO|null>(null);const processTarget=ref('strategy')
 const closeVisible=ref(false);const closing=ref(false);const closeRow=ref<FeedbackVO|null>(null);const closeNote=ref('')
 const feedbackDetailVisible=ref(false);const feedbackDetail=ref<FeedbackVO|null>(null)
 const deleteWordVisible=ref(false);const deleteWordRowData=ref<WordVO|null>(null);const deletingWord=ref(false)
-const wordVisible=ref(false);const wordSubmitting=ref(false);const wordForm=reactive({id:0,word:'',scene:'all',enabled:true,sort:0})
+const wordVisible=ref(false);const wordSubmitting=ref(false);const wordForm=reactive({id:'' as Id,word:'',scene:'all',enabled:true,sort:0})
 const devOpen=ref(false);const toastVisible=ref(false);const toastMessage=ref('');const toastType=ref<'info'|'ok'|'err'>('info');let toastTimer:ReturnType<typeof setTimeout>|undefined;let historySearchTimer:ReturnType<typeof setTimeout>|undefined
 const fbPageCount=computed(()=>Math.max(1,Math.ceil(fbTotal.value/fbPageSize)));const stats=ref<FeedbackStatsVO>({total:0,pending:0,processing:0,closed:0});const pendingCount=computed(()=>stats.value.pending);const processingCount=computed(()=>stats.value.processing);const closedCount=computed(()=>stats.value.closed)
 onMounted(async()=>{[fbTypeDict.value,fbStatusDict.value,fbTargetDict.value,scenes.value]=await Promise.all([dictStore.ensure('cmr_feedback_type'),dictStore.ensure('cmr_feedback_status'),dictStore.ensure('cmr_feedback_target'),dictStore.ensure('cmr_scene')]);await Promise.all([loadFeedbacks(1),loadStats(),loadWords()])})
@@ -246,7 +246,7 @@ async function submitProcess(){if(!processRow.value)return;processing.value=true
 function openClose(row:FeedbackVO){closeRow.value=row;closeNote.value='';closeVisible.value=true}
 async function submitClose(){if(!closeRow.value)return;closing.value=true;try{await closeFeedback(closeRow.value.id,closeNote.value||undefined);closeVisible.value=false;showToast('反馈已闭环','ok');await Promise.all([loadFeedbacks(fbPage.value),loadStats()])}catch(e){showToast((e as Error).message,'err')}finally{closing.value=false}}
 async function loadWords(){wordLoading.value=true;try{const data=await pageWords({pageNum:1,pageSize:100});words.value=data.records}catch(e){showToast((e as Error).message,'err')}finally{wordLoading.value=false}}
-function openWord(row?:WordVO){wordForm.id=row?.id||0;wordForm.word=row?.word||'';wordForm.scene=row?.scene||'all';wordForm.enabled=row?.enabled??true;wordForm.sort=row?.sort||0;wordVisible.value=true}
+function openWord(row?:WordVO){wordForm.id=row?.id||'';wordForm.word=row?.word||'';wordForm.scene=row?.scene||'all';wordForm.enabled=row?.enabled??true;wordForm.sort=row?.sort||0;wordVisible.value=true}
 async function submitWord(){if(!wordForm.word.trim()){showToast('请填写推荐词','err');return}wordSubmitting.value=true;try{const body={word:wordForm.word.trim(),scene:wordForm.scene,enabled:wordForm.enabled,sort:wordForm.sort};if(wordForm.id)await updateWord(wordForm.id,body);else await createWord(body);wordVisible.value=false;showToast('推荐词已保存','ok');await loadWords()}catch(e){showToast((e as Error).message,'err')}finally{wordSubmitting.value=false}}
 async function toggleWord(row:WordVO){try{await updateWord(row.id,{word:row.word,scene:row.scene,enabled:!row.enabled,sort:row.sort});row.enabled=!row.enabled;showToast(row.enabled?'已启用':'已停用','ok')}catch(e){showToast((e as Error).message,'err')}}
 function askDeleteWord(row:WordVO){deleteWordRowData.value=row;deleteWordVisible.value=true}

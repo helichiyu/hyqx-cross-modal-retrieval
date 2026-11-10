@@ -104,7 +104,7 @@
     <div class="toast" :class="{ show: toastVisible, ok: toastType === 'ok', err: toastType === 'err' }">{{ toastMessage }}</div>
 
     <!-- 登记数据源 -->
-    <div class="modal-mask" :class="{ show: sourceVisible }" @click.self="sourceVisible = false">
+    <div class="modal-mask" :class="{ open: sourceVisible }" @click.self="sourceVisible = false">
       <div class="modal" role="dialog" aria-modal="true">
         <div class="modal-head"><span class="sec-title">登记数据源</span><button class="modal-x" type="button" aria-label="关闭" @click="sourceVisible = false">×</button></div>
         <p class="modal-sub">登记要对接的数据集管理池，一个池子登记一次。</p>
@@ -126,7 +126,7 @@
     </div>
 
     <!-- 登记数据集 -->
-    <div class="modal-mask" :class="{ show: datasetVisible }" @click.self="datasetVisible = false">
+    <div class="modal-mask" :class="{ open: datasetVisible }" @click.self="datasetVisible = false">
       <div class="modal" role="dialog" aria-modal="true">
         <div class="modal-head"><span class="sec-title">登记数据集</span><button class="modal-x" type="button" aria-label="关闭" @click="datasetVisible = false">×</button></div>
         <p class="modal-sub">上传 zip 或填写共享卷中的数据集路径，提交后触发 401→406 建库链。</p>
@@ -144,7 +144,7 @@
     </div>
 
     <!-- 裁决 -->
-    <div class="modal-mask" :class="{ show: adjudicateVisible }" @click.self="adjudicateVisible = false">
+    <div class="modal-mask" :class="{ open: adjudicateVisible }" @click.self="adjudicateVisible = false">
       <div class="modal" role="dialog" aria-modal="true">
         <div class="modal-head"><span class="sec-title">评定挂起裁决</span><button class="modal-x" type="button" @click="adjudicateVisible = false">×</button></div>
         <form class="modal-body" @submit.prevent="submitAdjudicate(true)">
@@ -159,7 +159,7 @@
     </div>
 
     <!-- 详情 -->
-    <div class="modal-mask detail-mask" :class="{ show: detailVisible }" @click.self="detailVisible = false">
+    <div class="modal-mask detail-mask" :class="{ open: detailVisible }" @click.self="detailVisible = false">
       <div class="modal detail-modal" role="dialog" aria-modal="true">
         <div class="modal-head"><span class="sec-title">数据集详情</span><button class="modal-x" type="button" @click="detailVisible = false">×</button></div>
         <div v-if="detailLoading" class="modal-body"><div class="note">加载中…</div></div>
@@ -269,7 +269,7 @@ import {
   testDatasource,
   rebuildDataset,
 } from '../../api'
-import type { DatasetDetailVO, DatasetVO, DatasourceTestVO, DatasourceVO, IndexVO, TaskVO } from '../../api/types'
+import type { DatasetDetailVO, DatasetVO, DatasourceTestVO, DatasourceVO, Id, IndexVO, TaskVO } from '../../api/types'
 import { useDictStore } from '../../stores/dict'
 
 const router = useRouter()
@@ -291,8 +291,8 @@ const detailLoading = ref(false)
 
 const sourceVisible = ref(false)
 const sourceSubmitting = ref(false)
-const testingSourceIds = ref(new Set<number>())
-const sourceTestResults = ref<Record<number, DatasourceTestVO>>({})
+const testingSourceIds = ref(new Set<Id>())
+const sourceTestResults = ref<Record<Id, DatasourceTestVO>>({})
 const datasetVisible = ref(false)
 const datasetSubmitting = ref(false)
 const adjudicateVisible = ref(false)
@@ -335,7 +335,7 @@ async function loadDatasources() {
 
 function changePage(page: number) { pageNum.value = page; void reload(false) }
 
-function datasourceName(id: number | null) {
+function datasourceName(id: Id | null) {
   if (!id) return '手动登记'
   return datasources.value.find(item => item.id === id)?.name || '未知数据源'
 }

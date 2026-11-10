@@ -6,6 +6,12 @@ export interface ApiEnvelope<T> {
   data: T
 }
 
+/**
+ * 后端 Long 主键统一序列化为字符串（雪花 ID 超出 JS 安全整数范围，数字下发会丢精度）。
+ * 前端一律按字符串传递，不要参与算术运算。
+ */
+export type Id = string
+
 export interface PageResult<T> {
   records: T[]
   total: number
@@ -31,11 +37,11 @@ export interface DictItem {
 }
 
 export interface HistoryVO {
-  id: number
+  id: Id
   bizNo: string
   resultSetId: string
-  taskId: number | null
-  indexId: number | null
+  taskId: Id | null
+  indexId: Id | null
   taskBizNo: string | null
   taskStatus: string | null
   queryText: string | null
@@ -47,12 +53,12 @@ export interface HistoryVO {
   itemCount: number | null
   elapsedMs: number | null
   adoptStatus: string | null
-  userId: number | null
+  userId: Id | null
   createTime: string | null
 }
 
 export interface ResultItemVO {
-  id: number
+  id: Id
   rank: number
   itemId: string
   name: string | null
@@ -80,10 +86,10 @@ export interface UnderstandVO {
 }
 
 export interface SearchResultVO {
-  id: number
+  id: Id
   srhNo: string
   resultSetId: string
-  taskId: number
+  taskId: Id
   taskBizNo: string
   queryModality: string
   targetModality: string | null
@@ -94,9 +100,9 @@ export interface SearchResultVO {
 }
 
 export interface DatasetVO {
-  id: number
+  id: Id
   bizNo: string
-  datasourceId: number | null
+  datasourceId: Id | null
   name: string
   version: string | null
   scene: string | null
@@ -106,13 +112,13 @@ export interface DatasetVO {
   decision: string | null
   itemCount: number | null
   modalityJson: string | null
-  currentIndexId: number | null
+  currentIndexId: Id | null
   createTime: string | null
 }
 
 export interface IndexVO {
-  id: number
-  datasetId: number
+  id: Id
+  datasetId: Id
   indexDir: string
   modelVersion: string | null
   status: string
@@ -123,10 +129,10 @@ export interface IndexVO {
 }
 
 export interface TaskVO {
-  id: number
+  id: Id
   bizNo: string
   type: string
-  refId: number | null
+  refId: Id | null
   refBizNo: string | null
   refRoute: string | null
   status: string
@@ -141,8 +147,8 @@ export interface TaskVO {
 }
 
 export interface TaskLogVO {
-  id: number
-  taskId: number
+  id: Id
+  taskId: Id
   step: string
   status: string
   message: string | null
@@ -163,7 +169,7 @@ export interface DatasetDetailVO {
 }
 
 export interface DatasourceVO {
-  id: number
+  id: Id
   bizNo: string
   name: string
   endpoint: string
@@ -188,7 +194,7 @@ export interface DatasourceTestVO {
 }
 
 export interface StrategyVO {
-  id: number
+  id: Id
   bizNo: string
   name: string
   scene: string
@@ -200,8 +206,8 @@ export interface StrategyVO {
 }
 
 export interface StrategyVersionVO {
-  id: number
-  strategyId: number
+  id: Id
+  strategyId: Id
   versionNo: number
   weightsJson: string
   rerank: boolean
@@ -221,7 +227,7 @@ export interface StrategyDetailVO {
 }
 
 export interface EvalSetVO {
-  id: number
+  id: Id
   bizNo: string
   name: string
   filtersJson: string
@@ -232,16 +238,16 @@ export interface EvalSetVO {
 }
 
 export interface EvalItemVO {
-  id: number
-  evalSetId: number
-  searchId: number
+  id: Id
+  evalSetId: Id
+  searchId: Id
   query: string
   answersJson: string
   labeled: boolean
 }
 
 export interface EvalPreviewItemVO {
-  searchId: number
+  searchId: Id
   searchBizNo: string
   query: string
   queryModality: string | null
@@ -256,12 +262,12 @@ export interface EvalPreviewVO {
 }
 
 export interface EvalRecordVO {
-  id: number
+  id: Id
   bizNo: string
-  evalSetId: number
-  indexId: number
-  strategyVersionId: number | null
-  taskId: number | null
+  evalSetId: Id
+  indexId: Id
+  strategyVersionId: Id | null
+  taskId: Id | null
   taskBizNo: string | null
   taskStatus: string | null
   metricsJson: string | null
@@ -280,22 +286,22 @@ export interface FeedbackStatsVO {
 }
 
 export interface FeedbackVO {
-  id: number
+  id: Id
   bizNo: string
-  searchId: number
+  searchId: Id
   searchBizNo: string | null
   type: string
   description: string | null
   status: string
   target: string | null
   resultNote: string | null
-  handlerId: number | null
+  handlerId: Id | null
   createTime: string
   updateTime: string | null
 }
 
 export interface WordVO {
-  id: number
+  id: Id
   bizNo: string
   word: string
   scene: string

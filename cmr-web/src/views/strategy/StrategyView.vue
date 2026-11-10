@@ -238,7 +238,7 @@ import {
   strategyModelOptions,
   updateDraft,
 } from '../../api'
-import type { DictItem, StrategyDetailVO, StrategyVersionVO, StrategyVO } from '../../api/types'
+import type { DictItem, Id, StrategyDetailVO, StrategyVersionVO, StrategyVO } from '../../api/types'
 import { useDictStore } from '../../stores/dict'
 
 type MainTab = 'config' | 'scene' | 'ops'
@@ -257,7 +257,7 @@ const strategyStatusFilter = ref('')
 
 const editorVisible = ref(false)
 const editorSaving = ref(false)
-const editingId = ref<number | null>(null)
+const editingId = ref<Id | null>(null)
 const editorDetail = ref<StrategyDetailVO | null>(null)
 const editor = reactive({
   name: '',
@@ -273,7 +273,7 @@ const newScene = reactive({ label: '', remark: '' })
 const sceneStrategiesVisible = ref(false)
 const selectedScene = ref<DictItem | null>(null)
 
-const opsStrategyId = ref(0)
+const opsStrategyId = ref<Id | ''>('')
 const opsDetail = ref<StrategyDetailVO | null>(null)
 const modelOptions = ref<Record<string, unknown> | null>(null)
 const consistencyResult = ref<Record<string, unknown> | null>(null)
@@ -472,8 +472,8 @@ async function saveStrategy(shouldPublish: boolean) {
 }
 
 async function locateStrategyFromRoute() {
-  const strategyVersionId = Number(route.query.strategyVersionId)
-  if (!Number.isFinite(strategyVersionId) || strategyVersionId <= 0) {
+  const strategyVersionId = String(route.query.strategyVersionId ?? '')
+  if (!strategyVersionId) {
     return
   }
   for (const row of strategies.value) {
