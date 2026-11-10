@@ -1,0 +1,1685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>检索台 · 跨模态检索中心</title>
+<style>
+:root{
+  /* 清爽冷白蓝 token */
+  --workspace-bg:#f6f9fe;
+  --module-bg:#f3f8ff;
+  --content-card:#ffffff;
+  --content-soft:#fbfdff;
+  --flow-card:#f8fbff;
+  --content-line:#e6edf8;
+  --content-line-strong:#d9e7f8;
+  --system-blue:#4169f6;
+  --system-blue-weak:#f1f5ff;
+  --ink:#1f2937;
+  --muted:#667085;
+  /* 语义色（L4 token，蓝色体系统一微调） */
+  --success:#34a853;
+  --warning:#f0a020;
+  --error:#e5484d;
+  --text-primary:#262626;
+  --text-secondary:#8c8c8c;
+  --radius:8px;
+  --shadow-card:0 2px 8px rgba(31,58,122,.05);
+  --shadow-pop:0 10px 22px rgba(64,80,112,.14);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--workspace-bg);
+  color:var(--text-primary);
+  font-size:14px;
+  line-height:1.5;
+  display:flex;
+}
+button{font-family:inherit;cursor:pointer}
+::selection{background:rgba(65,105,246,.16)}
+
+/* ============ 左侧全局导航 ============ */
+.sidebar{
+  width:220px;flex-shrink:0;
+  background:#fff;border-right:1px solid var(--content-line);
+  display:flex;flex-direction:column;
+  height:100vh;position:sticky;top:0;
+}
+.brand{
+  padding:18px 18px 14px;
+  display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid var(--content-line);
+}
+.brand .logo{
+  width:30px;height:30px;border-radius:7px;flex-shrink:0;
+  background:linear-gradient(135deg,#4169f6,#6e8cff);
+  display:grid;place-items:center;color:#fff;font-size:15px;font-weight:700;
+}
+.brand b{font-size:14px;color:#16204a;display:block;line-height:1.25}
+.brand span{font-size:11px;color:var(--text-secondary)}
+.nav-scroll{flex:1;overflow-y:auto;padding:10px 12px}
+.nav-item{text-decoration:none;
+  display:flex;align-items:center;gap:9px;
+  padding:9px 10px;margin-bottom:2px;
+  border-radius:6px;color:#344054;font-size:13px;
+  cursor:pointer;user-select:none;
+}
+.nav-item .ico{width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:#8a96ad;flex-shrink:0}
+.nav-item .ico svg{width:16px;height:16px;display:block}
+.nav-item.active .ico{color:var(--system-blue)}
+.nav-item:hover{background:var(--system-blue-weak);color:var(--system-blue)}
+.nav-item.active{
+  background:var(--system-blue-weak);color:var(--system-blue);font-weight:600;
+  box-shadow:inset 2px 0 0 var(--system-blue);
+}
+.nav-item.soon{color:#b3bccc;cursor:not-allowed}
+.nav-item.soon:hover{background:transparent;color:#b3bccc}
+.nav-divider{height:1px;background:var(--content-line);margin:8px 10px}
+
+/* ============ 主区 ============ */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+
+.content{padding:20px 24px 32px;display:flex;flex-direction:column;gap:16px;max-width:1280px;width:100%;margin:0 auto}
+
+/* 卡片基础 */
+.card{border:1px solid #e4edf8;border-radius:var(--radius);background:#fff}
+
+/* Section1 模块介绍 */
+.module-intro{
+  display:block;
+  padding:18px 20px;
+  border:1px solid #e4edf8;
+  border-radius:10px;
+  background:#fff;
+}
+.module-intro h2{font-size:20px;font-weight:700;color:#111827;margin-bottom:7px;display:flex;align-items:center;gap:10px}
+.module-intro p{color:var(--muted);line-height:1.65;max-width:760px;font-size:13px}
+
+/* Section3 检索工作台 */
+.workbench{padding:18px 20px;display:flex;flex-direction:column;gap:16px}
+.sec-head{display:flex;align-items:center;gap:8px}
+.sec-head .sec-title{font-size:15px;font-weight:700;color:#1f2a44}
+.sec-head .sec-sub{font-size:12px;color:#9aa6bd}
+.sec-head::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--system-blue)}
+
+.input-row{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:14px}
+.query-box{position:relative}
+.query-box textarea{
+  width:100%;height:150px;resize:none;
+  border:1px solid #cfd8e8;border-radius:var(--radius);
+  padding:12px 14px;font-size:14px;font-family:inherit;color:var(--text-primary);
+  outline:none;transition:border-color .15s,box-shadow .15s;line-height:1.6;
+}
+.query-box textarea:focus{border-color:#8fa3ff;box-shadow:0 0 0 3px rgba(65,105,246,.12)}
+.query-box textarea.err{border-color:var(--error);box-shadow:0 0 0 3px rgba(229,72,77,.1)}
+.query-foot{display:flex;align-items:center;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--text-secondary)}
+.inline-err{color:var(--error);font-size:12px;display:none}
+.inline-err.show{display:block}
+
+/* Z3 联想下拉 */
+.suggest-pop{
+  position:absolute;left:0;right:0;top:calc(100% + 34px);z-index:30;
+  border:1px solid #d8e1ef;border-radius:var(--radius);background:#fff;
+  box-shadow:var(--shadow-pop);padding:6px;display:none;
+}
+.suggest-pop.show{display:block}
+.suggest-group{padding:5px 8px 3px;font-size:11px;color:#9aa6bd;font-weight:600}
+.suggest-item{
+  display:flex;align-items:center;gap:8px;width:100%;
+  padding:7px 8px;border:0;border-radius:5px;background:transparent;
+  font-size:13px;color:#344054;text-align:left;
+}
+.suggest-item:hover{background:var(--system-blue-weak);color:var(--system-blue)}
+.suggest-item .s-hist{margin-left:auto;font-size:11px;color:#b3bccc}
+
+/* 拖拽上传 */
+.dropzone{
+  border:1.5px dashed #c3d2ec;border-radius:var(--radius);
+  background:var(--content-soft);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  padding:16px;text-align:center;min-height:150px;
+  transition:all .15s;cursor:pointer;position:relative;
+}
+.dropzone:hover,.dropzone.drag{border-color:var(--system-blue);background:var(--system-blue-weak)}
+.dropzone .dz-ico{
+  width:38px;height:38px;border-radius:10px;background:#eef3ff;
+  display:grid;place-items:center;font-size:18px;color:var(--system-blue);
+}
+.dropzone strong{font-size:13px;color:#273244}
+.dropzone span{font-size:11.5px;color:var(--muted);line-height:1.5}
+.dropzone.success{border-style:solid;border-color:#bfe3c9;background:#f6fef8;cursor:default}
+.dropzone.fail{border-style:solid;border-color:#f3c4c6;background:#fff7f7;cursor:default}
+.dz-file{display:flex;align-items:center;gap:9px;width:100%;text-align:left}
+.dz-file .f-thumb{
+  width:40px;height:40px;border-radius:6px;background:#eaf0ff;color:var(--system-blue);
+  display:grid;place-items:center;font-size:17px;flex-shrink:0;
+}
+.dz-file .f-meta{min-width:0;flex:1}
+.dz-file .f-name{font-size:12.5px;font-weight:600;color:#1f2a44;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dz-file .f-rec{font-size:11px;color:var(--success);margin-top:2px}
+.dz-file .f-rec.err{color:var(--error)}
+.dz-clear{border:0;background:transparent;color:#b3bccc;font-size:15px;padding:4px}
+.dz-clear:hover{color:var(--error)}
+.dz-types{display:flex;gap:6px;margin-top:2px;flex-wrap:wrap;justify-content:center}
+.dz-types em{font-style:normal;font-size:10px;color:#8fa0bd;border:1px solid #e2ebf7;border-radius:3px;padding:1px 5px}
+
+/* Z2b 模态矩阵 */
+.matrix-wrap{position:relative}
+.matrix-legend{display:flex;gap:16px;align-items:center;margin-bottom:10px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.matrix-legend .lg{display:flex;align-items:center;gap:5px}
+.matrix-legend .mk{
+  width:22px;height:22px;border-radius:5px;display:grid;place-items:center;font-size:11px;font-weight:700;
+}
+.mk.on{background:#eef3ff;color:var(--system-blue);border:1px solid #cdd9ff}
+.mk.lock{background:#f4f5f8;color:#a8b0c0;border:1px solid #e6e9f0}
+.mk.off{background:#fafbfd;border:1px dashed #edf0f6;color:#d5dbe6}
+.modal-matrix{
+  display:grid;grid-template-columns:84px repeat(4,minmax(0,1fr));gap:6px;
+  max-width:620px;
+}
+.mm-corner,.mm-colh,.mm-rowh{font-size:12px;color:var(--muted);display:grid;place-items:center;font-weight:600}
+.mm-colh{height:26px}
+.mm-rowh{justify-content:flex-end;padding-right:4px;font-weight:400;color:#667085}
+.mm-cell{
+  height:40px;border-radius:6px;display:grid;place-items:center;font-size:14px;
+  position:relative;user-select:none;
+}
+.mm-cell.available{
+  background:#eef3ff;border:1px solid #cdd9ff;color:var(--system-blue);cursor:pointer;
+  transition:all .12s;
+}
+.mm-cell.available:hover{background:#e0e9ff;border-color:var(--system-blue);transform:translateY(-1px)}
+.mm-cell.selected{
+  background:var(--system-blue);border-color:var(--system-blue);color:#fff;
+  box-shadow:0 4px 10px rgba(65,105,246,.3);
+}
+.mm-cell.locked{
+  background:#f4f5f8;border:1px solid #e6e9f0;color:#b8bfcc;cursor:not-allowed;opacity:.75;
+}
+.mm-cell.locked .lk{font-size:11px}
+.mm-cell.blank{background:#fafbfd;border:1px dashed #edf0f6;cursor:default}
+.mm-cell.dim{opacity:.35;pointer-events:none}
+
+/* 检索策略 + 按钮 */
+.action-row{display:flex;align-items:center;gap:10px;margin-top:2px}
+.btn-primary{
+  height:36px;padding:0 26px;border:0;border-radius:6px;
+  background:var(--system-blue);color:#fff;font-size:14px;font-weight:600;
+  display:inline-flex;align-items:center;gap:7px;
+  box-shadow:0 3px 8px rgba(65,105,246,.25);transition:all .15s;
+}
+.btn-primary:hover{background:#335be8;box-shadow:0 4px 12px rgba(65,105,246,.32)}
+.btn-primary:disabled{opacity:.7;cursor:wait}
+.btn-ghost{
+  height:36px;padding:0 18px;border-radius:6px;border:1px solid #d7e0f0;
+  background:#fff;color:#475467;font-size:13px;
+}
+.btn-ghost:hover{border-color:var(--system-blue);color:var(--system-blue)}
+.spinner{
+  width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;
+  border-radius:50%;animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.action-hint{font-size:12px;color:#9aa6bd}
+
+.badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;display:inline-block;justify-self:start}
+.badge.ok{background:#e8f7ec;color:var(--success)}
+.badge.fail{background:#fdecec;color:var(--error)}
+.badge.run{background:#e9f0ff;color:var(--system-blue)}
+
+/* 全局消息 */
+.toast{
+  position:fixed;top:56px;left:50%;transform:translateX(-50%) translateY(-12px);
+  z-index:200;background:#2b3245;color:#fff;font-size:13px;
+  padding:9px 18px;border-radius:7px;box-shadow:0 8px 24px rgba(20,32,70,.25);
+  opacity:0;pointer-events:none;transition:all .2s;display:flex;align-items:center;gap:7px;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#c0392b}
+.toast.ok{background:#1e8e4a}
+
+@media (max-width:1100px){
+  .input-row{grid-template-columns:1fr}
+}
+
+/* ===== 研发说明入口（八页统一：头部胶囊按钮 + 右侧抽屉） ===== */
+.dev-entry{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px 0 5px;border:1px solid #d7e0f0;border-radius:999px;background:#fff;color:#667085;font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+.dev-entry:hover{border-color:#b9c9ff;background:var(--system-blue-weak);color:var(--system-blue)}
+.dev-entry:hover .de-q{background:var(--system-blue);color:#fff}
+.dev-entry:focus-visible{outline:2px solid #cdd9ff;outline-offset:1px}
+.dev-entry .de-q{width:20px;height:20px;border-radius:50%;flex:0 0 auto;background:var(--system-blue-weak);color:var(--system-blue);font-size:12px;font-weight:700;line-height:20px;text-align:center;transition:background .15s,color .15s}
+/* 右侧抽屉：520px / 全高 / 从右滑入 + 半透明遮罩 */
+.dev-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:10000;opacity:0;pointer-events:none;transition:opacity .22s}
+.dev-mask.open{opacity:1;pointer-events:auto}
+.dev-drawer{position:fixed;top:0;right:0;width:720px;max-width:100vw;height:100vh;background:#f6f8fc;z-index:10001;display:flex;flex-direction:column;transform:translateX(102%);transition:transform .28s ease;box-shadow:-8px 0 30px rgba(15,23,42,.18)}
+.dev-drawer.open{transform:translateX(0)}
+.dev-head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:#fff;border-bottom:1px solid #e4eaf3;flex:0 0 auto}
+.dev-head h3{margin:0;font-size:15px;color:#1f2937}
+.dev-head .dh-tag{font-size:11px;font-weight:600;color:#b54708;background:#fdf3e6;border-radius:4px;padding:2px 8px}
+.dev-close{margin-left:auto;width:28px;height:28px;border:none;background:#f2f4f8;border-radius:6px;font-size:15px;line-height:1;cursor:pointer;color:#475467;flex:0 0 auto}
+.dev-close:hover{background:#e6eaf2}
+.dev-body{flex:1;min-height:0;overflow:auto;padding:16px 18px 36px}
+.dev-ov{background:#fff;border:1px solid #e4eaf3;border-radius:10px;padding:14px 18px;margin-bottom:16px}
+.dev-ov h4{margin:0 0 6px;font-size:13px;color:var(--system-blue)}
+.dev-ov p{margin:0;line-height:1.75;color:#475467;font-size:12.5px}
+.dev-ov+.dev-ov{margin-top:0}
+.ov-grid{display:grid;grid-template-columns:1fr;gap:12px}
+/* 功能卡 */
+.dev-card{background:#fff;border:1px solid #e4eaf3;border-radius:10px;margin-bottom:14px;overflow:hidden;scroll-margin-top:14px}
+.dc-head{display:flex;align-items:center;gap:8px;padding:11px 16px;background:#fbfcfe;border-bottom:1px solid #eef2f8}
+.dc-id{font-size:11px;font-weight:700;color:#fff;background:#b54708;border-radius:4px;padding:1px 7px;flex:0 0 auto}
+.dc-name{font-size:13.5px;font-weight:700;color:#1f2937}
+.dc-body{padding:6px 16px 12px}
+.dc-row{display:flex;gap:10px;padding:7px 0;border-bottom:1px dashed #f0f3f8;font-size:12.5px;line-height:1.7}
+.dc-row:last-child{border-bottom:none}
+.dc-k{flex:0 0 78px;font-weight:700;color:#344054}
+.dc-v{flex:1;color:#475467}
+.dc-v ul{margin:0;padding-left:17px}
+.dc-v li{margin:2px 0}
+.k-in .dc-k{color:#027a48}.k-out .dc-k{color:#1f5fd4}.k-err .dc-k{color:#c0362c}.k-dep .dc-k{color:#7a5af8}
+.demo-limit{display:inline-block;font-size:10.5px;font-weight:600;color:#b54708;background:#fdf3e6;border:1px solid #f6d9b0;border-radius:4px;padding:0 6px;margin-left:6px;vertical-align:1px}
+.dev-xref{color:#1f5fd4;font-weight:700;text-decoration:none;border-bottom:1px dashed #9dbcf5;padding:0 1px;white-space:nowrap}
+.dev-xref:hover{background:#eaf1fe;border-bottom-style:solid}
+
+/* ================================================================
+   P1 v5.1 · C 端检索首页视觉重构（覆盖上方旧工作台样式）
+   主色 #1f5fd4 / 大留白 / 大字号 Hero / 大圆角 + 轻阴影
+   ================================================================ */
+:root{
+  --brand:#1f5fd4;
+  --brand-deep:#17479f;
+  --brand-soft:#eef4ff;
+  --brand-line:#d6e4fb;
+  --brand-ink:#10203f;
+  --text-1:#1f2937;
+  --text-2:#475467;
+  --text-3:#667085;
+  --text-4:#98a2b3;
+  --line:#e8eef8;
+  --line-soft:#f0f4fb;
+  --radius-lg:22px;
+  --radius-md:16px;
+  --radius-sm:10px;
+  --shadow-card:0 2px 10px rgba(23,52,110,.05);
+  --shadow-soft:0 12px 32px rgba(23,52,110,.07);
+  --shadow-hero:0 26px 64px rgba(21,66,150,.14),0 2px 8px rgba(21,66,150,.06);
+  --shadow-pop:0 18px 40px rgba(20,40,90,.16);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:
+    radial-gradient(1100px 560px at 12% -8%,#e9f1ff 0%,rgba(233,241,255,0) 62%),
+    radial-gradient(900px 520px at 102% 2%,#eef1ff 0%,rgba(238,241,255,0) 55%),
+    var(--workspace-bg);
+  color:var(--text-1);
+  font-size:14px;
+  line-height:1.5;
+  display:flex;
+  min-height:100vh;
+}
+button{font-family:inherit;cursor:pointer;color:inherit}
+input,select,textarea{font-family:inherit}
+::selection{background:rgba(31,95,212,.16)}
+
+/* ---- 主区容器 ---- */
+.main{flex:1;min-width:0;height:100vh;overflow-y:auto}
+.page{
+  max-width:1200px;width:100%;margin:0 auto;
+  padding:30px 40px 72px;
+  display:flex;flex-direction:column;gap:22px;
+}
+
+/* ---- Hero ---- */
+.hero{
+  position:relative;overflow:hidden;
+  border:1px solid #e7effb;border-radius:30px;
+  background:
+    radial-gradient(760px 380px at 50% -18%,rgba(31,95,212,.10),rgba(31,95,212,0) 68%),
+    linear-gradient(180deg,#fcfdff 0%,#f4f9ff 100%);
+  box-shadow:0 24px 60px rgba(24,60,130,.06);
+  padding:54px 46px 38px;
+  text-align:center;
+}
+.hero::before{content:"";position:absolute;left:-170px;top:-230px;width:440px;height:440px;border-radius:50%;background:radial-gradient(circle,rgba(31,95,212,.14),rgba(31,95,212,0) 70%);pointer-events:none}
+.hero::after{content:"";position:absolute;right:-190px;bottom:-240px;width:480px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(110,140,255,.15),rgba(110,140,255,0) 70%);pointer-events:none}
+.hero-inner{position:relative;z-index:1;max-width:940px;margin:0 auto}
+.hero h1{
+  margin:0;font-size:clamp(40px,4.2vw,54px);line-height:1.12;
+  font-weight:700;letter-spacing:.01em;color:var(--brand-ink);
+}
+.hero h1 span{color:var(--brand)}
+.hero-sub{margin:16px auto 0;max-width:660px;font-size:16.5px;line-height:1.7;color:#5b6b85;letter-spacing:.005em}
+
+/* ---- 大搜索框 ---- */
+.searchbox{
+  position:relative;display:flex;align-items:center;gap:10px;
+  height:80px;margin:34px auto 0;padding:0 10px 0 22px;
+  background:#fff;border:1px solid #e3ecfa;border-radius:24px;
+  box-shadow:var(--shadow-hero);
+  transition:border-color .18s,box-shadow .18s;
+}
+.searchbox:focus-within{border-color:#b9cef4;box-shadow:0 28px 68px rgba(21,66,150,.18),0 0 0 4px rgba(31,95,212,.07)}
+.searchbox.is-error{border-color:#efb1b4;box-shadow:0 24px 56px rgba(170,40,40,.12),0 0 0 4px rgba(217,45,32,.05)}
+.searchbox.drag{border-color:#9dbcf0;background:#fbfdff;box-shadow:0 0 0 4px rgba(31,95,212,.08),var(--shadow-hero)}
+.search-ico{flex:0 0 auto;width:24px;height:24px;display:grid;place-items:center;color:#7d90ae}
+.search-ico svg{width:22px;height:22px}
+.search-field{position:static;flex:1;min-width:0;height:100%;display:flex;align-items:center}
+#queryInput{
+  width:100%;height:100%;border:0;outline:none;background:transparent;
+  font-size:18.5px;color:#1b2b45;letter-spacing:.005em;
+}
+#queryInput::placeholder{color:#9dabc1}
+.btn-search{
+  flex:0 0 auto;height:58px;padding:0 30px;border:0;border-radius:17px;
+  background:linear-gradient(135deg,#2a68e0 0%,#1f5fd4 62%,#1a51bc 100%);
+  color:#fff;font-size:16px;font-weight:700;letter-spacing:.04em;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  box-shadow:0 12px 26px rgba(31,95,212,.30);
+  transition:transform .15s,box-shadow .15s,filter .15s;
+}
+.btn-search:hover{transform:translateY(-1px);box-shadow:0 16px 30px rgba(31,95,212,.36)}
+.btn-search:active{transform:translateY(0);box-shadow:0 8px 18px rgba(31,95,212,.28)}
+.btn-search:disabled{opacity:.78;cursor:wait;transform:none;box-shadow:0 8px 18px rgba(31,95,212,.22)}
+.btn-search svg{width:18px;height:18px}
+.inline-err{display:none;font-size:12.5px;color:#d92d20;line-height:1.5}
+.inline-err.show{display:block}
+#actionErr{max-width:940px;margin:10px auto 0;text-align:left;padding-left:8px}
+#uploadErr{margin-top:8px}
+
+/* ---- 联想下拉 ---- */
+.suggest-pop{
+  position:absolute;left:12px;right:12px;top:calc(100% + 10px);z-index:60;
+  background:#fff;border:1px solid #e2eaf7;border-radius:16px;
+  box-shadow:var(--shadow-pop);padding:8px;display:none;text-align:left;
+}
+.suggest-pop.show{display:block}
+.suggest-group{padding:6px 9px 4px;font-size:11px;color:#9aa8bf;font-weight:600;letter-spacing:.04em}
+.suggest-item{
+  display:flex;align-items:center;gap:8px;width:100%;
+  padding:8px 10px;border:0;border-radius:9px;background:transparent;
+  font-size:13px;color:#344054;text-align:left;transition:background .12s,color .12s;
+}
+.suggest-item:hover{background:var(--brand-soft);color:var(--brand)}
+.suggest-item .s-hist{margin-left:auto;font-size:11px;color:#a8b3c5}
+
+/* ---- 检索类型 / 检索策略 ---- */
+.search-meta{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  margin:18px auto 0;max-width:940px;text-align:left;
+}
+.mode-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mg-label{font-size:12px;font-weight:600;color:#8b9ab2;letter-spacing:.08em;margin-right:2px}
+.mode-tab{
+  height:42px;padding:0 16px;border-radius:12px;border:1px solid #e2eaf7;background:#fff;
+  color:#43536b;font-size:13.5px;display:inline-flex;align-items:center;gap:7px;
+  transition:border-color .15s,background .15s,color .15s,box-shadow .15s;
+}
+.mode-tab svg{width:17px;height:17px;color:#7b8ca8;transition:color .15s}
+.mode-tab:hover{border-color:#c6d8f5;color:var(--brand);background:#f8fbff}
+.mode-tab:hover svg{color:var(--brand)}
+.mode-tab.active{
+  background:var(--brand-soft);border-color:#bcd2f6;color:var(--brand);font-weight:600;
+  box-shadow:inset 0 0 0 1px rgba(31,95,212,.08);
+}
+.mode-tab.active svg{color:var(--brand)}
+.mode-group.nudge{animation:mgNudge .45s ease}
+@keyframes mgNudge{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}60%{transform:translateX(4px)}80%{transform:translateX(-2px)}}
+.stg-pick{
+  display:flex;align-items:center;gap:4px;padding:3px 4px 3px 12px;
+  border:1px solid #e2eaf7;border-radius:12px;background:#fff;
+}
+.stg-pick .sp-label{font-size:12px;font-weight:600;color:#8b9ab2;letter-spacing:.04em;white-space:nowrap}
+.stg-select{
+  height:36px;border:0;outline:none;background:transparent;
+  font-size:13px;color:#26374f;padding:0 6px;min-width:112px;max-width:100%;
+}
+.stg-diff{
+  font-size:11.5px;color:#8b9ab2;white-space:nowrap;letter-spacing:.01em;
+  padding:0 8px 0 10px;border-left:1px solid #eef2f9;margin-left:2px;
+}
+.stg-fb{
+  font-size:11.5px;color:#c98a12;white-space:nowrap;letter-spacing:.01em;
+  padding:0 8px 0 10px;border-left:1px solid #eef2f9;margin-left:2px;
+}
+.stg-fb[hidden]{display:none}
+
+/* ---- 辅助信息 ---- */
+.search-aux{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin:12px auto 0;max-width:940px;font-size:12px;color:#93a1b7;
+}
+.search-aux .pa b{color:var(--brand);font-weight:600}
+.search-aux .ca b{color:#667085;font-weight:600;font-variant-numeric:tabular-nums}
+.search-aux .aux-right{display:inline-flex;align-items:center;gap:12px}
+.link-btn{border:0;background:transparent;font-size:12px;color:#93a1b7;padding:2px 4px;text-decoration:underline;text-underline-offset:3px}
+.link-btn:hover{color:var(--brand)}
+.link-btn b{color:var(--brand);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ---- 模态矩阵（直接展示）+ 文件上传 ---- */
+.setup{display:block}
+.panel{
+  background:#fff;border:1px solid #e8eef8;border-radius:20px;
+  padding:22px 24px 22px;box-shadow:var(--shadow-card);
+  transition:border-color .18s,box-shadow .18s;
+}
+.panel:hover{border-color:#dfe9f7;box-shadow:var(--shadow-soft)}
+.setup-head{display:flex;align-items:center;gap:7px;margin-bottom:14px;flex-wrap:wrap}
+.ph-ico{width:22px;height:22px;display:grid;place-items:center;color:#8fa2c0}
+.ph-ico svg{width:17px;height:17px}
+.setup-head h3{font-size:14px;font-weight:700;color:#1b2a44;letter-spacing:.01em}
+.setup-hint{font-size:11px;color:#a2aec2;margin-left:2px}
+.upload-strip{margin-top:18px;padding-top:16px;border-top:1px solid #eef3fb}
+.dropzone.compact{
+  flex-direction:row;align-items:center;justify-content:flex-start;gap:12px;
+  min-height:0;padding:12px 14px;text-align:left;border-radius:12px;
+}
+.dropzone.compact .dz-default{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:12px;row-gap:2px;align-items:center;width:100%}
+.dropzone.compact .dz-ico{grid-row:1/3;width:38px;height:38px;border-radius:10px}
+.dropzone.compact .dz-default>strong{grid-column:2;font-size:12.5px;line-height:1.4}
+.dropzone.compact .dz-default>span{grid-column:2;font-size:11px;line-height:1.5}
+.dropzone.compact .dz-types{display:none}
+
+/* ---- 拖拽上传 ---- */
+.dropzone{
+  border:1.5px dashed #cfdcf0;border-radius:14px;background:#fbfdff;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  padding:18px;text-align:center;min-height:148px;
+  transition:border-color .15s,background .15s;cursor:pointer;position:relative;
+}
+.dropzone:hover,.dropzone.drag{border-color:#9dbcf0;background:#f4f9ff}
+.dropzone .dz-ico{width:42px;height:42px;border-radius:12px;background:#eef4ff;color:var(--brand);display:grid;place-items:center}
+.dropzone .dz-ico svg{width:20px;height:20px}
+.dropzone strong{font-size:13px;color:#273244;font-weight:600}
+.dropzone span{font-size:11.5px;color:#8b9ab2;line-height:1.55}
+.dropzone.success{border-style:solid;border-color:#bfe3c9;background:#f7fdf9;cursor:default}
+.dropzone.fail{border-style:solid;border-color:#f3c4c6;background:#fff7f7;cursor:default}
+.dz-file{display:flex;align-items:center;gap:10px;width:100%;text-align:left}
+.dz-file .f-thumb{
+  width:40px;height:40px;border-radius:10px;background:#eef4ff;color:var(--brand);
+  display:grid;place-items:center;flex-shrink:0;
+}
+.dz-file .f-thumb svg{width:19px;height:19px}
+.dz-file .f-meta{min-width:0;flex:1}
+.dz-file .f-name{font-size:12.5px;font-weight:600;color:#1f2a44;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dz-file .f-rec{font-size:11px;color:#1e8e4a;margin-top:2px}
+.dz-file .f-rec.err{color:#d92d20}
+.dz-clear{border:0;background:transparent;color:#b3bccc;padding:5px;line-height:1;border-radius:6px;display:grid;place-items:center}
+.dz-clear svg{width:14px;height:14px}
+.dz-clear:hover{color:#d92d20;background:#fdf2f2}
+.dz-types{display:flex;gap:6px;margin-top:2px;flex-wrap:wrap;justify-content:center}
+.dz-types em{font-style:normal;font-size:10px;color:#8fa0bd;border:1px solid #e2ebf7;border-radius:4px;padding:1px 5px}
+
+/* ---- 模态矩阵 ---- */
+.matrix-wrap{position:relative}
+.matrix-legend{display:flex;gap:14px;align-items:center;margin-bottom:12px;font-size:11.5px;color:#8b9ab2;flex-wrap:wrap}
+.matrix-legend .lg{display:flex;align-items:center;gap:5px}
+.matrix-legend .mk{width:20px;height:20px;border-radius:6px;display:grid;place-items:center}
+.matrix-legend .mk svg{width:12px;height:12px}
+.mk.on{background:#f3f7ff;color:var(--brand);border:1px solid #d7e3f8}
+.mk.sel{background:var(--brand);color:#fff;border:1px solid var(--brand)}
+.mk.off{background:#fbfcfe;border:1px dashed #e7ecf5}
+.modal-matrix{
+  display:grid;grid-template-columns:76px repeat(4,minmax(0,1fr));gap:7px;
+  max-width:640px;
+}
+.mm-corner,.mm-colh,.mm-rowh{font-size:11.5px;color:#8b9ab2;display:grid;place-items:center;font-weight:600}
+.mm-colh{height:24px;letter-spacing:.04em}
+.mm-rowh{justify-content:flex-end;padding-right:6px;font-weight:500;color:#667085}
+.mm-cell{
+  height:42px;border-radius:9px;display:grid;place-items:center;
+  position:relative;user-select:none;
+}
+.mm-cell svg{width:15px;height:15px}
+.mm-cell.available{
+  background:#f3f7ff;border:1px solid #d7e3f8;color:var(--brand);cursor:pointer;
+  transition:background .12s,border-color .12s,transform .12s,box-shadow .12s;
+}
+.mm-cell.available:hover{background:#e8f0ff;border-color:#a9c4ee;transform:translateY(-1px)}
+.mm-cell.selected{
+  background:linear-gradient(135deg,#2a68e0,#1f5fd4);border-color:var(--brand);color:#fff;
+  box-shadow:0 6px 14px rgba(31,95,212,.28);
+}
+.mm-cell.locked{
+  background:#f4f5f8;border:1px solid #e6e9f0;color:#b8bfcc;cursor:not-allowed;opacity:.75;
+}
+.mm-cell.blank{background:#fbfcfe;border:1px dashed #eef2f8;cursor:default}
+.mm-cell.dim{opacity:.32;pointer-events:none}
+
+/* ---- 通用按钮 ---- */
+.btn-primary{
+  height:38px;padding:0 24px;border:0;border-radius:10px;
+  background:var(--brand);color:#fff;font-size:13.5px;font-weight:600;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  box-shadow:0 6px 16px rgba(31,95,212,.24);transition:background .15s,box-shadow .15s,transform .15s;
+}
+.btn-primary:hover{background:var(--brand-deep);box-shadow:0 8px 20px rgba(31,95,212,.3)}
+.btn-ghost{height:38px;padding:0 18px;border-radius:10px;border:1px solid #d7e0f0;background:#fff;color:#475467;font-size:13px;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:border-color .15s,color .15s}
+.btn-ghost:hover{border-color:var(--brand);color:var(--brand)}
+.spinner{
+  width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;
+  border-radius:50%;animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---- 全局消息 ---- */
+.toast{
+  position:fixed;top:64px;left:50%;transform:translateX(-50%) translateY(-12px);
+  z-index:200;background:#16233d;color:#fff;font-size:13px;
+  padding:10px 18px;border-radius:10px;box-shadow:0 12px 30px rgba(20,32,70,.28);
+  opacity:0;pointer-events:none;transition:all .2s;display:flex;align-items:center;gap:7px;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#b42318}
+.toast.ok{background:#1e8e4a}
+
+/* ---- 研发说明入口：Hero 头部卡片右上角（与标题同一行、右对齐） ---- */
+.hero .dev-entry{position:absolute;top:24px;right:28px;z-index:3}
+@media (max-width:820px){
+  .hero .dev-entry{top:16px;right:16px;height:28px;font-size:11.5px;padding:0 11px 0 4px}
+  .hero .dev-entry .de-q{width:18px;height:18px;line-height:18px;font-size:11px}
+}
+
+/* ---- 响应式 ---- */
+@media (max-width:1180px){
+  .page{padding:24px 26px 60px}
+  .hero{padding:46px 30px 34px}
+  .modal-matrix{max-width:100%}
+}
+@media (max-width:820px){
+  .page{padding:18px 16px 48px;gap:18px}
+  .hero{border-radius:24px;padding:36px 20px 30px}
+  .hero h1{font-size:34px}
+  .hero-sub{font-size:14.5px}
+  .searchbox{height:68px;border-radius:18px;padding:0 8px 0 16px;margin-top:26px}
+  #queryInput{font-size:16px}
+  .btn-search{height:50px;padding:0 20px;font-size:14px;border-radius:14px}
+  .search-meta{flex-direction:column;align-items:stretch;gap:10px}
+  .stg-pick{width:100%;flex-wrap:wrap;row-gap:2px}
+  .stg-select{flex:1;min-width:0}
+  .stg-diff{white-space:normal;line-height:1.35}
+  .search-aux{flex-direction:column;align-items:flex-start;gap:6px}
+  .search-aux .aux-right{width:100%;justify-content:space-between}
+  .dropzone.compact{padding:11px 12px}
+  .modal-matrix{grid-template-columns:64px repeat(4,minmax(0,1fr));gap:5px}
+  .mm-cell{height:38px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+}
+/* ================= 一屏布局：左模态矩阵 / 右侧竖版上传 ================= */
+html,body{height:100%;overflow:hidden}
+.main{height:100vh;overflow:hidden}
+.page{
+  height:100%;min-height:0;max-width:1200px;
+  padding:20px 26px 20px;
+  gap:18px;overflow:hidden;
+}
+.hero{padding:26px 28px;border-radius:22px}
+.hero h1{font-size:32px;line-height:1.1}
+.hero-sub{margin:8px auto 0;font-size:14.5px;line-height:1.55}
+.searchbox{height:60px;margin:20px auto 0;padding:0 0 0 18px;border-radius:17px}
+.search-ico{width:20px;height:20px}
+.search-ico svg{width:18px;height:18px}
+#queryInput{font-size:15.5px}
+.btn-search{height:60px;width:118px;padding:0;font-size:15px;border-radius:15px}
+.btn-search svg{width:16px;height:16px}
+#actionErr{margin:5px auto 0}
+.search-meta{margin:14px auto 0;min-height:50px;gap:10px}
+.mode-group{gap:8px}
+.mode-tab{height:42px;padding:0 18px;font-size:13.5px;border-radius:11px}
+.mode-tab svg{width:16px;height:16px}
+.mg-label{font-size:12px}
+.stg-pick{padding:4px 4px 4px 12px;border-radius:11px}
+.stg-select{height:38px;font-size:13px}
+.stg-diff{font-size:11.5px;padding:0 8px 0 10px}
+.search-aux{margin:8px auto 0;font-size:12px}
+.setup{flex:1;min-height:0;display:flex;flex-direction:column}
+.mt-and-upload{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:stretch}
+.panel.mt-left{min-width:0;height:100%;display:flex;align-items:center;justify-content:center;padding:20px 24px}
+.mt-right{min-width:0;display:block}
+.panel{padding:14px 18px 16px;border-radius:16px}
+.matrix-card{width:100%;max-width:760px;margin:0 auto}
+.upload-panel{height:100%;width:100%;display:flex;flex-direction:column;padding:0;background:transparent;border:0;box-shadow:none}
+.upload-panel:hover{box-shadow:none}
+.mt-right .dropzone{
+  flex:1;width:100%;height:auto;min-height:0;
+  display:flex;align-items:center;justify-content:center;
+  text-align:center;padding:24px 20px;border-radius:16px;gap:8px;
+}
+.upload-panel .dz-ico{width:40px;height:40px}
+.upload-panel strong{font-size:14px}
+.upload-panel span{font-size:12.5px}
+.upload-panel .dz-types{margin-top:4px}
+.upload-panel .inline-err{margin-top:6px;padding:0 4px}
+.setup-head{margin-bottom:8px}
+.matrix-wrap{display:block}
+.matrix-legend{margin-bottom:8px;font-size:12px}
+.matrix-legend .mk{width:18px;height:18px}
+.modal-matrix{
+  width:100%;max-width:720px;
+  grid-template-columns:56px repeat(4,minmax(0,1fr));
+  grid-template-rows:32px repeat(4,44px);
+  grid-auto-rows:44px;gap:6px;
+}
+.mm-colh{height:32px;font-size:12.5px}
+.mm-rowh{font-size:12.5px}
+.mm-cell{height:44px;min-height:0;font-size:13px;border-radius:6px}
+@media (max-width:1000px){
+  html,body{height:auto;overflow:auto}
+  .main{height:auto;min-height:100vh;overflow:visible}
+  .page{height:auto;min-height:100vh;overflow:visible;padding-bottom:28px}
+  .setup{flex:none}
+  .mt-and-upload{grid-template-columns:1fr}
+  .mt-right .dropzone{height:auto;min-height:140px}
+}
+@media (max-height:680px) and (min-width:1001px){
+  html,body{height:auto;overflow:auto}
+  .main{height:auto;min-height:100vh;overflow:visible}
+  .page{height:auto;min-height:100vh;overflow:visible}
+  .setup{flex:none}
+}
+
+/* ================================================================
+   意图澄清浮层（F5）：只新增 .clarify-*，不改动上方任何既有样式
+   遮罩 + 居中卡片（宽约 520px），与既有弹层同款
+   ================================================================ */
+.clarify-mask{
+  position:fixed;inset:0;z-index:900;
+  background:rgba(15,23,42,.45);
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.clarify-mask.open{opacity:1;pointer-events:auto}
+.clarify-modal{
+  position:fixed;left:50%;top:50%;z-index:901;
+  width:520px;max-width:calc(100vw - 32px);
+  background:#fff;border:1px solid #e2eaf7;border-radius:18px;
+  box-shadow:0 26px 64px rgba(20,40,90,.22);
+  transform:translate(-50%,-50%) scale(.98);
+  opacity:0;pointer-events:none;
+  transition:opacity .18s,transform .18s;
+}
+.clarify-modal.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+.clarify-head{display:flex;align-items:center;gap:10px;padding:16px 20px 8px}
+.clarify-head h3{margin:0;font-size:15px;font-weight:700;color:#1b2a44;letter-spacing:.01em}
+.clarify-close{
+  margin-left:auto;width:26px;height:26px;flex:0 0 auto;
+  border:0;border-radius:7px;background:#f2f4f8;color:#667085;
+  font-size:15px;line-height:1;display:grid;place-items:center;
+}
+.clarify-close:hover{background:#e6eaf2;color:#1f2937}
+.clarify-body{padding:0 20px 18px}
+.clarify-lead{margin:0 0 12px;font-size:13px;color:#475467;line-height:1.65}
+.clarify-list{
+  border:1px solid #e6edf8;border-radius:12px;overflow:hidden;background:#fff;
+}
+.clarify-opt{
+  display:flex;align-items:center;gap:8px;width:100%;
+  padding:12px 14px;border:0;border-bottom:1px solid #eef2f9;background:#fff;
+  font-size:13.5px;color:#26374f;text-align:left;
+  transition:background .12s,color .12s;
+}
+.clarify-opt:last-child{border-bottom:0}
+.clarify-opt:hover{background:var(--brand-soft);color:var(--brand-deep)}
+.clarify-opt .co-arrow{margin-left:auto;color:#c2cbdb;font-size:14px}
+.clarify-opt:hover .co-arrow{color:var(--brand)}
+.clarify-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}
+.clarify-orig{
+  border:0;background:transparent;padding:2px 0;
+  font-size:12.5px;color:var(--brand);text-decoration:underline;text-underline-offset:3px;
+}
+.clarify-orig:hover{color:var(--brand-deep)}
+.clarify-hint{font-size:11.5px;color:#a2aec2;white-space:nowrap}
+@media (max-width:560px){
+  .clarify-modal{width:calc(100vw - 28px);border-radius:16px}
+  .clarify-head{padding:14px 16px 6px}
+  .clarify-body{padding:0 16px 16px}
+  .clarify-foot{flex-wrap:wrap;row-gap:6px}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ 左侧导航 ============ -->
+<aside class="sidebar">
+    <div class="nav-scroll">
+    <div class="nav-item active"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span>检索台</div>
+    <div class="nav-divider"></div>
+    <a class="nav-item admin-nav" href="P4_库管理_v5.2_20261026.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6"/><path d="M5 12v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6"/></svg></span>数据源库管理</a>
+    <a class="nav-item admin-nav" href="P5_策略管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="10" cy="17" r="1.6"/></svg></span>策略管理</a>
+    <a class="nav-item admin-nav" href="P6_任务管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="12" height="16" rx="2"/><path d="M9 5V3.5h6V5"/><path d="M9 10h6M9 14h6M9 18h4"/></svg></span>搜索行为</a>
+    <a class="nav-item admin-nav" href="P7_结果运营_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>结果运营</a>
+    <a class="nav-item admin-nav" href="P8_评测_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="13" width="3" height="4"/><rect x="12" y="9" width="3" height="8"/><rect x="17" y="5" width="3" height="12"/></svg></span>效果评测</a>
+  </div>
+</aside>
+
+<!-- ============ 主区 ============ -->
+<div class="main">
+
+
+  <div class="page">
+
+    <!-- ================= Hero：检索大入口 ================= -->
+    <section class="hero" aria-labelledby="heroTitle">
+      <button class="dev-entry" id="devEntry" type="button" onclick="openDev()" title="研发说明"><span class="de-q" aria-hidden="true">?</span>研发说明</button>
+      <div class="hero-inner">
+        <h1 id="heroTitle">跨模态<span>检索</span></h1>
+        <p class="hero-sub">用一句话、一张图、一段音频，检索图文音视频资产</p>
+
+        <!-- 大搜索框 -->
+        <div class="searchbox" id="searchbox">
+          <span class="search-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.2"/><path d="M15.2 15.2L20 20"/></svg></span>
+          <div class="search-field">
+            <input type="text" id="queryInput" maxlength="512" autocomplete="off" spellcheck="false" aria-label="检索内容" placeholder="输入一句话描述，或拖入图片 / 音频 / 视频…">
+            <!-- Z3 联想 -->
+            <div class="suggest-pop" id="suggestPop" role="listbox" aria-label="输入联想"></div>
+          </div>
+          <button class="btn-search" id="searchBtn" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.2"/><path d="M15.2 15.2L20 20"/></svg>
+            <span id="searchBtnLabel">检索</span>
+          </button>
+        </div>
+        <div class="inline-err" id="actionErr" role="alert"></div>
+
+        <!-- 模态快捷选择 + 检索策略 -->
+        <div class="search-meta">
+          <div class="mode-group" id="modeGroup" role="group" aria-label="检索类型快捷选择">
+            <span class="mg-label">检索类型</span>
+            <button class="mode-tab active" type="button" data-target="全部" aria-pressed="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.4"/><rect x="14" y="4" width="6" height="6" rx="1.4"/><rect x="4" y="14" width="6" height="6" rx="1.4"/><rect x="14" y="14" width="6" height="6" rx="1.4"/></svg>全部
+            </button>
+            <button class="mode-tab" type="button" data-target="图像" aria-pressed="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.2" y="4.6" width="17.6" height="14.8" rx="2.6"/><circle cx="8.6" cy="9.6" r="1.5"/><path d="M4.2 17.2l4.6-4.4 3.4 3.2 2.8-2.4 4.6 3.8"/></svg>图像
+            </button>
+            <button class="mode-tab" type="button" data-target="文本" aria-pressed="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4.5 7h15M4.5 12h15M4.5 17h9"/></svg>文本
+            </button>
+            <button class="mode-tab" type="button" data-target="音频" aria-pressed="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 10.5v3M7.5 7.5v9M11 5v14M14.5 8v8M18 10.5v3M21 11.5v1"/></svg>音频
+            </button>
+            <button class="mode-tab" type="button" data-target="视频" aria-pressed="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5.2" width="13.4" height="13.6" rx="2.6"/><path d="M16.4 10.2l4.4-2.5v8.6l-4.4-2.5"/></svg>视频
+            </button>
+          </div>
+          <div class="stg-pick">
+            <label class="sp-label" for="stgSelect">检索策略</label>
+            <select id="stgSelect" class="stg-select" aria-describedby="stgDiff">
+              <option value="STG261018K7M2PQ" selected>系统默认策略（兜底）</option>
+              <option value="STG261025A3F9KX">训练取样检索策略</option>
+              <option value="STG261022P6L4MN">业务素材检索策略</option>
+              <option value="STG261020D8N3QR">日常检索检索策略</option>
+            </select>
+            <span class="stg-diff" id="stgDiff">阈值 0.60 · 重排开</span>
+            <span class="stg-fb" id="stgFbHint" hidden>所有策略已下线，已回退系统默认</span>
+          </div>
+        </div>
+
+        <div class="search-aux">
+          <span class="pa">当前模态对 <b id="pairHint">全部</b></span>
+          <span class="aux-right">
+            <span class="ca"><b id="charCount">0</b>/512</span>
+            <button class="link-btn" type="button" onclick="resetAll()">清空</button>
+          </span>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ================= 模态矩阵 + 文件上传（F2）：左矩阵 / 右侧竖版上传 ================= -->
+    <section class="setup" aria-label="模态矩阵与文件上传">
+      <div class="mt-and-upload">
+      <div class="panel matrix-panel mt-left">
+        <div class="matrix-card">
+        <div class="setup-head">
+          <span class="ph-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6" height="6" rx="1.4"/><rect x="14" y="4" width="6" height="6" rx="1.4"/><rect x="4" y="14" width="6" height="6" rx="1.4"/><rect x="14" y="14" width="6" height="6" rx="1.4"/></svg></span>
+          <h3>模态矩阵</h3>
+          <span class="setup-hint">查询模态 × 目标模态</span>
+        </div>
+        <div class="matrix-wrap">
+          <div class="matrix-legend">
+            <span class="lg"><span class="mk on" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.4 4.5L19 7.4"/></svg></span>支持</span>
+          </div>
+          <div class="modal-matrix" id="modalMatrix">
+            <div class="mm-corner"></div>
+            <div class="mm-colh">文本</div><div class="mm-colh">图像</div><div class="mm-colh">音频</div><div class="mm-colh">视频</div>
+          </div>
+        </div>
+        </div>
+      </div>
+
+      <div class="mt-right">
+        <div class="panel upload-panel">
+          <div class="dropzone" id="dropzone">
+            <div class="dz-default" id="dzDefault">
+              <div class="dz-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5.5"/><path d="M7.5 10L12 5.5 16.5 10"/><path d="M4.5 15.5v2.2A2.3 2.3 0 0 0 6.8 20h10.4a2.3 2.3 0 0 0 2.3-2.3v-2.2"/></svg></div>
+              <strong>拖拽或点击上传图片 / 音频 / 视频</strong>
+              <span>自动识别查询模态 · JPG/PNG/MP4/WAV/MP3 · 单文件 ≤ 100MB</span>
+              <div class="dz-types"><em>JPG/PNG</em><em>MP4</em><em>WAV/MP3</em></div>
+            </div>
+            <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.mp4,.wav,.mp3" hidden>
+          </div>
+          <div class="inline-err" id="uploadErr" role="alert"></div>
+        </div>
+      </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 意图澄清浮层（F5）：短词检索前给一次改写建议；× / Esc 关闭，不检索、不标记 -->
+<div class="clarify-mask" id="clarifyMask" onclick="closeClarify()"></div>
+<div class="clarify-modal" id="clarifyModal" role="dialog" aria-modal="true" aria-labelledby="clarifyTitle" aria-describedby="clarifyLead">
+  <div class="clarify-head">
+    <h3 id="clarifyTitle">意图澄清</h3>
+    <button class="clarify-close" type="button" onclick="closeClarify()" title="关闭（Esc）" aria-label="关闭">×</button>
+  </div>
+  <div class="clarify-body">
+    <p class="clarify-lead" id="clarifyLead"></p>
+    <div class="clarify-list" id="clarifyList"></div>
+    <div class="clarify-foot">
+      <button class="clarify-orig" type="button" onclick="keepOriginalQuery()">仍按原词检索</button>
+      <span class="clarify-hint">每个 query 最多澄清 1 轮</span>
+    </div>
+  </div>
+</div>
+
+<!-- 研发需求说明（入口在头部卡片右上角 · 右侧抽屉） -->
+<div class="dev-mask" id="devMask" onclick="closeDev()"></div>
+<div class="dev-drawer" id="devDrawer" role="dialog" aria-modal="true" aria-label="研发需求说明">
+  <div class="dev-head">
+    <h3>研发需求说明</h3>
+    <span class="dh-tag">给研发</span>
+    <button type="button" class="dev-close" id="devClose" title="关闭（Esc）" aria-label="关闭" onclick="closeDev()">×</button>
+  </div>
+  <div class="dev-body">
+      <div class="dev-card" id="dc-ov" style="scroll-margin-top:14px">
+        <div class="dc-head"><span class="dc-id" style="background:#1f5fd4">总览</span><span class="dc-name">页面定位 / 闭环 / 功能清单 / 设计出处</span></div>
+        <div class="dc-body">
+          <div class="ov-grid">
+            <div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>本页定位【设计】</h4><p>全系统唯一查询入口：输入文本描述或图/音频/视频文件，选择「查询模态 × 目标模态」发起检索；结果进入 <a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a> 确认与查看。</p></div>
+            <div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>平台全景闭环【研发】</h4><p>检索台发起检索 → <a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">P6</a> 搜索行为调度运行 → <a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a> 结果页确认/查看 → <a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a> 结果运营（反馈处理）→ 反馈归因到 <a class="dev-xref" href="P5_策略管理_v5.0_20261025.html">P5</a> 策略调整（<a class="dev-xref" href="P8_评测_v5.0_20261025.html">P8</a> 评测验证）→ 策略发布后下次检索生效；<a class="dev-xref" href="P4_库管理_v5.2_20261026.html">P4</a> 数据源库管理持续供给检索库。八页即此闭环的八个切面。</p></div>
+            <div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>功能清单【设计】</h4><p>本页主功能：发起检索并携参跳转结果页（F7）、输入联想（F6）、意图澄清（F5）；全局件：多模态输入（F1/F2）、模态矩阵（F3）、检索策略（F4）、权限态（F8）。完整历史在 <a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">搜索行为</a>。</p></div>
+            <div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>检索类型口径【设计】</h4><p>检索类型用于收窄目标模态：默认「全部」不限定目标模态，按统一向量空间跨模态混排返回，结果按相似度排序；选择具体模态（图像/文本/音频/视频）时，按当前查询模态自动选对应模态对（如文本→图像=「文搜图」），无对应组合时 toast「{查询模态}输入暂不支持检索「{目标模态}」结果」并保持原选择。</p></div>
+            <div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>设计出处与演示性质【设计】</h4><p>依据 L2 设计_13 页面架构地图 / L3 设计_15 模板 / L4 设计_16 基础件生成；模态能力：4×4 全矩阵 16 种模态对全部可检索（4 模态统一共享空间对齐，2026-10-27 确认）。本页检索为前端演示：校验通过后携参跳转 P2，不请求真实引擎；示例数据不构成交付承诺。</p></div>
+          </div>
+        </div>
+      </div>
+<div class="dev-card" id="dc-f1"><div class="dc-head"><span class="dc-id">F1</span><span class="dc-name">文本检索输入</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">输入查询文本，作为文本检索（文搜X）的查询语义；与文件同时存在时以文本 q 发起检索，文件只作上下文（演示不入 URL）。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">常驻可用；文本与文件二选一即可，不强制二者都有。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>用户手输文本</li><li>单行大输入框（Hero 搜索框），最多 512 字</li><li>占位文案「输入一句话描述，或拖入图片 / 音频 / 视频…」；示例词由输入联想提供。</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">实时字数统计（0/512，硬截断不允许超长）；输入去首尾空格后参与判定；有任务记录时输入非空即触发 F6 按包含匹配联想，无记录时去空格≥2 字展示示例；联想来自 cm_task_meta 的最近搜索与热门检索。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>作为 Query 参数进入 F7 检索</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>仅空格等同未输入</li><li>达到 512 字后无法继续输入</li><li>无文本也无文件时点检索，红字提示「请输入查询描述，或上传图片 / 视频 / 音频文件」，3.5 秒自动消失。</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">默认空；聚焦输入态；错误态=输入框红框+行内红字。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">下游 F6 联想 / F7 检索。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">512 字截断生效；计数实时；空输入拦截并提示。</div></div></div></div>
+<div class="dev-card" id="dc-f2"><div class="dc-head"><span class="dc-id">F2</span><span class="dc-name">文件输入与查询模态自动识别</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">上传图/视频/音频文件，系统自动识别查询模态并点亮对应矩阵行。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">拖拽区常驻；未上传时点击或拖入；已上传后该区显示文件卡片。Hero 搜索框也接受拖入文件，与拖拽区走同一 handleFile 流程。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>单文件</li><li>支持 JPG/JPEG/PNG/MP4/WAV/MP3</li><li>页面文案承诺单文件 ≤100MB。</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">按扩展名判定模态：jpg/jpeg/png→图像、mp4→视频、wav/mp3→音频；识别约 0.9 秒加载态；成功后写入 queryMode，矩阵仅保留该查询模态所在行可选（其余行置淡约 32%），非该行已选自动清除；音频额外默认选中「音搜音」。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>文件模态=矩阵查询模态（行）</li><li>文件名与模态留在本页 state，不入 URL</li><li>成功后可点 × 移除并复位。</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>类型不符→失败卡片+红字「不支持的文件类型…」</li><li>识别中重复点检索→「文件识别中，请稍候」</li><li>移除文件后矩阵行限制与已选全部复位。</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">默认态（虚线上传区）/拖拽高亮/识别中（spinner）/成功（文件卡+识别结果）/失败（红!卡+错误文案）。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">识别结果驱动 F3 矩阵行；文件名只留在本页 state，不入 URL。原始文件在正式系统留源系统，本中心只存检索要素。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">JPG/JPEG/PNG/MP4/WAV/MP3 识别为正确模态；非法类型被拦截并给明确文案；成功后矩阵仅该行可选、音频自动选音搜音；×移除后完全复位。</div></div></div></div>
+<div class="dev-card" id="dc-f3"><div class="dc-head"><span class="dc-id">F3</span><span class="dc-name">模态矩阵选择（查询模态 × 目标模态）</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">选择「查询模态 × 目标模态」组合，确定本次检索的模态对。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">与上传同处模态矩阵卡片内（一屏布局：矩阵在左、上传区在右）；4×4 全矩阵 16 种模态对全部可检索（4 模态统一共享空间对齐）；未开通库权限的账号不做置淡/锁定，点格时直接拦截。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>4×4 矩阵</li><li>行=查询模态（文本/图像/音频/视频），列=目标模态（文本/图像/音频/视频）</li><li>上传文件后按 F2 自动锁定查询模态行。</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">16 格均显示对勾、可点，点击置 selected（同时只允许一个）；guest 角色点击任意格只 toast「当前账号未开通库权限」，不改选中态、不置淡。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>选中模态对（如「文搜图」）进入 F7；未选时（检索类型=全部）pair=全部，不阻断检索</li><li>页面「当前模态对」与 <a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a> 均显示该模态对。</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>检索类型≠全部且无对应模态对时→红字「请先选择检索类型（全部 / 图像 / 文本 / 音频 / 视频）」并抖动检索类型组</li><li>切换文件致查询模态行变化时，非该行已选自动清除</li><li>无权限账号不可选。</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">可选/选中（蓝底）/置淡约 32%（文件锁定其他行）。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">能力清单：4×4 全矩阵 16 种模态对全部可检索（4 模态统一共享空间对齐，2026-10-27 确认）；入参供 F7、<a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a>。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">可选格恰好 16 个（4×4 全亮）；单选互斥；文件上传后非查询行置淡且跨行已选被清除；guest 点击被拦截提示。</div></div></div></div>
+<div class="dev-card" id="dc-f4"><div class="dc-head"><span class="dc-id">F4</span><span class="dc-name">检索策略选择（<a class="dev-xref" href="P5_策略管理_v5.0_20261025.html">P5</a> 反推）</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">选择本次检索所用的检索策略：检索时直接选一条策略，策略决定本次检索的相似度阈值与重排参数。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">常驻下拉，默认「系统默认策略（兜底）」；右侧小字显示该策略的参数摘要。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>选项来自 <a class="dev-xref" href="P5_策略管理_v5.0_20261025.html">P5</a> 已生效策略（读 sessionStorage.cm_strategies，仅取 status=生效中，草稿与已下线过滤掉；读不到存储时用与 P5 同构的兜底常量，本页不回写存储）</li><li>下拉只显示策略名、不显示策略号</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">选择即写入 state.stg；右侧小字随选项动态输出「阈值 x.xx · 重排开/关」（如「阈值 0.60 · 重排开」）；未选择或未知策略号回落系统默认策略 STG261018K7M2PQ。<br>下拉只列 status=生效中 的策略，草稿与已下线都不出现；若一条生效中都没有，回退「系统默认策略（兜底）」并显示回退提示：存在已下线策略时提示「所有策略已下线，已回退系统默认」，否则提示「暂无生效中策略，已回退系统默认」；检索仍可发起。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>策略号作为入参进入 F7 → <a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a>（跳转参数 stg + thr）</li><li>本次检索使用该策略的阈值与重排参数</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>未知 / 已下线的策略号按系统默认策略处理</li><li>存储里没有生效中策略（下拉为空）→ 兜底下拉只剩「系统默认策略（兜底）」并按是否存在已下线策略显示对应回退提示</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">下拉默认系统默认策略；切换即时生效，无加载态。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=<a class="dev-xref" href="P5_策略管理_v5.0_20261025.html">P5</a> 策略管理（唯一来源）；下游=F7、<a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a>。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">4 个选项与 P5 已生效策略一致；默认选中系统默认策略（兜底）；右侧摘要与 P5 参数一致；跳转带 stg 与 thr 参数。</div></div></div></div>
+<div class="dev-card" id="dc-f5"><div class="dc-head"><span class="dc-id">F5</span><span class="dc-name">意图澄清（短词检索前的改写建议）</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">去空格后 &lt;4 字的短 query 在检索前给一次改写建议，帮助用户把过短输入补成可检索的描述；每个 query 只给一轮建议，不打断正常检索主流程。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">点「检索」时触发；前置=有 query 且去空格长度 &lt; 4 且本轮未澄清过该 query。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>用户输入的短 query（长度去空格后 &lt; 4）</li><li>本轮已澄清的 query 记录（会话存储 cm_p1_clarified，仅本页使用）</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">弹出居中浮层（遮罩 + 约 520px 卡片）：标题「意图澄清」，正文「「{q}」较短或存在歧义，你是不是想找：」；候选按输入 query 拼模板生成三条，不写死文案；底部左「仍按原词检索」、右「每个 query 最多澄清 1 轮」。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>选候选 → 候选文本作为 query 进入 F7 检索流程（URL 的 q 即候选文本）</li><li>仍按原词 → 原 query 进入 F7 检索流程</li><li>关闭 → 不检索</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>≥4 字不触发</li><li>同一 query 已澄清不再触发</li><li>纯文件检索（无 query）不触发</li><li>× / Esc 仅关闭，不检索、不标记</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">隐藏 / 显示两态；显示时遮罩 + 卡片，点击遮罩或 × 或 Esc 均关闭。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=F1 检索输入；下游=F7 发起检索并携参跳 <a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a>。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">输入「发票」点检索弹出浮层且三条候选由 query 拼出（含{q}的扫描件 / {q} 高清扫描 / {q} 内容示意）；点候选后 URL 的 q 为候选文本；同一 query 第二次点检索不再弹；≥4 字与纯文件检索不弹。</div></div></div></div>
+<div class="dev-card" id="dc-f6"><div class="dc-head"><span class="dc-id">F6</span><span class="dc-name">相似查询复用（输入联想）</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">输入时给最近搜索与热门检索，减少重复输入。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">输入框聚焦且有任务记录时，输入非空即可能下拉；无任务记录时需去空格文本≥2 字；失焦 150ms 后收起（保留点击时间）。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>读会话存储 cm_task_meta（<a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a> 写入，结构 {task: {q, time, n, pair, user}}）；无记录时用 3 条示例</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">输入非空即按包含匹配（q.indexOf(输入) &gt; -1）展示分组（无任务记录时需 ≥2 字）：最近搜索=按 time 倒序去重取前 3；热门检索=按 query 频次降序取前 3（频次 ≥ 2 才显示）；无记录时展示「示例搜索」分组；mousedown 点选项（避免 blur 先收起）即回填到输入框、更新字数、收起下拉并聚焦。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>回填文本进入 F1，等同手输</li><li>完整历史在 <a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">搜索行为</a>。</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>输入为空不显示</li><li>&lt;2 字且无任务记录时不显示</li><li>Esc 收起</li><li>点击弹层外失焦收起</li><li>下拉项点击不被 blur 提前吞掉。</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">隐藏/显示两态；分组标题「最近搜索」/「热门检索」/「示例搜索」。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=<a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a> 写入的 cm_task_meta（<a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">搜索行为</a> 展示同一份记录）；下游回填 F1。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">有任务记录时输入命中即出现「最近搜索」/「热门检索」分组、无记录时 ≥2 字出现「示例搜索」；热门检索仅在频次 ≥ 2 时出现；点选项正确回填并聚焦；失焦/Esc 正常收起。</div></div></div></div>
+<div class="dev-card" id="dc-f7"><div class="dc-head"><span class="dc-id">F7</span><span class="dc-name">发起检索并携参跳转结果页</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">校验必填后组装检索上下文，生成任务号并携参跳 <a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a> 结果页（演示为前端跳转，不请求真实引擎）。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">「检索」主按钮；另有「清空」复位全部条件。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>Query（文本；纯文件检索时为空，URL 不带 q）、文件（可无）、模态对（可选；检索类型=全部时 pair=全部）、检索策略（必选，默认系统默认策略）。</li></ul></div></div><div class="dc-row "><div class="dc-k">检索流程</div><div class="dc-v">输入 → 校验 → 生成任务号 → 跳结果页。校验顺序：文件识别中拦截→文本与文件均空拦截→检索类型≠全部但无对应模态对拦截；通过后先判 F5：短 query（去空格&lt;4 字且本轮未澄清）弹意图澄清，澄清出口再进入 doSearch。doSearch 生成新任务号，按钮转「检索中」禁用态约 1.2 秒后携参跳转；文件存在而无文本时 URL 不带 q 参数。</div></div><div class="dc-row"><div class="dc-k">任务号</div><div class="dc-v">每次检索生成一个新任务号（TASK + yyMMdd + 6 位大写字母数字，去掉 I O 0 1），作为本次搜索的唯一标识，随 URL 的 task 参数带到 <a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a>；同一 query 再次检索也是新任务号。赞踩、反馈、评测都挂在这个任务号上。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>携参跳 <a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a>：?from=P1&back=P1&task=&q=&pair=&stg=&thr=（q 为空时省略；文件不入 URL）</li><li>task 为本次新任务号，pair 未选时为「全部」，stg 为策略号，thr 为该策略阈值（两位小数）</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>三类前置校验各自给明确红字/toast</li><li>检索中按钮防重复提交</li><li>清空复位：文本、模态对、文件、检索策略回系统默认、错误提示、联想。</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">默认「检索」/「检索中」禁用约 1.2 秒后跳转 P2，本页无完成态；错误为行内红字 3.5 秒。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=F1-F6 全部入参；下游=<a class="dev-xref" href="P2_结果页_v5.0_20261025.html">P2</a> 结果页（确认/查看）、<a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">P6</a> 搜索行为（正式系统建任务）。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">三种缺参分别被拦截且文案准确；通过后 task/q/pair/stg/thr 与界面选择一致，且任务号为本次检索新生成、与 URL 的 task 参数一致；检索中防连点；清空后页面回到初始态。</div></div></div></div>
+<div class="dev-card" id="dc-f8"><div class="dc-head"><span class="dc-id">F8</span><span class="dc-name">权限态（演示占位）</span><span class="demo-limit">含演示限制，正式实现需另定</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">声明本页权限位的演示口径：演示固定 role=admin，guest 分支只做点选拦截，不接真实登录态。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">演示不提供角色切换；正式由登录态与库授权决定，接入方式待定。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>登录态身份（账号）</li><li>库授权范围（正式数据；当前原型未接入，P4 也不再提供授权配置）</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">演示固定 admin，全部功能可用；预留 guest 分支：点模态矩阵格、检索类型按钮时 toast「当前账号未开通库权限」并保持原选择。检索按钮与输入框不拦 guest（原型未实现只读渲染）。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>演示固定可写态</li><li>guest 点选拦截 toast</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>guest 只拦截矩阵 / 检索类型点选，不拦截输入与检索按钮</li><li>原型无授权变更入口，正式接入后按登录态生效</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">演示固定已授权；guest 为预留分支。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=登录态与库授权（正式，未接入）；本页无权限配置入口。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">guest 点矩阵 / 检索类型被拦截并提示；原型不做只读渲染，检索按钮不拦。</div></div></div></div>
+  </div>
+</div>
+
+<script>
+/* ================= 数据 ================= */
+// 模态矩阵：行=查询模态，列=目标模态
+// 4 模态（文/图/音/视频）已统一共享空间对齐，4×4 全矩阵 16 种模态对全部可检索（2026-10-27 确认）
+var MATRIX = [
+  {row:'文本', cells:[
+    {t:'文搜文', s:'on'},
+    {t:'文搜图', s:'on'},
+    {t:'文搜音', s:'on'},
+    {t:'文搜视频', s:'on'}]},
+  {row:'图像', cells:[
+    {t:'图搜文', s:'on'},
+    {t:'图搜图', s:'on'},
+    {t:'图搜音', s:'on'},
+    {t:'图搜视频', s:'on'}]},
+  {row:'音频', cells:[
+    {t:'音搜文', s:'on'},
+    {t:'音搜图', s:'on'},
+    {t:'音搜音', s:'on'},
+    {t:'音搜视频', s:'on'}]},
+  {row:'视频', cells:[
+    {t:'视频搜文', s:'on'},
+    {t:'视频搜图', s:'on'},
+    {t:'视频搜音', s:'on'},
+    {t:'视频搜视频', s:'on'}]}
+];
+/* 无任务记录时展示的示例联想（分组标题「示例搜索」） */
+var HIST_SUGGEST = ['含发票代码的扫描件','窗口办事人员操作特写','产线设备运行画面'];
+var TARGETS = ['文本','图像','音频','视频'];
+
+var state = {
+  queryMode:null,        // 文件识别出的查询模态
+  uploadedFile:null,     // {name, mode}
+  target:'全部',          // 检索类型：全部=不限定目标模态
+  selectedPair:null,     // 如 '文搜图'
+  stg:'STG261018K7M2PQ', // 本次检索所用的检索策略（默认系统默认策略兜底）
+  recognizing:false,
+  role:'admin'
+};
+
+/* 线框 SVG 图标（上传卡片 / 文件缩略 / 对勾 / 关闭） */
+var ICON = {
+  image:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="4.6" width="17.6" height="14.8" rx="2.6"/><circle cx="8.6" cy="9.6" r="1.5"/><path d="M4.2 17.2l4.6-4.4 3.4 3.2 2.8-2.4 4.6 3.8"/></svg>',
+  video:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5.2" width="13.4" height="13.6" rx="2.6"/><path d="M16.4 10.2l4.4-2.5v8.6l-4.4-2.5"/></svg>',
+  audio:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 10.5v3M7.5 7.5v9M11 5v14M14.5 8v8M18 10.5v3M21 11.5v1"/></svg>',
+  upload:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5.5"/><path d="M7.5 10L12 5.5 16.5 10"/><path d="M4.5 15.5v2.2A2.3 2.3 0 0 0 6.8 20h10.4a2.3 2.3 0 0 0 2.3-2.3v-2.2"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.4 4.5L19 7.4"/></svg>',
+  close:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>'
+};
+
+/* ================= 初始化矩阵 ================= */
+function renderMatrix(){
+  var box = document.getElementById('modalMatrix');
+  box.querySelectorAll('.mm-cell').forEach(function(n){n.remove()});
+  MATRIX.forEach(function(r){
+    var rh = document.createElement('div');
+    rh.className = 'mm-rowh'; rh.textContent = r.row;
+    box.appendChild(rh);
+    r.cells.forEach(function(c){
+      var d = document.createElement('div');
+      d.className = 'mm-cell ' + (c.s === 'on' ? 'available' : c.s);
+      d.dataset.pair = c.t;
+      if(c.s === 'on'){
+        d.innerHTML = ICON.check;
+        d.title = c.t;
+        d.onclick = function(){ selectPair(c.t, d); };
+      }
+      // 4×4 全矩阵均可用
+      box.appendChild(d);
+    });
+  });
+  applyFileFilter();
+}
+function selectPair(pair, el){
+  if(state.role === 'guest'){ toast('当前账号未开通库权限','err'); return; }
+  state.selectedPair = pair;
+  var ti = pairTargetIndex(pair);
+  if(ti >= 0) state.target = TARGETS[ti];
+  document.querySelectorAll('#modalMatrix .mm-cell').forEach(function(n){ n.classList.remove('selected'); });
+  if(el) el.classList.add('selected');
+  syncModeTabs();
+  updateHints();
+  hideActionErr();
+}
+// 按模态对名称自动选中（上传后联动）
+function autoSelectPair(pair){
+  var target = null;
+  document.querySelectorAll('#modalMatrix .mm-cell.available').forEach(function(c){
+    if(c.dataset.pair === pair){ target = c; }
+  });
+  if(target && state.role !== 'guest'){ target.click(); }
+}
+// 上传文件后：只保留该查询模态所在行可选
+function applyFileFilter(){
+  var rows = document.querySelectorAll('.mm-rowh');
+  var idx = state.queryMode ? TARGETS.indexOf(state.queryMode) : -1;
+  MATRIX.forEach(function(r, ri){
+    var dim = idx >= 0 && ri !== idx;
+    var rowEl = rows[ri];
+    if(rowEl) rowEl.style.opacity = dim ? '.35' : '1';
+    var cells = document.querySelectorAll('#modalMatrix .mm-cell');
+    // 每4个一组
+    for(var k=0;k<4;k++){
+      var cell = cells[ri*4+k];
+      if(!cell) continue;
+      cell.classList.toggle('dim', dim && cell.classList.contains('available'));
+    }
+  });
+  if(idx >= 0){
+    // 自动清除不在该行的已选
+    var inRow = MATRIX[idx].cells.some(function(c){ return c.t === state.selectedPair; });
+    if(!inRow){ state.selectedPair = null; state.target = '全部'; document.querySelectorAll('#modalMatrix .mm-cell.selected').forEach(function(n){n.classList.remove('selected')}); }
+  }
+  syncModeTabs();
+  updateHints();
+}
+
+/* ================= 模态快捷选择（目标模态） ================= */
+function pairExists(pair){
+  var ok = false;
+  MATRIX.forEach(function(r){ r.cells.forEach(function(c){ if(c.t === pair && c.s === 'on') ok = true; }); });
+  return ok;
+}
+function pairTargetIndex(pair){
+  for(var r=0;r<MATRIX.length;r++){
+    for(var c=0;c<4;c++){ if(MATRIX[r].cells[c].t === pair) return c; }
+  }
+  return -1;
+}
+function currentModeLabel(){ return state.queryMode || '文本'; }
+function findPairForTarget(ti, preferMode){
+  // 已上传文件时，查询模态被锁定，只在对应行内找
+  if(state.queryMode){
+    var ri = TARGETS.indexOf(state.queryMode);
+    if(ri >= 0 && MATRIX[ri].cells[ti] && MATRIX[ri].cells[ti].s === 'on') return MATRIX[ri].cells[ti].t;
+    return null;
+  }
+  var order = [];
+  var pi = TARGETS.indexOf(preferMode || '文本'); if(pi < 0) pi = 0;
+  order.push(pi);
+  for(var i=0;i<4;i++){ if(i!==pi) order.push(i); }
+  for(var k=0;k<order.length;k++){
+    var r = order[k];
+    if(MATRIX[r].cells[ti] && MATRIX[r].cells[ti].s === 'on') return MATRIX[r].cells[ti].t;
+  }
+  return null;
+}
+function applyPair(pair){
+  state.selectedPair = (pair && pairExists(pair)) ? pair : null;
+  var ti = state.selectedPair ? pairTargetIndex(state.selectedPair) : -1;
+  state.target = ti >= 0 ? TARGETS[ti] : '全部';
+  document.querySelectorAll('#modalMatrix .mm-cell').forEach(function(n){ n.classList.remove('selected'); });
+  if(state.selectedPair){
+    document.querySelectorAll('#modalMatrix .mm-cell.available').forEach(function(n){
+      if(n.dataset.pair === state.selectedPair) n.classList.add('selected');
+    });
+  }
+  syncModeTabs();
+  updateHints();
+}
+function selectTarget(name){
+  if(state.role === 'guest'){ toast('当前账号未开通库权限','err'); return; }
+  if(name === '全部'){ selectAllTarget(); return; }
+  var ti = TARGETS.indexOf(name); if(ti < 0) return;
+  var pair = findPairForTarget(ti, currentModeLabel());
+  if(!pair){
+    toast((state.queryMode || '文本') + '输入暂不支持检索「' + name + '」结果','err');
+    return;
+  }
+  applyPair(pair);
+  hideActionErr();
+}
+function selectAllTarget(){
+  if(state.role === 'guest'){ toast('当前账号未开通库权限','err'); return; }
+  state.target = '全部';
+  state.selectedPair = null;
+  document.querySelectorAll('#modalMatrix .mm-cell.selected').forEach(function(n){ n.classList.remove('selected'); });
+  syncModeTabs();
+  updateHints();
+  hideActionErr();
+}
+function syncModeTabs(){
+  var target = state.target || '全部';
+  if(target !== '全部' && !state.selectedPair) target = '全部';
+  document.querySelectorAll('.mode-tab').forEach(function(b){
+    var on = b.dataset.target === target;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+function updateHints(){
+  var ph = document.getElementById('pairHint');
+  if(ph) ph.textContent = (state.target === '全部') ? '全部' : (state.selectedPair || '全部');
+}
+
+/* ================= 输入与联想 ================= */
+var queryInput = document.getElementById('queryInput');
+var suggestPop = document.getElementById('suggestPop');
+queryInput.addEventListener('input', function(){
+  document.getElementById('charCount').textContent = queryInput.value.length;
+  if(document.getElementById('actionErr').classList.contains('show')) hideActionErr();
+  renderSuggest();
+});
+queryInput.addEventListener('keydown', function(e){
+  if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('searchBtn').click(); }
+});
+queryInput.addEventListener('blur', function(){ setTimeout(function(){ suggestPop.classList.remove('show'); }, 150); });
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){
+    suggestPop.classList.remove('show');
+  }
+});
+/* ================= 输入联想：最近搜索 / 热门检索（只读 P2 写入的 cm_task_meta） ================= */
+var TASK_META_KEY = 'cm_task_meta';   /* 结构：{task:{q,time,n,pair,user}}；本页只读、不写、不改结构 */
+var SUGGEST_LIMIT = 3;
+
+/* 读出全部任务记录（只取 q / time 两个字段），无记录或结构异常返回空数组 */
+function readTaskRecords(){
+  var out = [];
+  try{
+    var raw = sessionStorage.getItem(TASK_META_KEY);
+    if(!raw){ return out; }
+    var obj = JSON.parse(raw);
+    if(!obj || typeof obj !== 'object' || Array.isArray(obj)){ return out; }
+    Object.keys(obj).forEach(function(k){
+      var it = obj[k];
+      if(!it || typeof it !== 'object'){ return; }
+      var q = String(it.q == null ? '' : it.q).trim();
+      if(!q){ return; }
+      out.push({q:q, time:String(it.time == null ? '' : it.time)});
+    });
+  }catch(e){}
+  return out;
+}
+/* 最近搜索：按 time（yyyy-MM-dd HH:mm 可直接比较）倒序，按 query 去重 */
+function recentQueries(recs){
+  var sorted = recs.slice().sort(function(a, b){
+    if(a.time === b.time){ return 0; }
+    return a.time < b.time ? 1 : -1;
+  });
+  var seen = {}, out = [];
+  sorted.forEach(function(r){
+    if(seen[r.q]){ return; }
+    seen[r.q] = 1;
+    out.push(r.q);
+  });
+  return out;
+}
+/* 热门检索：按 query 出现频次降序，仅保留频次 ≥ 2 */
+function hotQueries(recs){
+  var count = {}, order = [];
+  recs.forEach(function(r){
+    if(!Object.prototype.hasOwnProperty.call(count, r.q)){ count[r.q] = 0; order.push(r.q); }
+    count[r.q]++;
+  });
+  var out = [];
+  order.forEach(function(q){ if(count[q] >= 2){ out.push({q:q, n:count[q]}); } });
+  out.sort(function(a, b){ return b.n - a.n; });
+  return out;
+}
+function makeSuggestGroup(title){
+  var g = document.createElement('div');
+  g.className = 'suggest-group';
+  g.textContent = title;
+  return g;
+}
+function makeSuggestItem(text, meta, q){
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'suggest-item';
+  b.appendChild(document.createTextNode(text));
+  if(meta){
+    var s = document.createElement('span');
+    s.className = 's-hist';
+    s.textContent = meta;
+    b.appendChild(s);
+  }
+  /* mousedown 先于 blur，避免下拉先被收起 */
+  b.onmousedown = function(e){ e.preventDefault(); refill(q); };
+  return b;
+}
+function renderSuggest(){
+  var v = queryInput.value.trim();
+  suggestPop.innerHTML = '';
+  /* 输入为空不弹 */
+  if(!v){ suggestPop.classList.remove('show'); return; }
+  var recs = readTaskRecords();
+  var groups = [];
+  if(recs.length){
+    /* 有真实任务记录：输入非空即按包含匹配联想（最近搜索 + 热门检索） */
+    var recent = recentQueries(recs).filter(function(q){ return q.indexOf(v) > -1; }).slice(0, SUGGEST_LIMIT);
+    if(recent.length){
+      groups.push({title:'最近搜索', items: recent.map(function(q){ return {text:q, meta:'', q:q}; })});
+    }
+    var hot = hotQueries(recs).filter(function(x){ return x.q.indexOf(v) > -1; }).slice(0, SUGGEST_LIMIT);
+    if(hot.length){
+      groups.push({title:'热门检索', items: hot.map(function(x){ return {text:x.q, meta:'（搜过 ' + x.n + ' 次）', q:x.q}; })});
+    }
+  }else{
+    /* 完全没有记录：<2 字不弹，≥2 字展示原来的 3 条演示联想，分组标题为「示例搜索」 */
+    if(v.length < 2){ suggestPop.classList.remove('show'); return; }
+    var demo = HIST_SUGGEST.filter(function(q){ return q.indexOf(v) > -1; });
+    if(!demo.length){ demo = HIST_SUGGEST.slice(0, SUGGEST_LIMIT); }
+    groups.push({title:'示例搜索', items: demo.slice(0, SUGGEST_LIMIT).map(function(q){ return {text:q, meta:'', q:q}; })});
+  }
+  if(!groups.length){ suggestPop.classList.remove('show'); return; }
+  groups.forEach(function(g){
+    suggestPop.appendChild(makeSuggestGroup(g.title));
+    g.items.forEach(function(it){ suggestPop.appendChild(makeSuggestItem(it.text, it.meta, it.q)); });
+  });
+  suggestPop.classList.add('show');
+}
+function refill(q){ queryInput.value = q; document.getElementById('charCount').textContent = q.length; suggestPop.classList.remove('show'); queryInput.focus(); hideActionErr(); }
+
+/* ================= 意图澄清（F5）：短词检索前给一次改写建议 ================= */
+/* 本轮已澄清过的 query 记在会话存储里（仅本页使用；不下发 URL、不碰 cm_strategies） */
+var CLARIFY_KEY = 'cm_p1_clarified';
+var clarifyOpen = false;
+var clarifyQuery = '';
+
+function readClarifiedList(){
+  try{
+    var raw = sessionStorage.getItem(CLARIFY_KEY);
+    if(!raw){ return []; }
+    var arr = JSON.parse(raw);
+    if(!Array.isArray(arr)){ return []; }
+    return arr.map(function(x){ return String(x); });
+  }catch(e){ return []; }
+}
+function isQueryClarified(q){
+  return readClarifiedList().indexOf(q) > -1;
+}
+function markQueryClarified(q){
+  if(!q){ return; }
+  try{
+    var arr = readClarifiedList();
+    var i = arr.indexOf(q);
+    if(i > -1){ arr.splice(i, 1); }
+    arr.push(q);
+    if(arr.length > 60){ arr = arr.slice(arr.length - 60); }
+    sessionStorage.setItem(CLARIFY_KEY, JSON.stringify(arr));
+  }catch(e){}
+}
+/* 候选：按输入 query 拼模板，不写死文案 */
+function clarifyCandidates(q){
+  return ['含' + q + '的扫描件', q + ' 高清扫描', q + ' 内容示意'];
+}
+function openClarify(q){
+  if(clarifyOpen){ return; }
+  clarifyOpen = true;
+  clarifyQuery = q;
+  var lead = document.getElementById('clarifyLead');
+  if(lead){ lead.textContent = '「' + q + '」较短或存在歧义，你是不是想找：'; }
+  var list = document.getElementById('clarifyList');
+  if(list){
+    list.innerHTML = '';
+    clarifyCandidates(q).forEach(function(text){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'clarify-opt';
+      b.appendChild(document.createTextNode(text));
+      var arrow = document.createElement('span');
+      arrow.className = 'co-arrow';
+      arrow.setAttribute('aria-hidden', 'true');
+      arrow.textContent = '→';
+      b.appendChild(arrow);
+      b.onclick = function(){ pickClarifyCandidate(text); };
+      list.appendChild(b);
+    });
+  }
+  var mask = document.getElementById('clarifyMask');
+  var modal = document.getElementById('clarifyModal');
+  if(mask){ mask.classList.add('open'); }
+  if(modal){ modal.classList.add('open'); }
+  suggestPop.classList.remove('show');
+  hideActionErr();
+}
+function closeClarify(){
+  clarifyOpen = false;
+  var mask = document.getElementById('clarifyMask');
+  var modal = document.getElementById('clarifyModal');
+  if(mask){ mask.classList.remove('open'); }
+  if(modal){ modal.classList.remove('open'); }
+}
+/* 出口一：选候选 → 用候选文本作为 query 走原检索流程 */
+function pickClarifyCandidate(text){
+  var origin = clarifyQuery;
+  closeClarify();
+  markQueryClarified(origin);
+  queryInput.value = text;
+  document.getElementById('charCount').textContent = text.length;
+  doSearch(text);
+}
+/* 出口二：仍按原词检索 → 原 query 走原检索流程 */
+function keepOriginalQuery(){
+  var origin = clarifyQuery || queryInput.value.trim();
+  closeClarify();
+  markQueryClarified(origin);
+  doSearch(origin);
+}
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && clarifyOpen){ closeClarify(); }
+});
+
+
+/* ================= 上传 ================= */
+var dz = document.getElementById('dropzone');
+var fileInput = document.getElementById('fileInput');
+var searchboxEl = document.getElementById('searchbox');
+searchboxEl.addEventListener('dragover', function(e){ e.preventDefault(); searchboxEl.classList.add('drag'); });
+searchboxEl.addEventListener('dragleave', function(){ searchboxEl.classList.remove('drag'); });
+searchboxEl.addEventListener('drop', function(e){
+  e.preventDefault(); searchboxEl.classList.remove('drag');
+  if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+dz.addEventListener('click', function(e){ if(!state.uploadedFile) fileInput.click(); });
+dz.addEventListener('dragover', function(e){ e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', function(){ dz.classList.remove('drag'); });
+dz.addEventListener('drop', function(e){
+  e.preventDefault(); dz.classList.remove('drag');
+  if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', function(){ if(fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+function handleFile(file){
+  var name = file.name;
+  var ext = (name.split('.').pop() || '').toLowerCase();
+  var isImg = ['jpg','jpeg','png'].indexOf(ext) >= 0;
+  var isVideo = ext === 'mp4';
+  var isAudio = ['wav','mp3'].indexOf(ext) >= 0;
+  if(!isImg && !isVideo && !isAudio){ uploadFail(name, '不支持的文件类型，请上传 JPG/PNG/MP4/WAV/MP3'); return; }
+
+  // 加载态：识别中
+  state.recognizing = true;
+  dz.className = 'dropzone';
+  dz.innerHTML = '<div class="dz-file"><div class="f-thumb"><span class="spinner" style="border-color:rgba(31,95,212,.35);border-top-color:#1f5fd4"></span></div>'+
+    '<div class="f-meta"><div class="f-name">'+name+'</div><div class="f-rec" style="color:#667085">正在识别模态…</div></div></div>';
+
+  setTimeout(function(){
+    state.recognizing = false;
+    var mode = isImg ? '图像' : (isVideo ? '视频' : '音频');
+    var thumb = isImg ? ICON.image : (isVideo ? ICON.video : ICON.audio);
+    state.queryMode = mode;
+    state.uploadedFile = {name:name, mode:mode};
+    dz.className = 'dropzone success';
+    var recText = '已识别为'+mode+'模态，请选择目标检索类型';
+    dz.innerHTML = '<div class="dz-file"><div class="f-thumb">'+thumb+'</div>'+
+      '<div class="f-meta"><div class="f-name">'+name+'</div>'+
+      '<div class="f-rec">'+recText+'</div></div>'+
+      '<button class="dz-clear" type="button" title="移除文件" aria-label="移除文件">'+ICON.close+'</button></div>';
+    dz.querySelector('.dz-clear').onclick = function(e){ e.stopPropagation(); clearFile(); };
+    applyFileFilter();
+    // 音频上传：默认选中同模态「音搜音」
+    if(isAudio){ autoSelectPair('音搜音'); }
+    hideUploadErr();
+  }, 900);
+}
+function uploadFail(name, msg){
+  state.recognizing = false; state.queryMode = null; state.uploadedFile = null;
+  dz.className = 'dropzone fail';
+  dz.innerHTML = '<div class="dz-file"><div class="f-thumb" style="background:#fdecec;color:#d92d20;font-weight:700">!</div>'+
+    '<div class="f-meta"><div class="f-name">'+name+'</div><div class="f-rec err">'+msg+'</div></div>'+
+    '<button class="dz-clear" type="button" title="移除" aria-label="移除文件">'+ICON.close+'</button></div>';
+  dz.querySelector('.dz-clear').onclick = function(e){ e.stopPropagation(); resetDropzone(); };
+  document.getElementById('uploadErr').textContent = msg;
+  document.getElementById('uploadErr').classList.add('show');
+  applyFileFilter();
+}
+function resetDropzone(){
+  state.uploadedFile = null;
+  dz.className = 'dropzone';
+  dz.innerHTML = '<div class="dz-default"><div class="dz-ico">'+ICON.upload+'</div><strong>拖拽或点击上传图片 / 音频 / 视频</strong>'+
+    '<span>自动识别查询模态 · JPG/PNG/MP4/WAV/MP3 · 单文件 ≤ 100MB</span>'+
+    '<div class="dz-types"><em>JPG/PNG</em><em>MP4</em><em>WAV/MP3</em></div></div>';
+  fileInput.value = '';
+  hideUploadErr();
+}
+function clearFile(){ resetDropzone(); state.queryMode = null; applyFileFilter(); }
+
+/* ================= 检索策略（选项来自 P5 策略管理 · sessionStorage.cm_strategies） ================= */
+/* 检索时直接选一条策略；该策略的阈值与重排参数即本次检索所用参数 */
+var STG_STORE_KEY='cm_strategies';
+var DEFAULT_STG='STG261018K7M2PQ';
+/* 与 P5 策略管理逐字一致的兜底常量（5 条，字段齐全）；仅当 cm_strategies 读不到时在内存使用，不回写存储 */
+var STG_FALLBACK=[
+  {id:'STG261018K7M2PQ', name:'系统默认策略（兜底）', ver:'v3', status:'生效中',
+   thr:0.60, rerank:true, model:'图文对齐 · CLIP双塔 v3',
+   w:{文本:25,图像:25,视频:25,音频:25}, time:'2026-10-18 09:30'},
+  {id:'STG261025A3F9KX', name:'训练取样检索策略', ver:'v3', status:'生效中',
+   thr:0.50, rerank:true, model:'图文对齐 · CLIP双塔 v3',
+   w:{文本:50,图像:30,视频:10,音频:10}, time:'2026-10-25 00:12'},
+  {id:'STG261022P6L4MN', name:'业务素材检索策略', ver:'v2', status:'生效中',
+   thr:0.75, rerank:true, model:'图文对齐 · CLIP双塔 v3',
+   w:{文本:45,图像:35,视频:10,音频:10}, time:'2026-10-22 16:40'},
+  {id:'STG261020D8N3QR', name:'日常检索检索策略', ver:'v2', status:'生效中',
+   thr:0.60, rerank:true, model:'图文对齐 · CLIP双塔 v3',
+   w:{文本:50,图像:30,视频:10,音频:10}, time:'2026-10-20 14:02'},
+  {id:'STG261024H5T6UW', name:'阈值收紧（评测建议生成）', ver:'v1', status:'草稿',
+   thr:0.90, rerank:true, model:'图文对齐 · CLIP双塔 v3',
+   w:{文本:50,图像:30,视频:10,音频:10}, time:'2026-10-24 11:20'}
+];
+var STG_MAP={};
+var STG_ORDER=[];
+var stgSelect=document.getElementById('stgSelect');
+function cloneStgFallback(){
+  var out=[];
+  for(var i=0;i<STG_FALLBACK.length;i++){
+    var s=STG_FALLBACK[i];
+    out.push({id:s.id,name:s.name,thr:s.thr,rerank:s.rerank,ver:s.ver,status:s.status,model:s.model,
+      w:{文本:s.w.文本,图像:s.w.图像,视频:s.w.视频,音频:s.w.音频},time:s.time});
+  }
+  return out;
+}
+function normalizeStgRecord(o){
+  if(!o||!o.id){return null;}
+  var thr=parseFloat(o.thr);
+  if(isNaN(thr)){thr=0.60;}
+  var rerank=!(o.rerank===false||o.rerank==='off'||o.rerank===0||o.rerank==='0');
+  return {
+    id:String(o.id),
+    name:String(o.name||'未命名策略'),
+    thr:thr,
+    rerank:rerank,
+    ver:String(o.ver||'v1'),
+    status:String(o.status||'生效中')
+  };
+}
+/* 只读 cm_strategies：读不到（无存储 / 内容损坏）返回 null，由调用方用兜底常量，本页不写存储 */
+function readStgStore(){
+  try{
+    var raw=sessionStorage.getItem(STG_STORE_KEY);
+    if(!raw){return null;}
+    var arr=JSON.parse(raw);
+    if(!Array.isArray(arr)||!arr.length){return null;}
+    return arr;
+  }catch(e){return null;}
+}
+/* 只取「生效中」策略渲染下拉（草稿 / 已下线都不进下拉）；id 为系统默认的优先选中，否则选第一条 */
+/* 若一条「生效中」都没有（全部下线等），回退系统默认策略并给出提示 */
+var STG_FALLBACK_ON=false;
+function setStgFallbackHint(on,allOff){
+  STG_FALLBACK_ON=!!on;
+  var fb=document.getElementById('stgFbHint');
+  var diff=document.getElementById('stgDiff');
+  if(fb){
+    fb.hidden=!on;
+    fb.textContent=on?(allOff?'所有策略已下线，已回退系统默认':'暂无生效中策略，已回退系统默认'):'';
+  }
+  if(diff){diff.style.display=on?'none':'';}
+}
+function loadStrategyOptions(){
+  var raw=readStgStore();
+  if(!raw){raw=cloneStgFallback();}
+  STG_MAP={};STG_ORDER=[];
+  var offCount=0;
+  for(var i=0;i<raw.length;i++){
+    var s=normalizeStgRecord(raw[i]);
+    if(!s){continue;}
+    if(s.status==='已下线'){offCount++;}
+    if(s.status!=='生效中'||STG_MAP[s.id]){continue;}
+    STG_MAP[s.id]=s;
+    STG_ORDER.push(s.id);
+  }
+  var fallbackOn=false;
+  if(!STG_ORDER.length){
+    fallbackOn=true;
+    var d=normalizeStgRecord(cloneStgFallback()[0]);
+    if(d){STG_MAP[d.id]=d;STG_ORDER.push(d.id);}
+  }
+  var html='';
+  for(var k=0;k<STG_ORDER.length;k++){
+    var it=STG_MAP[STG_ORDER[k]];
+    html+='<option value="'+it.id.replace(/"/g,'&quot;')+'">'+
+      it.name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</option>';
+  }
+  if(stgSelect){stgSelect.innerHTML=html;}
+  setStgFallbackHint(fallbackOn,offCount>0);
+  state.stg=STG_MAP[DEFAULT_STG]?DEFAULT_STG:(STG_ORDER[0]||DEFAULT_STG);
+}
+function normalizeStg(id){
+  var v=String(id==null?'':id).trim();
+  if(Object.prototype.hasOwnProperty.call(STG_MAP,v)){return v;}
+  for(var k in STG_MAP){
+    if(Object.prototype.hasOwnProperty.call(STG_MAP,k)&&STG_MAP[k].name===v){return k;}
+  }
+  if(STG_MAP[DEFAULT_STG]){return DEFAULT_STG;}
+  return STG_ORDER[0]||DEFAULT_STG;
+}
+function strategyThr(id){
+  var s=STG_MAP[normalizeStg(id)];
+  return s?Number(s.thr):0.60;
+}
+function strategySummary(id){
+  var s=STG_MAP[normalizeStg(id)];
+  if(!s){return '';}
+  return '阈值 '+Number(s.thr).toFixed(2)+' · 重排'+(s.rerank?'开':'关');
+}
+stgSelect.addEventListener('change', function(){ setStrategy(stgSelect.value); });
+function setStrategy(id){
+  var s=normalizeStg(id);
+  stgSelect.value=s;
+  state.stg=s;
+  var d=document.getElementById('stgDiff');
+  if(d){d.textContent=strategySummary(s);d.style.display=STG_FALLBACK_ON?'none':'';}
+  updateHints();
+}
+loadStrategyOptions();
+setStrategy(state.stg);
+
+/* ================= 检索主流程 ================= */
+var searchBtn = document.getElementById('searchBtn');
+searchBtn.addEventListener('click', function(){
+  var q = queryInput.value.trim();
+  if(state.recognizing){ toast('文件识别中，请稍候','err'); return; }
+  if(!q && !state.uploadedFile){ showActionErr('请输入查询描述，或上传图片 / 视频 / 音频文件'); return; }
+  if(state.target !== '全部' && !state.selectedPair){
+    showActionErr('请先选择检索类型（全部 / 图像 / 文本 / 音频 / 视频）');
+    nudgeModeTabs();
+    return;
+  }
+  hideActionErr();
+
+  /* F5 意图澄清：有 query 且去空格长度 < 4 且本轮未澄清过该 query → 先给一次改写建议；
+     其余情况（≥4 字 / 纯文件检索 / 本 query 已澄清）一律直接走原流程，校验与传参不变 */
+  if(q && q.length < 4 && !isQueryClarified(q)){ openClarify(q); return; }
+
+  // 检索流程：输入 → 校验 → 生成任务号 → 跳结果页（无中间步骤）
+  doSearch(q);
+});
+function showActionErr(m){
+  var el = document.getElementById('actionErr');
+  el.textContent = m; el.classList.add('show');
+  document.getElementById('searchbox').classList.add('is-error');
+  queryInput.classList.add('err');
+  setTimeout(hideActionErr, 3500);
+}
+function hideActionErr(){
+  document.getElementById('actionErr').classList.remove('show');
+  document.getElementById('searchbox').classList.remove('is-error');
+  queryInput.classList.remove('err');
+}
+function hideUploadErr(){ document.getElementById('uploadErr').classList.remove('show'); }
+function nudgeModeTabs(){
+  var g = document.getElementById('modeGroup'); if(!g) return;
+  g.classList.remove('nudge');
+  void g.offsetWidth;
+  g.classList.add('nudge');
+  setTimeout(function(){ g.classList.remove('nudge'); }, 600);
+}
+
+/* 每次检索生成新任务号：TASK + yyMMdd + 6 位大写字母数字（去掉 I O 0 1） */
+function genTaskId(){
+  var d = new Date();
+  var y = String(d.getFullYear()).slice(2);
+  var m = ('0' + (d.getMonth()+1)).slice(-2);
+  var dd = ('0' + d.getDate()).slice(-2);
+  var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  var s = '';
+  for(var i=0;i<6;i++){ s += chars.charAt(Math.floor(Math.random()*chars.length)); }
+  return 'TASK' + y + m + dd + s;
+}
+function doSearch(q){
+  var btn = document.getElementById('searchBtn');
+  var label = document.getElementById('searchBtnLabel');
+  btn.disabled = true;
+  label.innerHTML = '<span class="spinner"></span> 检索中';
+  /* 本页每次执行检索（含放宽过滤后再检）都生成新任务号 */
+  var taskId = genTaskId();
+  setTimeout(function(){
+    var url = 'P2_结果页_v5.0_20261025.html?from=P1&back=P1&task=' + encodeURIComponent(taskId);
+    if(q) url += '&q=' + encodeURIComponent(q);
+    var pairParam = (state.target === '全部') ? '全部' : state.selectedPair;
+    if(pairParam) url += '&pair=' + encodeURIComponent(pairParam);
+    var stgId = normalizeStg(state.stg);
+    url += '&stg=' + encodeURIComponent(stgId);
+    url += '&thr=' + strategyThr(stgId).toFixed(2);
+    location.href = url;
+  }, 1200);
+}
+
+function resetAll(){
+  queryInput.value = ''; document.getElementById('charCount').textContent = '0';
+  applyPair(null);
+  clearFile(); setStrategy(DEFAULT_STG);
+  hideActionErr(); hideUploadErr();
+  closeClarify();
+  suggestPop.classList.remove('show'); suggestPop.innerHTML = '';
+  updateHints();
+  toast('已清空检索条件');
+}
+
+/* ================= Toast ================= */
+var toastTimer;
+function toast(msg, type){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.className = 'toast'; }, 2600);
+}
+
+
+/* ================= 启动 ================= */
+renderMatrix();
+document.querySelectorAll('.mode-tab').forEach(function(b){
+  b.addEventListener('click', function(){ selectTarget(b.dataset.target); });
+});
+updateHints();
+syncModeTabs();
+setStrategy(state.stg);
+
+/* ===== URL 参数：再次执行 / P2 修改检索 / 放宽过滤 回填 ===== */
+(function(){
+  try{
+    var qs=new URLSearchParams(location.search);
+    var q=qs.get('q');
+    if(q){
+      var ta=document.getElementById('queryInput');
+      if(ta){ ta.value=q; var cc=document.getElementById('charCount'); if(cc) cc.textContent=q.length; }
+    }else{
+      try{
+        var rf=localStorage.getItem('cmRefill');
+        if(rf){ var o=JSON.parse(rf); if(o && o.q){ var ta2=document.getElementById('queryInput'); if(ta2){ ta2.value=o.q; var cc2=document.getElementById('charCount'); if(cc2) cc2.textContent=o.q.length; } } }
+      }catch(e){}
+    }
+    var pair=qs.get('pair');
+    if(!pair || pair === '全部'){ applyPair(null); }
+    else if(pairExists(pair)){ applyPair(pair); }
+    var stg=qs.get('stg');
+    if(stg){ setStrategy(stg); }
+    if(qs.get('relax')==='1'){ toast('已放宽过滤，按原 query 重新检索'); }
+  }catch(e){}
+})();
+
+/* ===== 系统门户桥接（index.html 壳用，单页直开无副作用）sysBridge v2 ===== */
+(function(){
+  try{
+    if(window.parent && window.parent!==window){
+      window.parent.postMessage({type:'sys-page',page:'P1',name:'检索台'},'*');
+    }
+  }catch(e){}
+})();
+
+
+
+/* ===== 研发说明抽屉（八页统一：头部胶囊入口 + 右侧 520px 抽屉） ===== */
+function openDev(){
+  var d = document.getElementById('devDrawer'), m = document.getElementById('devMask');
+  if(d) d.classList.add('open');
+  if(m) m.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeDev(){
+  var d = document.getElementById('devDrawer'), m = document.getElementById('devMask');
+  if(d) d.classList.remove('open');
+  if(m) m.classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeDev(); });
+</script>
+</body>
+</html>

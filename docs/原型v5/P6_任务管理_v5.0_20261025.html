@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>搜索行为 · 跨模态检索中心</title>
+<style>
+:root{
+  --workspace-bg:#f6f9fe;
+  --content-soft:#fbfdff;
+  --content-line:#e6edf8;
+  --system-blue:#4169f6;
+  --system-blue-weak:#f1f5ff;
+  --muted:#667085;
+  --success:#34a853;
+  --warning:#f0a020;
+  --error:#e5484d;
+  --radius:8px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--workspace-bg);
+  color:#262626;
+  font-size:14px;
+  line-height:1.5;
+  display:flex;
+}
+button{font-family:inherit;cursor:pointer}
+a{color:inherit;text-decoration:none}
+::selection{background:rgba(65,105,246,.16)}
+
+/* ============ 左侧全局导航（壳层与 P1 一致） ============ */
+.sidebar{
+  width:220px;flex-shrink:0;
+  background:#fff;border-right:1px solid var(--content-line);
+  display:flex;flex-direction:column;
+  height:100vh;position:sticky;top:0;
+}
+.nav-scroll{flex:1;overflow-y:auto;padding:10px 12px}
+.nav-item{
+  display:flex;align-items:center;gap:9px;
+  padding:9px 10px;margin-bottom:2px;
+  border-radius:6px;color:#344054;font-size:13px;
+  cursor:pointer;user-select:none;
+}
+.nav-item .ico{width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:#8a96ad;flex-shrink:0}
+.nav-item .ico svg{width:16px;height:16px;display:block}
+.nav-item.active .ico{color:var(--system-blue)}
+.nav-item:hover{background:var(--system-blue-weak);color:var(--system-blue)}
+.nav-item.active{
+  background:var(--system-blue-weak);color:var(--system-blue);font-weight:600;
+  box-shadow:inset 2px 0 0 var(--system-blue);
+}
+.nav-divider{height:1px;background:var(--content-line);margin:8px 10px}
+
+/* ============ 主区 ============ */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+.content{padding:20px 24px 32px;display:flex;flex-direction:column;gap:16px;max-width:1280px;width:100%;margin:0 auto}
+
+.page-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:18px 20px;
+  border:1px solid #e4edf8;
+  border-radius:10px;
+  background:#fff;
+}
+.page-head h1{font-size:20px;font-weight:700;color:#111827;line-height:1.3}
+.page-head p{font-size:13px;color:#667085;line-height:1.65;max-width:760px;margin-top:5px}
+
+/* ===== 研发说明入口（八页统一：头部胶囊按钮 + 右侧抽屉） ===== */
+.dev-entry{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px 0 5px;border:1px solid #d7e0f0;border-radius:999px;background:#fff;color:#667085;font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+.dev-entry:hover{border-color:#b9c9ff;background:var(--system-blue-weak);color:var(--system-blue)}
+.dev-entry:hover .de-q{background:var(--system-blue);color:#fff}
+.dev-entry:focus-visible{outline:2px solid #cdd9ff;outline-offset:1px}
+.dev-entry .de-q{width:20px;height:20px;border-radius:50%;flex:0 0 auto;background:var(--system-blue-weak);color:var(--system-blue);font-size:12px;font-weight:700;line-height:20px;text-align:center;transition:background .15s,color .15s}
+/* 右侧抽屉：520px / 全高 / 从右滑入 + 半透明遮罩 */
+.dev-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:10000;opacity:0;pointer-events:none;transition:opacity .22s}
+.dev-mask.open{opacity:1;pointer-events:auto}
+.dev-drawer{position:fixed;top:0;right:0;width:720px;max-width:100vw;height:100vh;background:#f6f8fc;z-index:10001;display:flex;flex-direction:column;transform:translateX(102%);transition:transform .28s ease;box-shadow:-8px 0 30px rgba(15,23,42,.18)}
+.dev-drawer.open{transform:translateX(0)}
+.dev-head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:#fff;border-bottom:1px solid #e4eaf3;flex:0 0 auto}
+.dev-head h3{margin:0;font-size:15px;color:#1f2937}
+.dev-head .dh-tag{font-size:11px;font-weight:600;color:#b54708;background:#fdf3e6;border-radius:4px;padding:2px 8px}
+.dev-close{margin-left:auto;width:28px;height:28px;border:none;background:#f2f4f8;border-radius:6px;font-size:15px;line-height:1;cursor:pointer;color:#475467;flex:0 0 auto}
+.dev-close:hover{background:#e6eaf2}
+.dev-body{flex:1;min-height:0;overflow:auto;padding:16px 18px 36px}
+.dev-stack{display:flex;flex-direction:column;gap:12px}
+
+/* 面板 */
+.panel{
+  padding:16px 18px;border:1px solid #e4edf8;border-radius:var(--radius);
+  background:#fff;display:flex;flex-direction:column;gap:12px;
+  scroll-margin-top:12px;
+}
+.panel-head{display:flex;align-items:flex-start;gap:10px;justify-content:space-between}
+.sec-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sec-head .sec-title{font-size:15px;font-weight:700;color:#1f2a44}
+.sec-head .sec-sub{font-size:12px;color:#9aa6bd}
+.sec-head::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--system-blue)}
+.sec-flash{animation:secFlash 1.1s ease-out}
+@keyframes secFlash{0%{box-shadow:0 0 0 3px rgba(65,105,246,.2)}100%{box-shadow:0 0 0 0 rgba(65,105,246,0)}}
+
+/* 过滤 chips / 搜索 */
+.chip-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{
+  border:1px solid #d7e0f0;border-radius:14px;padding:4px 13px;background:#fff;
+  color:#475467;font-size:12px;white-space:nowrap;
+}
+.chip:hover{border-color:#aebdf5;color:var(--system-blue)}
+.chip.active{background:var(--system-blue);color:#fff;border-color:var(--system-blue);font-weight:600}
+.search-input input{
+  height:30px;border:1px solid #cfd8e8;border-radius:5px;background:#fff;
+  padding:0 11px;font-size:12.5px;outline:none;min-width:180px;
+}
+.search-input input:focus{border-color:#8fa3ff;box-shadow:0 0 0 2px rgba(65,105,246,.12)}
+.chip-tools{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* 数据表格 */
+.dtable{width:100%;border:1px solid #eef2f8;border-radius:8px;overflow:auto}
+table.dt{width:100%;min-width:720px;border-collapse:collapse;font-size:12.5px}
+table.dt th{
+  background:#f4f6fb;color:#7a8493;font-weight:600;font-size:11.5px;text-align:left;
+  padding:9px 12px;border-bottom:1px solid #e6edf8;white-space:nowrap;
+}
+table.dt td{padding:9px 12px;border-bottom:1px solid #eef2f8;color:#344054;vertical-align:middle}
+table.dt tbody tr:last-child td{border-bottom:0}
+table.dt td .mono{font-variant-numeric:tabular-nums;color:#475467}
+table.dt td.tid{font-weight:600;color:#273244;white-space:nowrap}
+table.dt td.tm{white-space:nowrap;font-variant-numeric:tabular-nums;color:#475467;vertical-align:middle}
+table.dt td.tk{vertical-align:middle;overflow:hidden}
+table.dt td.tk .tk-id{
+  display:block;font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#273244;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  user-select:all;-webkit-user-select:all;
+}
+table.dt td.tk .tk-replay{
+  display:block;margin-top:2px;font-size:12px;line-height:16px;color:#98a2b3;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+table.dt td.tq{max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.dt td.op-user{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#344054}
+table.dt td.res{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums;color:#475467}
+table.dt td.votes{white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums;color:#475467}
+table.dt td.votes.zero{color:#b3bccb}
+table.dt td.pair{white-space:nowrap;color:#344054}
+#opBody td.act{white-space:nowrap}
+/* 搜索行为：8 列固定布局（时间 140 / 任务号 170 / 操作人 90 / 模态对 110 / 输入内容自适应 / 结果数 80 / 赞踩 80 / 操作 170） */
+#secOps table.dt{table-layout:fixed;min-width:1040px}
+#secOps table.dt th.c-num{text-align:right}
+#secOps table.dt th.c-center{text-align:center}
+#failBody td.tq{max-width:180px}
+#failBody td.sys{white-space:nowrap}
+
+/* ================= 分页组件（表格下方 · 右对齐） ================= */
+.pager-bar{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:#667085}
+.pager-total{color:#8a96ad;margin-right:4px;font-variant-numeric:tabular-nums}
+.pager-btn,.pager-num{height:28px;border:1px solid #d7e0f0;background:#fff;border-radius:5px;color:#475467;font-size:12px;cursor:pointer;font-family:inherit}
+.pager-btn{padding:0 10px}
+.pager-num{min-width:28px;padding:0 6px;font-variant-numeric:tabular-nums}
+.pager-btn:hover:not(:disabled),.pager-num:hover:not(.is-cur){border-color:#4169f6;color:#4169f6}
+.pager-btn:disabled{opacity:.45;cursor:not-allowed}
+.pager-num.is-cur{background:#4169f6;border-color:#4169f6;color:#fff;font-weight:700;cursor:default}
+.pager-gap{color:#98a2b3;padding:0 2px}
+
+/* 系统自动处理说明（只读） */
+.auto-note{
+  font-size:12px;color:#475467;line-height:1.7;
+  background:var(--system-blue-weak);border:1px dashed #cdd9f5;
+  border-radius:8px;padding:9px 12px;
+}
+
+/* 按钮 */
+.btn-mini{
+  height:26px;padding:0 11px;border-radius:5px;border:1px solid #d7e0f0;
+  background:#fff;color:#475467;font-size:11.5px;white-space:nowrap;display:inline-flex;align-items:center;
+}
+.btn-mini:hover{border-color:var(--system-blue);color:var(--system-blue)}
+.btn-mini:disabled{opacity:.45;cursor:not-allowed}
+.btn-mini:disabled:hover{border-color:#d7e0f0;color:#475467}
+
+/* 操作列 */
+#opBody td.act .btn-mini + .btn-mini{margin-left:6px}
+.btn-mini.primary{background:var(--system-blue);border-color:var(--system-blue);color:#fff;font-weight:600}
+.btn-mini.primary:hover{background:#335be8;border-color:#335be8;color:#fff}
+
+/* 徽章（失败任务：处置状态 / 失败类型） */
+.badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;display:inline-block;white-space:nowrap}
+.badge.ok{background:#e8f7ec;color:var(--success)}
+.badge.fail{background:#fdecec;color:var(--error)}
+.badge.run{background:#e9f0ff;color:var(--system-blue)}
+.badge.wait{background:#fff8e1;color:#c99a12}
+.badge.gray{background:#f0f2f7;color:#8c98ad}
+
+/* 空态 / 辅助文本 */
+.empty{padding:26px 20px;text-align:center;color:#9aa6bd;font-size:12.5px}
+.empty .e-ico{font-size:24px;opacity:.45;margin-bottom:8px}
+.empty .e-act{margin-top:10px}
+
+/* 权限态 */
+.perm-gate{display:none;padding:60px 20px}
+.perm-gate.show{display:flex;justify-content:center}
+.pg-card{
+  text-align:center;padding:44px 40px;border:1px solid #e4edf8;border-radius:12px;
+  background:linear-gradient(180deg,#fff 0%,#f8fbff 100%);max-width:720px;
+}
+.pg-ico{
+  width:54px;height:54px;border-radius:14px;background:var(--system-blue-weak);
+  display:grid;place-items:center;font-size:24px;margin:0 auto 14px;
+}
+.pg-card h3{font-size:17px;color:#1f2a44;margin-bottom:8px}
+.pg-card p{font-size:12.5px;color:var(--muted)}
+
+/* 研发说明抽屉 */
+.help-lead{
+  font-size:12.5px;color:#475467;line-height:1.75;
+  background:var(--system-blue-weak);border:1px dashed #cdd9f5;
+  border-radius:8px;padding:9px 12px;
+}
+.help-lead b{color:#1f2a44;font-weight:700}
+.hb-t{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:#1f2a44;margin-bottom:6px}
+.hb-t::before{content:"";width:3px;height:12px;border-radius:2px;background:var(--system-blue)}
+.help-table th{font-size:10.5px;padding:7px 9px}
+.help-table td{padding:7px 9px;font-size:11.5px;line-height:1.55;vertical-align:top}
+.help-table td.fld{white-space:nowrap;font-weight:600;color:#1f2a44}
+.help-note{font-size:11.5px;color:#475467;line-height:1.75;border-top:1px dashed #eef2f8;padding-top:9px}
+.help-note b{color:#1f2a44;font-weight:700}
+.help-note a{color:var(--system-blue);border-bottom:1px dashed #b9c9ff}
+
+/* 全局消息 */
+.toast{
+  position:fixed;top:56px;left:50%;transform:translateX(-50%) translateY(-12px);
+  z-index:200;background:#2b3245;color:#fff;font-size:13px;
+  padding:9px 18px;border-radius:7px;box-shadow:0 8px 24px rgba(20,32,70,.25);
+  opacity:0;pointer-events:none;transition:all .2s;display:flex;align-items:center;gap:7px;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#c0392b}
+.toast.ok{background:#1e8e4a}
+
+/* 演示角色切换（左下角） */
+.demo-float{position:fixed;left:24px;bottom:24px;z-index:90;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #d5dfef;border-radius:8px;padding:6px 10px;box-shadow:0 2px 8px rgba(31,41,55,.08);flex-wrap:wrap}
+.demo-float .df-tag{font-size:10px;font-weight:700;color:#8c98ad;border-radius:3px;padding:2px 6px;letter-spacing:1px;background:#f2f4f8}
+.demo-float .demo-btn{height:24px;padding:0 10px;border:1px solid #d7e0f0;border-radius:12px;background:#fff;color:#667085;font-size:11px;cursor:pointer}
+.demo-float .demo-btn:hover{border-color:var(--system-blue);color:var(--system-blue)}
+.demo-float .demo-btn.active{background:var(--system-blue);border-color:var(--system-blue);color:#fff;font-weight:600}
+
+@media (max-width:1100px){
+  .content{padding:14px 14px 28px}
+  .page-head{flex-direction:column;gap:8px}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ 左侧导航 ============ -->
+<aside class="sidebar">
+    <div class="nav-scroll">
+    <a class="nav-item" href="P1_检索台_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span>检索台</a>
+    <div class="nav-divider"></div>
+    <a class="nav-item admin-nav" href="P4_库管理_v5.2_20261026.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6"/><path d="M5 12v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6"/></svg></span>数据源库管理</a>
+    <a class="nav-item admin-nav" href="P5_策略管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="10" cy="17" r="1.6"/></svg></span>策略管理</a>
+    <a class="nav-item admin-nav active" href="P6_任务管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="12" height="16" rx="2"/><path d="M9 5V3.5h6V5"/><path d="M9 10h6M9 14h6M9 18h4"/></svg></span>搜索行为</a>
+    <a class="nav-item admin-nav" href="P7_结果运营_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>结果运营</a>
+    <a class="nav-item admin-nav" href="P8_评测_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="13" width="3" height="4"/><rect x="12" y="9" width="3" height="8"/><rect x="17" y="5" width="3" height="12"/></svg></span>效果评测</a>
+  </div>
+</aside>
+
+<!-- ============ 主区 ============ -->
+<div class="main">
+
+  <!-- 权限态 -->
+  <div class="perm-gate" id="permGate">
+    <div class="pg-card">
+      <div class="pg-ico">🔒</div>
+      <h3>当前账号无管理员页面权限</h3>
+      <p>本页为管理员页面，正式由登录态与库授权决定访问权限；演示可在左下角切换角色查看只读态。</p>
+    </div>
+  </div>
+
+  <div class="content" id="pageBody">
+
+    <!-- 轻量页面头 -->
+    <header class="page-head">
+      <div>
+        <h1>搜索行为</h1>
+        <p>谁在什么时候搜了什么、结果多少、赞 / 踩多少。</p>
+      </div>
+      <button class="dev-entry" id="devEntry" type="button" onclick="openDev()" title="研发说明"><span class="de-q" aria-hidden="true">?</span>研发说明</button>
+    </header>
+
+    <!-- ===== 搜索行为（核心） ===== -->
+    <section class="panel" id="secOps" aria-label="搜索行为">
+      <div class="panel-head">
+        <div class="sec-head">
+          <span class="sec-title">搜索行为</span>
+        </div>
+      </div>
+      <div class="chip-row">
+        <button class="chip active" type="button" data-f="全部" onclick="setOpFilter(this)">全部</button>
+        <button class="chip" type="button" data-f="有踩" onclick="setOpFilter(this)">有踩</button>
+        <button class="chip" type="button" data-f="无踩" onclick="setOpFilter(this)">无踩</button>
+        <div class="chip-tools">
+          <span class="search-input"><input type="search" id="opSearch" placeholder="按操作人 / 输入内容 / 任务号搜索" oninput="onOpSearch()"></span>
+        </div>
+      </div>
+      <div class="dtable">
+        <table class="dt">
+          <colgroup>
+            <col style="width:140px">
+            <col style="width:170px">
+            <col style="width:90px">
+            <col style="width:110px">
+            <col>
+            <col style="width:80px">
+            <col style="width:80px">
+            <col style="width:170px">
+          </colgroup>
+          <thead>
+            <tr><th>时间</th><th>任务号</th><th>操作人</th><th>模态对</th><th>输入内容</th><th class="c-num">结果数</th><th class="c-center">赞 / 踩</th><th>操作</th></tr>
+          </thead>
+          <tbody id="opBody"></tbody>
+        </table>
+      </div>
+      <div class="pager-bar" id="opPager"></div>
+    </section>
+
+    <!-- ===== 失败任务（只读） ===== -->
+    <section class="panel" id="secFail" aria-label="失败任务">
+      <div class="panel-head">
+        <div class="sec-head">
+          <span class="sec-title">失败任务</span>
+        </div>
+      </div>
+      <p class="auto-note">失败由系统自动处理：引擎侧失败自动重试（最多 3 次），数据侧失败自动转隔离区；此处只展示处理结果。</p>
+      <div class="dtable">
+        <table class="dt">
+          <thead>
+            <tr><th>任务ID</th><th>Query</th><th>失败原因</th><th>失败类型</th><th>系统处理</th><th>状态</th></tr>
+          </thead>
+          <tbody id="failBody"></tbody>
+        </table>
+      </div>
+      <div class="pager-bar" id="failPager"></div>
+    </section>
+
+  </div>
+</div>
+
+<!-- ===== 研发需求说明（入口在头部卡片右上角 · 右侧抽屉） ===== -->
+<div class="dev-mask" id="devMask" onclick="closeDev()"></div>
+<div class="dev-drawer" id="devDrawer" role="dialog" aria-modal="true" aria-label="研发需求说明">
+  <div class="dev-head">
+    <h3>研发需求说明</h3>
+    <span class="dh-tag">给研发</span>
+    <button type="button" class="dev-close" id="devClose" title="关闭（Esc）" aria-label="关闭" onclick="closeDev()">×</button>
+  </div>
+  <div class="dev-body dev-stack">
+      <p class="help-lead">本页是<b>用户搜索行为流水</b>：一条搜索一条记录，<b>不做跨记录的统计与聚合</b>；每条记录只留两个结果：<b>结果数</b>与<b>赞 / 踩</b>。更深的运营与评测在 <a href="P7_结果运营_v5.0_20261025.html">结果运营</a>、<a href="P8_评测_v5.0_20261025.html">效果评测</a>。</p>
+
+      <div>
+        <div class="hb-t">表格 8 列（赞 / 踩 同格）</div>
+        <div class="dtable">
+          <table class="dt help-table">
+            <thead>
+              <tr><th>列</th><th>取值与说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="fld">时间</td><td>搜索发起时间，YYYY-MM-DD HH:mm；第一列只放时间，固定按时间倒序（最新在上），不提供排序切换</td></tr>
+              <tr><td class="fld">任务号</td><td>本次搜索的任务编号（TASK…），紧接时间列独立一列；等宽字体、单行、可整体选中复制，不可点；查看详情走操作列「详情」</td></tr>
+              <tr><td class="fld">操作人</td><td>登录账户的昵称，<b>只显示昵称（张三）</b>；没有昵称时回退显示账户名；用于按账户追溯是谁搜的</td></tr>
+              <tr><td class="fld">模态对</td><td>文搜图 / 图搜图 / 文搜视频 / 图搜文 / 视频搜视频；真实搜索记录缺省按「文搜图」</td></tr>
+              <tr><td class="fld">输入内容</td><td>文搜类＝query 原文；图搜 / 视频搜＝所上传文件名（图片：发票扫描页_01.jpg）；单行省略，悬停看全量</td></tr>
+              <tr><td class="fld">结果数</td><td>该次搜索返回条数（130 / 87 / 42）；未搜到为「—」</td></tr>
+              <tr><td class="fld">赞 / 踩</td><td>同一格显示「赞数 / 踩数」（如 3 / 5），按任务号汇总该次结果中被点过赞 / 踩的<b>条目数</b>；两者都为 0 时灰色显示「0 / 0」，无结果数为「—」</td></tr>
+              <tr><td class="fld">操作</td><td>「详情」跳任务详情页；「重新执行」生成一条新任务记录并跳结果页；表格行本身不承接点击</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="help-note"><b>重放来源不是独立列：</b>有重放来源时，任务号下方追加一行小灰字「⟳ 重放自 TASK…」，纯文本标注原任务号，不可点。</p>
+      </div>
+
+      <p class="help-note"><b>记录来源（三类，按 task 去重）：</b>①真实搜索——结果页加载时写 <code>cm_task_meta</code>（任务号 → query / 时间 / 操作人 / 模态对 / 结果数）；②重新执行——本页写 <code>cm_replay_records</code>（最多保留 100 条）；③演示数据——内置 12 条。加载时先并入重放记录、再并入真实搜索（合并时<b>按任务号去重</b>，同号以先到者为准、重放优先），列表展示上真实搜索排在演示数据之前；从结果页返回 / bfcache 恢复（pageshow）时重新读一次存储。</p>
+
+      <p class="help-note"><b>记录边界：</b>本页只记用户搜索行为，一条行为一条记录；编辑策略、屏蔽数据等其他操作不记在本页。赞 / 踩落在数据条目上，本页只按任务号汇总条目数，不记单条明细。</p>
+
+      <p class="help-note"><b>不设状态：</b>搜索记录不设成功 / 失败状态：结果数有值即搜到了，为「—」即未搜到。失败任务单独在页面「失败任务」表展示，其处置状态独立保留。</p>
+
+      <p class="help-note"><b>赞 / 踩口径：</b>结果页按「任务号 + 条目号」写入 <code>cm_item_votes</code>；本页按行任务号统计 up / down 的<b>条目数</b>（同一条多次只算 1 条），不统计点击次数。存储里一条赞踩都没有时写入演示种子；新任务号默认 0 / 0。</p>
+
+      <p class="help-note"><b>重新执行：</b>点「重新执行」生成一条新记录：新任务号（TASK + yyMMdd + 6 位大写字母数字，避开已有号）、当前时间、结果数＝原结果数 − 3（最小 0，演示模拟优化后结果收敛）、赞 / 踩 0 / 0；操作人 / 模态对 / 输入内容继承原记录，并写「⟳ 重放自 原任务号」。记录写入 <code>cm_replay_records</code> 后跳转结果页（q、pair、replay=1、was=原结果数、task=新任务号、back=P6）；同一 query 重放几次就有几条记录，可据此看出被重放过几次、结果数与赞 / 踩如何变化。</p>
+
+      <p class="help-note"><b>详情与快照：</b>「详情」→ 任务详情页（任务号带入）。详情只存 Top-20 摘要（ID + 名称 + 分数），不存图片本体，保留 30 天；本页不存结果快照，「重新执行」只存条件与新结果数，在结果页看「当时 → 现在」的对比。</p>
+
+      <p class="help-note"><b>排序与筛选：</b>固定按时间倒序（最新在上）；「全部 / 有踩 / 无踩」chip（有踩＝踩数 &gt; 0；无踩＝踩数 = 0 或「—」）+ 搜索框（按操作人昵称 / 账户名、输入内容、任务号、重放来源，包含匹配、不区分大小写）叠加过滤；每页 10 条；无结果时给「清除筛选」。</p>
+
+      <p class="help-note"><b>失败任务（只读）：</b>表格 6 列：任务ID / Query / 失败原因 / 失败类型 / 系统处理 / 状态；演示 3 条。失败由系统自动处理——引擎侧失败自动重试（最多 3 次），数据侧失败自动转隔离区；状态取「重试中 / 已恢复 / 已转隔离」，本页不提供人工处置；每页 10 条。</p>
+
+      <p class="help-note"><b>权限：</b>本页为管理员页面，正式由登录态与库授权决定访问权限。演示态左下角可切换「管理员 / 只读」：切到只读后正文隐藏、显示「当前账号无管理员页面权限」遮罩并自动关闭研发说明抽屉。</p>
+
+      <p class="help-note"><b>入口与跳转：</b>支持 <code>?task=</code> 定位一条搜索记录（自动把搜索词填入搜索框并滚动到列表）、<code>?tab=fail</code> 定位失败任务表；上游来自 <a href="P2_结果页_v5.0_20261025.html">结果页</a>（写 <code>cm_task_meta</code> / <code>cm_item_votes</code>），下游去 <a href="P3_任务详情_v5.0_20261025.html">任务详情</a>、结果页重放、<a href="P7_结果运营_v5.0_20261025.html">结果运营</a> 与 <a href="P8_评测_v5.0_20261025.html">效果评测</a>。图搜类 q 取文件名；无结果数（「—」）时原结果数按 0 计；条目屏蔽与数据集黑名单分别由 P7 / <a href="P4_库管理_v5.2_20261026.html">数据源库管理</a> 生效，本页只做展示。</p>
+  </div>
+</div>
+
+<!-- 演示角色切换（左下角） -->
+<div class="demo-float" id="roleFloat" aria-label="演示角色切换">
+  <span class="df-tag">角色</span>
+  <button type="button" class="demo-btn active" id="roleAdmin" onclick="setRole('admin')">管理员</button>
+  <button type="button" class="demo-btn" id="roleGuest" onclick="setRole('guest')">只读</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= 演示数据：用户搜索行为流水（一条行为一条记录，无统计） ================= */
+var OPS = [
+  {user:'zhangsan', name:'张三', pair:'文搜图',   input:'含发票代码的扫描件',           time:'2026-10-25 00:30', n:130, task:'TASK261025A3F9KX', scene:'训练数据筛选'},
+  {user:'lisi',     name:'李四', pair:'图搜图',   input:'图片：发票扫描页_01.jpg',      time:'2026-10-24 21:12', n:87,  task:'TASK261024W4H7ZR', scene:'训练数据筛选'},
+  {user:'wangwu',   name:'王五', pair:'文搜视频', input:'生产线作业安全帽佩戴',         time:'2026-10-24 18:05', n:87,  task:'TASK261024M7V4YC', scene:'作业'},
+  {user:'zhaoliu',  name:'赵六', pair:'文搜视频', input:'窗口办事人员操作特写',         time:'2026-10-24 17:50', n:null, task:'TASK261024K7M2PQ', scene:'通用'},
+  {user:'zhaoliu',  name:'赵六', pair:'图搜文',   input:'图片：营业执照_正本.jpg',      time:'2026-10-24 16:40', n:42,  task:'TASK261024Q6T2NX', scene:'专业'},
+  {user:'zhangsan', name:'张三', pair:'文搜图',   input:'营业执照 法人代表字段',        time:'2026-10-24 14:20', n:210, task:'TASK261024P9W6ZS', scene:'专业'},
+  {user:'lisi',     name:'李四', pair:'图搜图',   input:'图片：合同骑缝章_局部.jpg',    time:'2026-10-24 13:05', n:42,  task:'TASK261024S8K3LY', scene:'通用'},
+  {user:'wangwu',   name:'王五', pair:'文搜图',   input:'红章文件 归档编号',            time:'2026-10-24 09:15', n:64,  task:'TASK261024R3X8TA', scene:'通用'},
+  {user:'lisi',     name:'李四', pair:'文搜图',   input:'电子发票查验截图',             time:'2026-10-23 17:25', n:96,  task:'TASK261023F2Q7NH', scene:'作业'},
+  {user:'zhaoliu',  name:'赵六', pair:'文搜图',   input:'合同骑缝章 高清图',            time:'2026-10-23 15:50', n:41,  task:'TASK261023J8T3MB', scene:'专业'},
+  {user:'wangwu',   name:'王五', pair:'图搜图',   input:'图片：手写签收单.jpg',         time:'2026-10-23 15:20', n:null, task:'TASK261023G5J8QC', scene:'通用'},
+  {user:'zhangsan', name:'张三', pair:'文搜视频', input:'车间流水线 质检工序',          time:'2026-10-23 11:30', n:73,  task:'TASK261023L6R9PK', scene:'作业'}
+];
+/* 失败任务：系统自动处理，本页只读 */
+var FAILS = [
+  {tid:'TASK261024K7M2PQ', q:'窗口办事人员操作特写', cause:'引擎响应超时', side:'引擎侧', action:'已自动重试 2 次', st:'重试中'},
+  {tid:'TASK261024D8N3QR', q:'产线设备运行画面', cause:'引擎连接中断', side:'引擎侧', action:'已自动重试 3 次 · 已恢复', st:'已恢复'},
+  {tid:'TASK261024H5T6UW', q:'税票防伪特征特写', cause:'语料包校验未通过', side:'数据侧', action:'已转隔离', st:'已转隔离'}
+];
+var state = {opFilter:'全部', role:'admin', opPage:1, failPage:1};
+var FAILBADGE = {'重试中':'run', '已恢复':'ok', '已转隔离':'wait'};
+var OP_PAGE_SIZE = 10;
+var FAIL_PAGE_SIZE = 10;
+var PAGER_GO = {};
+var toastTimer;
+
+/* ================= 分页组件（每页 10 条） ================= */
+function pagerNumbers(page, pages){
+  var out = [], i;
+  if(pages <= 7){
+    for(i = 1; i <= pages; i++){ out.push(i); }
+  }else{
+    out.push(1);
+    var s = Math.max(2, page - 1), e = Math.min(pages - 1, page + 1);
+    if(s > 2){ out.push('...'); }
+    for(i = s; i <= e; i++){ out.push(i); }
+    if(e < pages - 1){ out.push('...'); }
+    out.push(pages);
+  }
+  return out;
+}
+function renderPager(containerId, total, page, pageSize){
+  var box = document.getElementById(containerId);
+  if(!box){ return; }
+  pageSize = pageSize || 10;
+  var pages = Math.max(1, Math.ceil(total / pageSize));
+  if(page > pages){ page = pages; }
+  if(page < 1){ page = 1; }
+  var go = PAGER_GO[containerId] || 'goPage';
+  var html = '<span class="pager-total">共 ' + total + ' 条</span>' +
+    '<button class="pager-btn" type="button" onclick="' + go + '(' + (page - 1) + ')"' + (page <= 1 ? ' disabled' : '') + '>上一页</button>';
+  pagerNumbers(page, pages).forEach(function(p){
+    if(p === '...'){ html += '<span class="pager-gap">…</span>'; }
+    else{
+      html += '<button class="pager-num' + (p === page ? ' is-cur' : '') + '" type="button" onclick="' + go + '(' + p + ')"' +
+        (p === page ? ' aria-current="page"' : '') + '>' + p + '</button>';
+    }
+  });
+  html += '<button class="pager-btn" type="button" onclick="' + go + '(' + (page + 1) + ')"' + (page >= pages ? ' disabled' : '') + '>下一页</button>';
+  box.innerHTML = html;
+}
+function goPage(n){
+  var pages = Math.max(1, Math.ceil(filteredOps().length / OP_PAGE_SIZE));
+  if(n < 1){ n = 1; }
+  if(n > pages){ n = pages; }
+  state.opPage = n;
+  renderOps();
+}
+function goPageFail(n){
+  var pages = Math.max(1, Math.ceil(FAILS.length / FAIL_PAGE_SIZE));
+  if(n < 1){ n = 1; }
+  if(n > pages){ n = pages; }
+  state.failPage = n;
+  renderFails();
+}
+PAGER_GO['opPager'] = 'goPage';
+PAGER_GO['failPager'] = 'goPageFail';
+
+/* ================= 赞 / 踩：结果页按「任务号 + 条目号」落 sessionStorage，本页按任务号汇总 ================= */
+var VOTE_KEY = 'cm_item_votes';
+/* 演示种子：4 个任务各有不同赞 / 踩条目数；首次打开时写入，避免列表全 0 */
+var DEMO_VOTES = {
+  'TASK261024W4H7ZR': {'ITM261024W4H7Z1':'up', 'ITM261024W4H7Z2':'up', 'ITM261024W4H7Z3':'down'},
+  'TASK261024M7V4YC': {'ITM261024M7V4Y1':'up', 'ITM261024M7V4Y2':'down', 'ITM261024M7V4Y3':'down', 'ITM261024M7V4Y4':'down'},
+  'TASK261024P9W6ZS': {'ITM261024P9W6Z1':'up', 'ITM261024P9W6Z2':'up', 'ITM261024P9W6Z3':'up', 'ITM261024P9W6Z4':'down', 'ITM261024P9W6Z5':'down', 'ITM261024P9W6Z6':'down', 'ITM261024P9W6Z7':'down'},
+  'TASK261023F2Q7NH': {'ITM261023F2Q7N1':'up', 'ITM261023F2Q7N2':'up'}
+};
+var VOTE_STATS = {};
+/* 读存储：解析失败 / 非对象按空处理 */
+function readVoteStore(){
+  try{
+    var raw = sessionStorage.getItem(VOTE_KEY);
+    if(!raw){ return {}; }
+    var o = JSON.parse(raw);
+    return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
+  }catch(e){ return {}; }
+}
+/* 按任务号统计 up / down 条目数 */
+function scanVotes(){
+  var store = readVoteStore();
+  var map = {}, total = 0;
+  Object.keys(store).forEach(function(tid){
+    var m = store[tid];
+    if(!m || typeof m !== 'object' || Array.isArray(m)){ return; }
+    var up = 0, down = 0;
+    Object.keys(m).forEach(function(iid){
+      if(m[iid] === 'up'){ up++; total++; }
+      else if(m[iid] === 'down'){ down++; total++; }
+    });
+    map[tid] = {up: up, down: down};
+  });
+  return {map: map, total: total};
+}
+/* 存储里一条赞 / 踩都没有时写入演示种子；已有任务的数据不覆盖 */
+function ensureVoteSeed(){
+  if(scanVotes().total > 0){ return; }
+  var store = readVoteStore();
+  Object.keys(DEMO_VOTES).forEach(function(tid){
+    var m = store[tid];
+    if(!m || typeof m !== 'object' || Array.isArray(m) || !Object.keys(m).length){
+      store[tid] = DEMO_VOTES[tid];
+    }
+  });
+  try{ sessionStorage.setItem(VOTE_KEY, JSON.stringify(store)); }catch(e){}
+}
+function refreshVotes(){ VOTE_STATS = scanVotes().map; }
+function voteStats(task){ return VOTE_STATS[task] || {up: 0, down: 0}; }
+
+/* ================= 公共小件 ================= */
+function byId(id){ return document.getElementById(id); }
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function toast(msg, type){
+  var t = byId('toast');
+  if(!t) return;
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.className = 'toast'; }, 2600);
+}
+function focusSection(id){
+  var el = byId(id);
+  if(!el) return;
+  try{ el.scrollIntoView({behavior:'smooth', block:'start'}); }
+  catch(e){ el.scrollIntoView(); }
+  el.classList.add('sec-flash');
+  setTimeout(function(){ el.classList.remove('sec-flash'); }, 1200);
+}
+
+/* ================= 研发说明抽屉（八页统一：头部胶囊入口 + 右侧 520px 抽屉） ================= */
+function openDev(){
+  var d = byId('devDrawer'), m = byId('devMask');
+  if(d) d.classList.add('open');
+  if(m) m.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeDev(){
+  var d = byId('devDrawer'), m = byId('devMask');
+  if(d) d.classList.remove('open');
+  if(m) m.classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){ closeDev(); }
+});
+
+/* ================= 搜索行为 ================= */
+function setOpFilter(btn){
+  document.querySelectorAll('#secOps .chip').forEach(function(c){ c.classList.remove('active'); });
+  btn.classList.add('active');
+  state.opFilter = btn.dataset.f;
+  state.opPage = 1;
+  renderOps();
+}
+function clearOpFilter(){
+  var inp = byId('opSearch');
+  if(inp) inp.value = '';
+  document.querySelectorAll('#secOps .chip').forEach(function(c){ c.classList.remove('active'); });
+  var first = document.querySelector('#secOps .chip');
+  if(first) first.classList.add('active');
+  state.opFilter = '全部';
+  state.opPage = 1;
+  renderOps();
+}
+/* 搜索：从第一页开始 */
+function onOpSearch(){
+  state.opPage = 1;
+  renderOps();
+}
+/* ================= 重新执行：生成一条新记录（重放自原任务） ================= */
+var REPLAY_KEY = 'cm_replay_records';
+/* 图搜类 q 取文件名 */
+function replayQ(o){
+  return String(o.input || '').replace(/^(图片|视频|音频)：/, '');
+}
+function pad2(n){ return n < 10 ? '0' + n : '' + n; }
+/* 当前时间 YYYY-MM-DD HH:mm */
+function nowMinute(){
+  var d = new Date();
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' +
+    pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+}
+/* 新任务号：TASK + yyMMdd + 6 位大写字母数字，避开已有记录 */
+function genTaskId(){
+  var d = new Date();
+  var date = String(d.getFullYear()).slice(-2) + pad2(d.getMonth() + 1) + pad2(d.getDate());
+  var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  var used = {};
+  OPS.forEach(function(o){ used[o.task] = 1; });
+  var id = '';
+  do{
+    id = 'TASK' + date;
+    for(var i = 0; i < 6; i++){ id += chars.charAt(Math.floor(Math.random() * chars.length)); }
+  }while(used[id]);
+  return id;
+}
+/* 原结果数：无结果数按 0 计 */
+function baseCount(o){
+  return (typeof o.n === 'number' && isFinite(o.n)) ? o.n : 0;
+}
+/* 重新执行 = 用户又搜了一次：条件继承原记录，任务号 / 时间 / 结果数都是新的 */
+function makeReplayRecord(src){
+  var base = baseCount(src);
+  return {
+    user: src.user, name: src.name, pair: src.pair, input: src.input,
+    time: nowMinute(), n: Math.max(0, base - 3),
+    task: genTaskId(), scene: src.scene || '', replayFrom: src.task
+  };
+}
+function replayUrl(rec, was){
+  return 'P2_结果页_v5.0_20261025.html?q=' + encodeURIComponent(replayQ(rec)) +
+    '&pair=' + encodeURIComponent(rec.pair) + '&replay=1&was=' + was +
+    '&task=' + encodeURIComponent(rec.task) + '&back=P6';
+}
+/* 写入 sessionStorage：跳走再回来仍能看到这条重放记录 */
+function saveReplayRecord(rec){
+  var arr = [];
+  try{
+    var raw = sessionStorage.getItem(REPLAY_KEY);
+    if(raw){
+      var parsed = JSON.parse(raw);
+      if(Array.isArray(parsed)){ arr = parsed; }
+    }
+  }catch(e){}
+  arr.unshift(rec);
+  if(arr.length > 100){ arr = arr.slice(0, 100); }
+  try{ sessionStorage.setItem(REPLAY_KEY, JSON.stringify(arr)); }catch(e){}
+  OPS.unshift(rec);
+}
+/* 加载时合并重放记录：解析失败 / 为空 / 任务号重复一律忽略 */
+function loadReplayRecords(){
+  var arr = [];
+  try{
+    var raw = sessionStorage.getItem(REPLAY_KEY);
+    if(raw){
+      var parsed = JSON.parse(raw);
+      if(Array.isArray(parsed)){ arr = parsed; }
+    }
+  }catch(e){ arr = []; }
+  var seen = {};
+  OPS.forEach(function(o){ seen[o.task] = 1; });
+  var out = [];
+  arr.forEach(function(r){
+    if(!r || typeof r !== 'object'){ return; }
+    if(typeof r.task !== 'string' || !r.task){ return; }
+    if(typeof r.time !== 'string' || !r.time){ return; }
+    if(seen[r.task]){ return; }
+    seen[r.task] = 1;
+    out.push({
+      user: String(r.user || ''), name: String(r.name || ''),
+      pair: String(r.pair || ''), input: String(r.input || ''),
+      time: r.time, n: (typeof r.n === 'number' && isFinite(r.n)) ? r.n : null,
+      task: r.task, scene: String(r.scene || ''),
+      replayFrom: String(r.replayFrom || '')
+    });
+  });
+  return out;
+}
+/* ================= 检索流水：读 P2 写入的 cm_task_meta，合并进本页列表 ================= */
+var TASK_META_KEY = 'cm_task_meta';
+/* 解析失败 / 非对象 / 无 query 一律忽略；任务号取键 */
+function loadTaskMetaRows(){
+  var out = [];
+  try{
+    var raw = sessionStorage.getItem(TASK_META_KEY);
+    var all = raw ? JSON.parse(raw) : null;
+    if(all && typeof all === 'object' && !Array.isArray(all)){
+      Object.keys(all).forEach(function(task){
+        var v = all[task];
+        if(!v || typeof v !== 'object') return;
+        var q = String(v.q == null ? '' : v.q).trim();
+        if(!q) return;
+        out.push({
+          user: String(v.user || 'zhangsan'),
+          name: String(v.user || 'zhangsan') === 'zhangsan' ? '张三' : String(v.user || ''),
+          pair: String(v.pair || '文搜图'),
+          input: q,
+          time: v.time ? String(v.time) : '',
+          n: (typeof v.n === 'number' && isFinite(v.n)) ? v.n : null,
+          task: String(task)
+        });
+      });
+    }
+  }catch(e){}
+  return out;
+}
+/* 合并：真实搜索排在演示数据前；按 task 去重（重放记录已存在则不重复插入） */
+function mergeTaskMeta(){
+  var rows = loadTaskMetaRows();
+  if(!rows.length){ return; }
+  var seen = {};
+  OPS.forEach(function(o){ seen[o.task] = 1; });
+  var add = [];
+  rows.forEach(function(r){
+    if(seen[r.task]){ return; }
+    seen[r.task] = 1;
+    add.push(r);
+  });
+  if(add.length){ OPS = add.concat(OPS); }
+}
+/* ================= 重新执行 ================= */
+/* 重新执行：生成新记录 → 落 sessionStorage → 携新任务号进结果页 */
+function doReplay(ev, task){
+  var o = opByTask(task);
+  if(!o){ return true; }
+  if(ev){ ev.preventDefault(); }
+  var base = baseCount(o);
+  var rec = makeReplayRecord(o);
+  saveReplayRecord(rec);
+  location.href = replayUrl(rec, base);
+  return false;
+}
+/* 详情：只存 Top-20 摘要（ID + 名称 + 分数），不存图片本体 */
+function taskHref(o){
+  return 'P3_任务详情_v5.0_20261025.html?task=' + encodeURIComponent(o.task);
+}
+
+function opByTask(task){
+  var hit = null;
+  OPS.forEach(function(o){ if(o.task === task) hit = o; });
+  return hit;
+}
+function filteredOps(){
+  var inp = byId('opSearch');
+  var kw = ((inp && inp.value) || '').trim().toLowerCase();
+  var rows = OPS.filter(function(o){
+    var dn = voteStats(o.task).down;
+    var okDn = state.opFilter === '全部' ||
+      (state.opFilter === '有踩' && dn > 0) ||
+      (state.opFilter === '无踩' && dn === 0);
+    var okKw = !kw ||
+      o.user.toLowerCase().indexOf(kw) >= 0 ||
+      o.name.toLowerCase().indexOf(kw) >= 0 ||
+      o.input.toLowerCase().indexOf(kw) >= 0 ||
+      o.task.toLowerCase().indexOf(kw) >= 0 ||
+      (o.replayFrom && o.replayFrom.toLowerCase().indexOf(kw) >= 0);
+    return okDn && okKw;
+  });
+  return rows.sort(function(a, b){
+    if(a.time !== b.time){ return a.time < b.time ? 1 : -1; }
+    return 0;
+  });
+}
+function renderOps(){
+  var rows = filteredOps();
+  var body = byId('opBody');
+  if(!body) return;
+  var total = rows.length;
+  var pages = Math.max(1, Math.ceil(total / OP_PAGE_SIZE));
+  if(state.opPage > pages){ state.opPage = pages; }
+  if(state.opPage < 1){ state.opPage = 1; }
+  if(!rows.length){
+    body.innerHTML = '<tr><td colspan="8"><div class="empty"><div class="e-ico">🔍</div>当前筛选条件下没有搜索记录' +
+      '<div class="e-act"><button class="btn-mini" type="button" onclick="clearOpFilter()">清除筛选</button></div></div></td></tr>';
+    renderPager('opPager', 0, 1, OP_PAGE_SIZE);
+    return;
+  }
+  var start = (state.opPage - 1) * OP_PAGE_SIZE;
+  var pageRows = rows.slice(start, start + OP_PAGE_SIZE);
+  body.innerHTML = pageRows.map(function(o){
+    var hasCnt = (typeof o.n === 'number');
+    var vs = voteStats(o.task);
+    var voteCell = hasCnt
+      ? '<td class="votes' + ((vs.up || vs.down) ? '' : ' zero') + '" title="本次结果中被点赞 ' + vs.up + ' 条、被点踩 ' + vs.down + ' 条">' + vs.up + ' / ' + vs.down + '</td>'
+      : '<td class="votes zero" title="无结果数">—</td>';
+    /* 操作人只显示昵称；没有昵称时回退账户名 */
+    var who = String(o.name == null ? '' : o.name).trim() || String(o.user == null ? '' : o.user);
+    /* 时间列只放时间，任务号独立一列；重放来源做任务号下方小灰字 */
+    var timeTxt = o.time ? esc(o.time) : '—';
+    var replayLine = o.replayFrom
+      ? '<span class="tk-replay" title="重放自 ' + esc(o.replayFrom) + '">⟳ 重放自 ' + esc(o.replayFrom) + '</span>'
+      : '';
+    return '<tr>' +
+      '<td class="tm">' + timeTxt + '</td>' +
+      '<td class="tk"><span class="tk-id" title="任务号 ' + esc(o.task) + '">' + esc(o.task) + '</span>' + replayLine + '</td>' +
+      '<td class="op-user" title="' + esc(who) + '">' + esc(who) + '</td>' +
+      '<td class="pair">' + esc(o.pair) + '</td>' +
+      '<td class="tq" title="' + esc(o.input) + '">' + esc(o.input) + '</td>' +
+      '<td class="res">' + (hasCnt ? o.n : '—') + '</td>' +
+      voteCell +
+      '<td class="act">' +
+        '<a class="btn-mini" href="' + esc(taskHref(o)) + '">详情</a>' +
+        '<a class="btn-mini primary" href="' + esc(replayUrl(o, baseCount(o))) + '" onclick="return doReplay(event, \'' + o.task + '\')">重新执行</a>' +
+      '</td></tr>';
+  }).join('');
+  renderPager('opPager', total, state.opPage, OP_PAGE_SIZE);
+}
+
+/* ================= 失败任务（只读，系统自动处理） ================= */
+function renderFails(){
+  var body = byId('failBody');
+  if(!body) return;
+  var total = FAILS.length;
+  var pages = Math.max(1, Math.ceil(total / FAIL_PAGE_SIZE));
+  if(state.failPage > pages){ state.failPage = pages; }
+  if(state.failPage < 1){ state.failPage = 1; }
+  var start = (state.failPage - 1) * FAIL_PAGE_SIZE;
+  var pageRows = FAILS.slice(start, start + FAIL_PAGE_SIZE);
+  if(!pageRows.length){
+    body.innerHTML = '<tr><td colspan="6"><div class="empty">暂无失败任务</div></td></tr>';
+    renderPager('failPager', 0, 1, FAIL_PAGE_SIZE);
+    return;
+  }
+  body.innerHTML = pageRows.map(function(f){
+    return '<tr><td class="tid">' + f.tid + '</td>' +
+      '<td class="tq" title="' + esc(f.q) + '">' + esc(f.q) + '</td>' +
+      '<td class="mono">' + esc(f.cause) + '</td>' +
+      '<td><span class="badge ' + (f.side === '引擎侧' ? 'run' : 'fail') + '">' + f.side + '</span></td>' +
+      '<td class="mono sys">' + esc(f.action) + '</td>' +
+      '<td><span class="badge ' + (FAILBADGE[f.st] || 'gray') + '">' + f.st + '</span></td></tr>';
+  }).join('');
+  renderPager('failPager', total, state.failPage, FAIL_PAGE_SIZE);
+}
+
+/* ================= 演示角色切换 ================= */
+function setRole(role){
+  state.role = role === 'guest' ? 'guest' : 'admin';
+  var gate = byId('permGate');
+  var body = byId('pageBody');
+  var admin = byId('roleAdmin');
+  var guest = byId('roleGuest');
+  if(gate) gate.classList.toggle('show', state.role === 'guest');
+  if(body) body.style.display = state.role === 'guest' ? 'none' : '';
+  if(admin) admin.classList.toggle('active', state.role === 'admin');
+  if(guest) guest.classList.toggle('active', state.role === 'guest');
+  if(state.role === 'guest'){
+    closeDev();
+    toast('已切换为只读角色');
+  }else{
+    toast('已切换为管理员角色', 'ok');
+  }
+}
+
+/* ================= 启动 ================= */
+/* 赞 / 踩演示种子 + 汇总；先合并上次会话生成的重放记录，再合并检索流水（cm_task_meta），
+   两条来源都按 task 去重；列表按时间倒序，新记录自然在最上 */
+ensureVoteSeed();
+refreshVotes();
+OPS = loadReplayRecords().concat(OPS);
+mergeTaskMeta();
+renderOps();
+renderFails();
+
+/* 页面加载 / pageshow（含从结果页返回、bfcache 恢复）都重读存储，确保赞 / 踩与检索记录最新 */
+window.addEventListener('pageshow', function(){
+  refreshVotes();
+  OPS = loadReplayRecords().concat(OPS);
+  mergeTaskMeta();
+  renderOps();
+});
+
+/* ===== URL 参数：?task= 任务定位 / ?tab=fail 失败任务 ===== */
+(function(){
+  try{
+    var qs = new URLSearchParams(location.search);
+    var tab = qs.get('tab');
+    var task = qs.get('task');
+    if(tab === 'fail'){
+      var fHit = null;
+      FAILS.forEach(function(f){ if(f.tid === task) fHit = f; });
+      setTimeout(function(){ focusSection('secFail'); }, 80);
+      if(task){
+        toast(fHit ? '已定位失败任务 ' + task : '任务 ' + task + ' 无失败记录', fHit ? '' : 'err');
+      }else{
+        toast('已进入失败任务');
+      }
+    }else if(task){
+      var hit = opByTask(task);
+      if(hit){
+        var inp = byId('opSearch');
+        if(inp) inp.value = hit.input;
+        state.opFilter = '全部';
+        state.opPage = 1;
+        var chips = document.querySelectorAll('#secOps .chip');
+        chips.forEach(function(c, i){ c.classList.toggle('active', i === 0); });
+        renderOps();
+        setTimeout(function(){ focusSection('secOps'); }, 80);
+        toast('已定位任务 ' + task);
+      }else{
+        toast('未找到任务 ' + task, 'err');
+      }
+    }
+  }catch(e){}
+})();
+
+/* ===== 系统门户桥接（index.html 壳用，单页直开无副作用） ===== */
+(function(){
+  try{
+    if(window.parent && window.parent !== window){
+      window.parent.postMessage({type:'sys-page', page:'P6', name:'搜索行为'}, '*');
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

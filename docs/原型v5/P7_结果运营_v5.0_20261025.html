@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>结果运营 · 跨模态检索中心</title>
+<style>
+:root{
+  /* 清爽冷白蓝 token（与检索台基准一致） */
+  --workspace-bg:#f6f9fe;
+  --module-bg:#f3f8ff;
+  --content-card:#ffffff;
+  --content-soft:#fbfdff;
+  --flow-card:#f8fbff;
+  --content-line:#e6edf8;
+  --content-line-strong:#d9e7f8;
+  --system-blue:#4169f6;
+  --system-blue-weak:#f1f5ff;
+  --ink:#1f2937;
+  --muted:#667085;
+  --success:#34a853;
+  --warning:#f0a020;
+  --error:#e5484d;
+  --text-primary:#262626;
+  --text-secondary:#8c8c8c;
+  --radius:8px;
+  --shadow-card:0 2px 8px rgba(31,58,122,.05);
+  --shadow-pop:0 10px 22px rgba(64,80,112,.14);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--workspace-bg);
+  color:var(--text-primary);
+  font-size:14px;
+  line-height:1.5;
+  display:flex;
+}
+button{font-family:inherit;cursor:pointer}
+button[disabled]{cursor:default}
+a{color:inherit;text-decoration:none}
+::selection{background:rgba(65,105,246,.16)}
+[hidden]{display:none !important}
+
+/* ============ 左侧全局导航（壳层，未改） ============ */
+.sidebar{
+  width:220px;flex-shrink:0;
+  background:#fff;border-right:1px solid var(--content-line);
+  display:flex;flex-direction:column;
+  height:100vh;position:sticky;top:0;
+}
+.nav-scroll{flex:1;overflow-y:auto;padding:10px 12px}
+.nav-item{
+  display:flex;align-items:center;gap:9px;
+  padding:9px 10px;margin-bottom:2px;
+  border-radius:6px;color:#344054;font-size:13px;
+  cursor:pointer;user-select:none;
+}
+.nav-item .ico{width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:#8a96ad;flex-shrink:0}
+.nav-item .ico svg{width:16px;height:16px;display:block}
+.nav-item.active .ico{color:var(--system-blue)}
+.nav-item:hover{background:var(--system-blue-weak);color:var(--system-blue)}
+.nav-item.active{
+  background:var(--system-blue-weak);color:var(--system-blue);font-weight:600;
+  box-shadow:inset 2px 0 0 var(--system-blue);
+}
+.nav-divider{height:1px;background:var(--content-line);margin:8px 10px}
+
+/* ============ 主区 ============ */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+.content{padding:20px 24px 32px;display:flex;flex-direction:column;gap:14px;max-width:1280px;width:100%;margin:0 auto}
+
+/* 页面定位 */
+.module-intro{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:18px 20px;
+  border:1px solid #e4edf8;
+  border-radius:10px;
+  background:#fff;
+}
+.module-intro h2{font-size:20px;font-weight:700;color:#111827}
+/* ===== 研发说明入口（八页统一：头部胶囊按钮 + 右侧抽屉） ===== */
+.dev-entry{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px 0 5px;border:1px solid #d7e0f0;border-radius:999px;background:#fff;color:#667085;font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+.dev-entry:hover{border-color:#b9c9ff;background:var(--system-blue-weak);color:var(--system-blue)}
+.dev-entry:hover .de-q{background:var(--system-blue);color:#fff}
+.dev-entry:focus-visible{outline:2px solid #cdd9ff;outline-offset:1px}
+.dev-entry .de-q{width:20px;height:20px;border-radius:50%;flex:0 0 auto;background:var(--system-blue-weak);color:var(--system-blue);font-size:12px;font-weight:700;line-height:20px;text-align:center;transition:background .15s,color .15s}
+/* 右侧抽屉：520px / 全高 / 从右滑入 + 半透明遮罩 */
+.dev-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:10000;opacity:0;pointer-events:none;transition:opacity .22s}
+.dev-mask.open{opacity:1;pointer-events:auto}
+.dev-drawer{position:fixed;top:0;right:0;width:720px;max-width:100vw;height:100vh;background:#f6f8fc;z-index:10001;display:flex;flex-direction:column;transform:translateX(102%);transition:transform .28s ease;box-shadow:-8px 0 30px rgba(15,23,42,.18)}
+.dev-drawer.open{transform:translateX(0)}
+.dev-head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:#fff;border-bottom:1px solid #e4eaf3;flex:0 0 auto}
+.dev-head h3{margin:0;font-size:15px;color:#1f2937}
+.dev-head .dh-tag{font-size:11px;font-weight:600;color:#b54708;background:#fdf3e6;border-radius:4px;padding:2px 8px}
+.dev-close{margin-left:auto;width:28px;height:28px;border:none;background:#f2f4f8;border-radius:6px;font-size:15px;line-height:1;cursor:pointer;color:#475467;flex:0 0 auto}
+.dev-close:hover{background:#e6eaf2}
+.dev-body{flex:1;min-height:0;overflow:auto;padding:16px 18px 36px}
+.dev-stack{display:flex;flex-direction:column;gap:12px}
+.dev-drawer .dtable{overflow-x:auto}
+
+/* ============ 面板 ============ */
+.panel{padding:16px 18px;border:1px solid #e4edf8;border-radius:var(--radius);background:#fff;display:flex;flex-direction:column;gap:12px}
+.panel-head{display:flex;align-items:flex-start;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.sec-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sec-head .sec-title{font-size:15px;font-weight:700;color:#1f2a44}
+.sec-head .sec-sub{font-size:12px;color:#9aa6bd}
+.sec-head::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--system-blue)}
+.panel-act{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* 按钮体系 */
+.btn-primary{
+  height:34px;padding:0 20px;border:0;border-radius:6px;
+  background:var(--system-blue);color:#fff;font-size:13px;font-weight:600;
+  display:inline-flex;align-items:center;gap:7px;
+  box-shadow:0 3px 8px rgba(65,105,246,.25);transition:all .15s;
+}
+.btn-primary:hover{background:#335be8;box-shadow:0 4px 12px rgba(65,105,246,.32)}
+.btn-primary[disabled]{opacity:.5;box-shadow:none;background:#a8b6f7;cursor:default}
+.btn-ghost{
+  height:32px;padding:0 16px;border-radius:6px;border:1px solid #d7e0f0;
+  background:#fff;color:#475467;font-size:12.5px;display:inline-flex;align-items:center;gap:6px;
+}
+.btn-ghost:hover{border-color:var(--system-blue);color:var(--system-blue)}
+.btn-ghost[disabled]{opacity:.55;border-color:#e6edf8;color:#9aa6bd;background:#fafbfd}
+.btn-xs{height:27px;padding:0 12px;font-size:12px}
+
+/* 徽章 */
+.badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;display:inline-block;white-space:nowrap}
+.badge.ok{background:#e8f7ec;color:var(--success)}
+.badge.fail{background:#fdecec;color:var(--error)}
+.badge.run{background:#e9f0ff;color:var(--system-blue)}
+.badge.wait{background:#fff8e1;color:#c99a12}
+.badge.gray{background:#f0f2f7;color:#8c98ad}
+
+/* ============ 业务块 ============ */
+.flow{display:flex;flex-direction:column;gap:16px}
+.flow-block{padding:18px 20px;gap:14px}
+.blk-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.blk-title{display:flex;align-items:center;gap:12px;min-width:0}
+.blk-title h3{font-size:16px;font-weight:700;color:#1f2a44;line-height:1.4}
+.blk-title .sec-sub{font-size:12px;color:#9aa6bd;font-weight:400;white-space:nowrap}
+
+.fb-table{overflow-x:auto}
+/* 反馈表：8 列平铺、固定布局（单行，列不被内容撑开） */
+.fb-table table.dt{table-layout:fixed}
+.fb-table table.dt th,.fb-table table.dt td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.fb-time{font-size:12px;color:#8c8c8c;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fb-no{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;font-weight:600;color:#273244;font-variant-numeric:tabular-nums}
+.fb-q{color:#344054}
+.fb-cnt{font-variant-numeric:tabular-nums;color:#475467}
+.fb-table table.dt th.fb-cnt,.fb-table table.dt td.fb-cnt{text-align:center}
+.fb-src{font-size:11.5px;color:#8c98ad;font-weight:400;white-space:nowrap}
+.fb-src b{color:#475467;font-weight:600;font-variant-numeric:tabular-nums}
+
+/* 登记反馈：搜索行为选择（分页） */
+.fb-step{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#475467;margin:6px 0 7px}
+.fb-step::before{content:"";width:3px;height:12px;border-radius:2px;background:var(--system-blue)}
+.hist-search{
+  width:100%;height:32px;border:1px solid #cfd8e8;border-radius:6px;padding:0 10px;
+  font-size:12.5px;color:#273244;background:#fff;outline:none;margin-bottom:8px;
+}
+.hist-search:focus{border-color:#8fa3ff;box-shadow:0 0 0 2px rgba(65,105,246,.12)}
+.pick-list{display:flex;flex-direction:column;border:1px solid #e6edf8;border-radius:8px;overflow:hidden;max-height:332px;overflow-y:auto}
+.pick-row{display:flex;align-items:flex-start;gap:9px;padding:9px 12px;border-bottom:1px solid #eef2f8;background:#fff;cursor:pointer;min-width:0}
+.pick-row:last-child{border-bottom:0}
+.pick-row:hover{background:#f8fbff}
+.pick-row.is-pick{background:#f4f8ff}
+.pick-ck{width:14px;height:14px;margin:2px 0 0;accent-color:var(--system-blue);flex-shrink:0;cursor:pointer}
+.pick-main{min-width:0;flex:1 1 auto}
+.pick-q{display:block;font-size:12.5px;font-weight:600;color:#273244;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick-sub{display:block;font-size:11px;color:#9aa6bd;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick-sub .zero{color:#c99a12;font-weight:700}
+.pick-empty{padding:22px 12px;text-align:center;font-size:12px;color:#9aa6bd;background:#fff}
+.pager{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:9px}
+.pg-num{
+  min-width:27px;height:27px;padding:0 6px;border:1px solid #d7e0f0;border-radius:6px;
+  background:#fff;color:#475467;font-size:12px;font-variant-numeric:tabular-nums;
+}
+.pg-num:hover{border-color:var(--system-blue);color:var(--system-blue)}
+.pg-num.is-cur{background:var(--system-blue);border-color:var(--system-blue);color:#fff;font-weight:700}
+.pg-info{font-size:11.5px;color:#8c98ad;white-space:nowrap;font-variant-numeric:tabular-nums;margin-left:2px}
+.fb-form-wrap{margin-top:14px;padding-top:12px;border-top:1px solid #f0f4fb}
+.pick-chosen{font-size:12px;color:#667085;background:#f8fafd;border:1px solid #eef2f8;border-radius:6px;padding:7px 10px;margin-bottom:10px;line-height:1.6}
+.pick-chosen b{color:#273244}
+
+/* 表格 */
+.dtable{width:100%;border:1px solid #eef2f8;border-radius:8px;overflow:hidden}
+table.dt{width:100%;border-collapse:collapse;font-size:12.5px}
+table.dt th{
+  background:#f4f6fb;color:#7a8493;font-weight:600;font-size:11.5px;text-align:left;
+  padding:9px 12px;border-bottom:1px solid #e6edf8;white-space:nowrap;
+}
+table.dt td{padding:9px 12px;border-bottom:1px solid #eef2f8;color:#344054;vertical-align:middle}
+table.dt tbody tr:last-child td{border-bottom:0}
+table.dt tbody tr:hover td{background:#f8fbff}
+table.dt td.mono{font-variant-numeric:tabular-nums;color:#475467}
+table.dt td.tid{font-weight:600;color:#273244;white-space:nowrap}
+
+/* ================= 分页组件（表格下方 · 右对齐） ================= */
+.pager-bar{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:#667085}
+.pager-total{color:#8a96ad;margin-right:4px;font-variant-numeric:tabular-nums}
+.pager-btn,.pager-num{height:28px;border:1px solid #d7e0f0;background:#fff;border-radius:5px;color:#475467;font-size:12px;cursor:pointer;font-family:inherit}
+.pager-btn{padding:0 10px}
+.pager-num{min-width:28px;padding:0 6px;font-variant-numeric:tabular-nums}
+.pager-btn:hover:not(:disabled),.pager-num:hover:not(.is-cur){border-color:#4169f6;color:#4169f6}
+.pager-btn:disabled{opacity:.45;cursor:not-allowed}
+.pager-num.is-cur{background:#4169f6;border-color:#4169f6;color:#fff;font-weight:700;cursor:default}
+.pager-gap{color:#98a2b3;padding:0 2px}
+
+/* 研发说明 */
+.research-lead{font-size:12px;color:#667085;line-height:1.8}
+.research-lead b{color:#344054}
+.cov-sum{
+  display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:#667085;
+  background:#fff;border:1px solid #eef2f8;border-radius:7px;padding:8px 12px;
+}
+.cov-sum b{color:#344054;font-weight:700}
+.cov-tb td{vertical-align:top;line-height:1.7}
+.cov-tb td:first-child{white-space:nowrap}
+.cov-tag{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:4px;margin-right:6px}
+.cov-tag.on{background:#e9f0ff;color:var(--system-blue)}
+.cov-tag.off{background:#f0f2f7;color:#8c98ad}
+.cov-desc{font-size:11.5px;color:#667085}
+.cover-note{border:1px dashed #d9e4f5;background:#fff;border-radius:8px;padding:10px 12px}
+.cover-note .cn-title{font-size:11.5px;font-weight:700;color:#475467;margin-bottom:6px}
+.cover-note ul{margin:0;padding-left:16px}
+.cover-note li{font-size:11.5px;color:#667085;line-height:1.8;margin:0}
+.cover-note li b{color:#344054;font-weight:700}
+
+/* 弹窗 */
+.modal-mask{
+  position:fixed;inset:0;background:rgba(23,33,66,.42);z-index:100;
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+.modal-mask.show{display:flex}
+.modal-box{
+  width:720px;max-width:100%;background:#fff;border-radius:10px;
+  box-shadow:0 16px 48px rgba(20,32,70,.28);overflow:hidden;animation:pop .18s ease;
+}
+@keyframes pop{from{transform:translateY(8px) scale(.98);opacity:0}to{transform:none;opacity:1}}
+.modal-head{padding:16px 20px 0;display:flex;align-items:flex-start;justify-content:space-between}
+.modal-head h3{font-size:16px;color:#1f2a44}
+.modal-close{border:0;background:transparent;color:#b3bccc;font-size:18px;line-height:1}
+.modal-close:hover{color:#667085}
+.modal-body{padding:12px 20px 4px;font-size:13px;color:#475467;max-height:min(66vh,600px);overflow:auto}
+.modal-body .mb-tip{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.7}
+.modal-body .mb-src{
+  display:block;width:fit-content;max-width:100%;
+  font-size:11.5px;color:#8c98ad;line-height:1.6;
+  background:#f8fafd;border:1px solid #eef2f8;border-radius:5px;
+  padding:2px 8px;margin-bottom:7px;
+}
+.modal-body .mb-src b{color:#475467;font-weight:600}
+.modal-foot{padding:14px 20px 18px;display:flex;justify-content:flex-end;gap:10px;border-top:1px solid #f0f4fb;margin-top:10px}
+
+/* 弹窗表单 */
+.form-grid{display:grid;grid-template-columns:92px minmax(0,1fr);gap:9px 10px;align-items:center;margin:6px 0 4px}
+.form-grid label{font-size:12px;color:#667085}
+.form-grid input[type=text],.form-grid select{
+  height:32px;border:1px solid #cfd8e8;border-radius:6px;padding:0 10px;
+  font-size:12.5px;color:#273244;background:#fff;outline:none;width:100%;
+}
+.form-grid input:focus,.form-grid select:focus{border-color:#8fa3ff;box-shadow:0 0 0 2px rgba(65,105,246,.12)}
+.form-grid .ro{font-size:12.5px;color:#475467;background:#f8fafd;border:1px solid #eef2f8;border-radius:6px;padding:6px 10px}
+
+/* 权限态 */
+.perm-gate{display:none;padding:60px 20px}
+.perm-gate.show{display:flex;justify-content:center}
+.pg-card{text-align:center;padding:44px 40px;border:1px solid #e4edf8;border-radius:12px;background:#fff;max-width:720px}
+.pg-ico{width:54px;height:54px;border-radius:14px;background:var(--system-blue-weak);display:grid;place-items:center;font-size:24px;margin:0 auto 14px}
+.pg-card h3{font-size:17px;color:#1f2a44;margin-bottom:8px}
+.pg-card p{font-size:12.5px;color:var(--muted)}
+
+/* 全局消息 */
+.toast{
+  position:fixed;top:56px;left:50%;transform:translateX(-50%) translateY(-12px);
+  z-index:200;background:#2b3245;color:#fff;font-size:13px;
+  padding:9px 18px;border-radius:7px;box-shadow:0 8px 24px rgba(20,32,70,.25);
+  opacity:0;pointer-events:none;transition:all .2s;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#c0392b}
+.toast.ok{background:#1e8e4a}
+
+/* 返回来源页：面包屑位（正文最上，页面标题下方），无 ?back= 不显示 */
+.back-row{display:none;align-items:center;gap:8px;margin:-2px 0 -2px}
+.back-row.show{display:flex}
+.back-link{
+  font-size:12.5px;color:var(--system-blue);text-decoration:none;white-space:nowrap;
+  padding:5px 10px;border:1px solid #d7e0ff;border-radius:6px;background:#fff;
+}
+.back-link:hover{background:var(--system-blue-weak);border-color:#aebdf5}
+
+/* 处理弹窗 · 标记条目：一行一条，ID 等宽 + 名称 */
+.form-grid .ro.item-list{align-self:start;display:flex;flex-direction:column;gap:3px;line-height:1.55}
+.item-list .it-row{font-size:12px;color:#475467;overflow-wrap:anywhere}
+.item-list .it-id{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;color:#1f2a44;font-weight:600;white-space:nowrap}
+
+/* 处理弹窗 · 处理判断：单选，一行一个选项 */
+.form-grid .judge-list{
+  align-self:start;display:flex;flex-direction:column;
+  padding:6px 10px;border:1px solid #eef2f8;border-radius:6px;background:#fbfdff;
+}
+.judge-opt{display:flex;align-items:flex-start;gap:7px;font-size:12.5px;color:#344054;line-height:1.55;cursor:pointer;padding:3px 0}
+.judge-opt input{width:14px;height:14px;margin:2px 0 0;flex:0 0 auto;accent-color:var(--system-blue);cursor:pointer}
+.judge-opt .jo-txt b{color:#1f2a44;font-weight:600}
+.judge-opt .jo-to{color:var(--system-blue);font-weight:600;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<!-- ============ 左侧导航（壳层，未改） ============ -->
+<aside class="sidebar">
+    <div class="nav-scroll">
+    <a class="nav-item" href="P1_检索台_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span>检索台</a>
+    <div class="nav-divider"></div>
+    <a class="nav-item admin-nav" href="P4_库管理_v5.2_20261026.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6"/><path d="M5 12v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6"/></svg></span>数据源库管理</a>
+    <a class="nav-item admin-nav" href="P5_策略管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="10" cy="17" r="1.6"/></svg></span>策略管理</a>
+    <a class="nav-item admin-nav" href="P6_任务管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="12" height="16" rx="2"/><path d="M9 5V3.5h6V5"/><path d="M9 10h6M9 14h6M9 18h4"/></svg></span>搜索行为</a>
+    <a class="nav-item admin-nav active" href="P7_结果运营_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>结果运营</a>
+    <a class="nav-item admin-nav" href="P8_评测_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="13" width="3" height="4"/><rect x="12" y="9" width="3" height="8"/><rect x="17" y="5" width="3" height="12"/></svg></span>效果评测</a>
+  </div>
+</aside>
+
+<!-- ============ 主区 ============ -->
+<div class="main">
+
+  <!-- 权限态 -->
+  <div class="perm-gate" id="permGate">
+    <div class="pg-card">
+      <div class="pg-ico">保障</div>
+      <h3>当前账号无管理员页面权限</h3>
+      <p>本页为管理员页面，正式由登录态与库授权决定访问权限，原型不提供角色切换。</p>
+    </div>
+  </div>
+
+  <div class="content" id="pageBody">
+
+    <!-- 页面定位 -->
+    <section class="module-intro">
+      <div>
+        <h2>结果运营</h2>
+        <p>检索结果的反馈登记与处理。</p>
+      </div>
+      <button class="dev-entry" id="devEntry" type="button" onclick="openDev()" title="研发说明"><span class="de-q" aria-hidden="true">?</span>研发说明</button>
+    </section>
+
+    <!-- 面包屑位 · 返回结果页（?back=P2 时显示） -->
+    <div class="back-row" id="backRow">
+      <a class="back-link" id="backLink" href="P2_结果页_v5.0_20261025.html?task=TASK261025A3F9KX">← 返回结果页</a>
+    </div>
+
+    <!-- 研发需求说明（入口在头部卡片右上角 · 右侧抽屉；内容原样搬入抽屉） -->
+    <div class="dev-mask" id="devMask" onclick="closeDev()"></div>
+    <div class="dev-drawer" id="devDrawer" role="dialog" aria-modal="true" aria-label="研发需求说明">
+      <div class="dev-head">
+        <h3>研发需求说明</h3>
+        <span class="dh-tag">给研发</span>
+        <button type="button" class="dev-close" id="devClose" title="关闭（Esc）" aria-label="关闭" onclick="closeDev()">×</button>
+      </div>
+      <div class="dev-body dev-stack">
+      <div class="panel-head">
+        <div class="sec-head">
+          <span class="sec-title">研发说明 · 反馈来源与去向</span>
+          <span class="sec-sub">三条去向 · 平台可执行</span>
+        </div>
+        <span class="badge gray">研发视角</span>
+      </div>
+      <p class="research-lead">
+        页面正文只保留<b>反馈</b>一个业务块：常规只在列表里处理已有反馈单；
+        唯一的登记入口是结果页「空结果处置 · 需求登记」带 <code>?zero=</code> 进来（自动弹登记窗，类型固定「零结果」），本页不提供常驻的「登记反馈」按钮。
+        反馈单的<b>类型</b>由入口决定（标记不匹配 / 零结果）；<b>去向</b>由处理时的<b>处理判断</b>决定，且必须是平台能执行的动作。
+        平台是检索层：<b>不修改上游数据，也不改写上游库内容</b>。
+      </p>
+      <div class="cover-note">
+        <div class="cn-title">三条去向，都是平台能落地的</div>
+        <ul>
+          <li><b>数据本身有问题 → 屏蔽数据</b>：进屏蔽列表，检索时自动排除，立即生效。</li>
+          <li><b>数据没问题、是匹配/排序问题 → 调整策略</b>：数据保留，不写屏蔽列表，只记状态，作为 <a href="P5_策略管理_v5.0_20261025.html">策略管理</a> 调参与 <a href="P8_评测_v5.0_20261025.html">效果评测</a> 的输入。</li>
+          <li><b>零结果 → 补充数据</b>：记录数据需求给上游，平台不自己补数据。</li>
+        </ul>
+      </div>
+      <div class="dtable">
+        <table class="dt cov-tb">
+          <thead><tr><th>入口</th><th>类型</th><th>处理判断</th><th>去向</th></tr></thead>
+          <tbody>
+            <tr><td class="tid">结果摘要 · 标记不匹配</td><td>标记不匹配</td><td class="cov-desc">数据本身有问题（默认）</td><td>屏蔽数据</td></tr>
+            <tr><td class="tid">结果摘要 · 标记不匹配</td><td>标记不匹配</td><td class="cov-desc">数据没问题，是匹配/排序问题</td><td>调整策略</td></tr>
+            <tr><td class="tid">空结果处置 · 需求登记</td><td>零结果</td><td class="cov-desc">库里缺这类数据（固定，不可选）</td><td>补充数据</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="cover-note">
+        <div class="cn-title">处理弹窗：判断单选，去向只读</div>
+        <ul>
+          <li><b>弹窗字段</b>：反馈单（单号 · query）/ 来源（结果摘要 / 空结果处置 · 来源任务号）/ 类型，均只读；标记不匹配且带标记条目时多一行「标记条目」（ID + 名称）。</li>
+          <li><b>类型</b>：由入口决定，登记弹窗与处理弹窗里都只读展示，不提供类型下拉。</li>
+          <li><b>处理判断</b>：标记不匹配给两个选项（数据本身有问题 / 数据没问题，是匹配/排序问题），默认「数据本身有问题」；零结果不给单选，固定一行「库里缺这类数据 → 补充数据」。</li>
+          <li><b>去向</b>：只读，跟着判断变 —— 数据本身有问题 → 屏蔽数据；匹配/排序问题 → 调整策略；零结果 → 补充数据。</li>
+          <li><b>提交</b>：底部按钮「标记已处理」；保存后状态转「已处理」、去向落定、按去向给 toast；列表里已处理行的操作按钮变为禁用的「已处理」。</li>
+          <li><b>点踩</b>：结果页单条点踩只用于统计（<a href="P6_任务管理_v5.0_20261025.html">搜索行为</a> 的「赞 / 踩」列），<b>不生成反馈单</b>，本页不读点踩数据。</li>
+        </ul>
+      </div>
+      <div class="cover-note">
+        <div class="cn-title">反馈 · 记录字段</div>
+        <ul>
+          <li><b>列顺序（8 列）</b>：时间 / 反馈单 / 搜索词 / 类型 / 条数 / 去向 / 状态 / 操作</li>
+          <li><b>时间</b>：反馈生成时间，YYYY-MM-DD HH:mm；第一列，列表按时间倒序（最新在上）</li>
+          <li><b>反馈单</b>：反馈单号（FBK + yyMMdd + 6 位安全码），单行显示</li>
+          <li><b>搜索词</b>：该反馈单的 query，单行，超出省略，悬停显示全量</li>
+          <li><b>类型</b>：由入口决定，只读（标记不匹配 / 零结果）</li>
+          <li><b>条数</b>：该反馈单涉及的标记条目数，显示「N 条」；零结果没有标记条目，显示「0 条」</li>
+          <li><b>去向</b>：处理完成后才显示，由处理判断决定，只读；屏蔽数据显示「屏蔽数据 · 已生效」；未处理一律显示「—」，不预填</li>
+          <li><b>状态</b>：待处理（橙） / 已处理（绿），只有这两态</li>
+          <li><b>排序与分页</b>：按时间倒序（最新在上），每页 10 条（「共 N 条」+ 上一页 / 页码 / 下一页）；无数据显示「暂无反馈单」</li>
+          <li><b>操作</b>：处理（选处理判断 → 标记已处理；零结果无需选择，直接标记已处理）</li>
+        </ul>
+      </div>
+      <div class="cover-note">
+        <div class="cn-title">来源带入与回写</div>
+        <ul>
+          <li><b>标记不匹配</b>：搜索结果摘要提交时写入浏览器会话存储（cm_mismatch_feedbacks），本页按反馈单号去重后并入列表最前</li>
+          <li><b>零结果</b>：以 ?zero= 任务号带入，本页自动打开登记弹窗（类型固定「零结果」、说明预填「检索无结果，疑似语料缺失」），登记窗内可按 query 搜索历史搜索记录（每页 10 条）选一条作为关联搜索，提交后生成反馈单</li>
+          <li><b>回写</b>：处理结果（st / judge / to）写回存储，刷新后该反馈单仍为已处理，去向不变</li>
+          <li><b>屏蔽列表只在一种情况写</b>：处理判断为「数据本身有问题」且该反馈单带标记条目时，才把条目 ID 写入 <code>cm_blocked_items</code>（数组，去重）；「调整策略」只改状态与 judge、<b>不写屏蔽列表</b>；「补充数据」只记录需求、不写任何存储</li>
+        </ul>
+      </div>
+      <div class="cover-note">
+        <div class="cn-title">屏蔽的作用范围</div>
+        <ul>
+          <li><b>屏蔽</b>：该条目进入屏蔽列表，结果页渲染前读取并过滤，立即生效；上游数据本身不变。</li>
+          <li><b>确认</b>：不经过数据源库管理二次确认，本页处理完成即生效。</li>
+          <li><b>数据集级黑名单</b>：由数据源库管理的「黑名单」按来源名整库屏蔽，与本页的单条条目屏蔽是两件事、独立生效；结果页把两类排除合并显示「本次共排除 N 条」。</li>
+        </ul>
+      </div>
+      <div class="cover-note">
+        <div class="cn-title">页面入口与上下游</div>
+        <ul>
+          <li><b>入口</b>：结果页「标记不匹配」提交后带 <code>cm_mismatch_feedbacks</code> 进来（按反馈单号去重、并入列表最前）；空结果处置带 <code>?zero=任务号</code> 进来并自动弹登记窗。</li>
+          <li><b>返回</b>：带 <code>?back=P2</code> 时顶部显示「← 返回结果页」，带回本次任务号（优先 task / zero，兜底取在册反馈单的来源任务号）。</li>
+          <li><b>上游</b>：<a href="P2_结果页_v5.0_20261025.html">结果页</a>（标记不匹配 / 零结果）。<b>下游</b>：「屏蔽数据」→ 结果页按 <code>cm_blocked_items</code> 过滤；「调整策略」→ <a href="P5_策略管理_v5.0_20261025.html">策略管理</a> 调参 + <a href="P8_评测_v5.0_20261025.html">效果评测</a> 验证；「补充数据」→ 记录需求给上游。</li>
+        </ul>
+      </div>
+      </div>
+    </div>
+
+    <!-- ============ 核心业务块 ============ -->
+    <div class="flow">
+
+      <!-- 反馈 -->
+      <section class="panel flow-block" id="blkFeedback">
+        <div class="blk-head">
+          <div class="blk-title">
+            <h3>反馈</h3>
+            <span class="fb-src" id="fbSrcTask" hidden></span>
+          </div>
+        </div>
+
+        <div class="dtable fb-table">
+          <table class="dt">
+            <colgroup>
+              <col style="width:140px"><col style="width:150px"><col><col style="width:110px">
+              <col style="width:70px"><col style="width:140px"><col style="width:96px"><col style="width:96px">
+            </colgroup>
+            <thead><tr><th>时间</th><th>反馈单</th><th>搜索词</th><th>类型</th><th class="fb-cnt">条数</th><th>去向</th><th>状态</th><th>操作</th></tr></thead>
+            <tbody id="fbRows"></tbody>
+          </table>
+        </div>
+        <div class="pager-bar" id="fbListPager"></div>
+      </section>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- 通用功能弹窗（每块唯一动作的确认 / 表单） -->
+<div class="modal-mask" id="infoMask">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="infoTitle">功能详情</h3>
+      <button class="modal-close" type="button" onclick="closeInfo()">×</button>
+    </div>
+    <div class="modal-body" id="infoBody"></div>
+    <div class="modal-foot" id="infoFoot"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= 数据（示例记录，集中在此，口径 = 本页在册数据） ================= */
+/* 搜索行为：登记反馈弹窗内的 query 选择（分页 10 条 / 页） */
+var HIST = [
+  {time:'2026-10-25 00:30', q:'含发票代码的扫描件', pair:'文搜图', task:'TASK261025A3F9KX', rs:'RST261025A3F9KX', total:130},
+  {time:'2026-10-24 20:10', q:'跨境包裹面单 手写编号', pair:'文搜图', task:'TASK261024V2N6BQ', rs:'RST261024V2N6BQ', total:0},
+  {time:'2026-10-24 18:05', q:'生产线作业安全帽佩戴', pair:'文搜视频', task:'TASK261024M7V4YC', rs:'RST261024M7V4YC', total:87},
+  {time:'2026-10-24 14:20', q:'营业执照 法人代表字段', pair:'文搜图', task:'TASK261024P9W6ZS', rs:'RST261024P9W6ZS', total:210},
+  {time:'2026-10-24 09:15', q:'红章文件 归档编号', pair:'文搜图', task:'TASK261024R3X8TA', rs:'RST261024R3X8TA', total:64},
+  {time:'2026-10-23 21:40', q:'窗口办事人员操作特写', pair:'文搜视频', task:'TASK261023C5L8WD', rs:'RST261023C5L8WD', total:152},
+  {time:'2026-10-23 17:25', q:'电子发票查验截图', pair:'文搜图', task:'TASK261023F2Q7NH', rs:'RST261023F2Q7NH', total:96},
+  {time:'2026-10-23 15:50', q:'合同骑缝章 高清图', pair:'文搜图', task:'TASK261023J8T3MB', rs:'RST261023J8T3MB', total:41},
+  {time:'2026-10-23 11:30', q:'车间流水线 质检工序', pair:'文搜视频', task:'TASK261023L6R9PK', rs:'RST261023L6R9PK', total:73},
+  {time:'2026-10-23 08:45', q:'手写签收单 日期栏', pair:'文搜图', task:'TASK261023N4W2QD', rs:'RST261023N4W2QD', total:0},
+  {time:'2026-10-22 19:10', q:'仓库货架 批次标签', pair:'文搜图', task:'TASK261022P7B5YX', rs:'RST261022P7B5YX', total:188},
+  {time:'2026-10-22 16:35', q:'身份证人像面 有效期限', pair:'文搜图', task:'TASK261022R3K8LC', rs:'RST261022R3K8LC', total:57},
+  {time:'2026-10-22 13:20', q:'展厅讲解视频 产品特写', pair:'文搜视频', task:'TASK261022T9D4GF', rs:'RST261022T9D4GF', total:34},
+  {time:'2026-10-22 10:05', q:'银行回单 交易流水号', pair:'文搜图', task:'TASK261022V5M7HZ', rs:'RST261022V5M7HZ', total:121},
+  {time:'2026-10-21 20:50', q:'车牌识别 停车场入口', pair:'文搜视频', task:'TASK261021X2C6JN', rs:'RST261021X2C6JN', total:0},
+  {time:'2026-10-21 18:15', q:'餐饮后厨 卫生检查项', pair:'文搜视频', task:'TASK261021Z8F3QP', rs:'RST261021Z8F3QP', total:65},
+  {time:'2026-10-21 14:40', q:'银行开户许可证 编号区', pair:'文搜图', task:'TASK261021B4H9TR', rs:'RST261021B4H9TR', total:92},
+  {time:'2026-10-21 09:30', q:'工地防护网 破损部位', pair:'文搜图', task:'TASK261021D6L2WS', rs:'RST261021D6L2WS', total:48},
+  {time:'2026-10-20 17:55', q:'公文红头 发文字号', pair:'文搜图', task:'TASK261020F3N7YE', rs:'RST261020F3N7YE', total:176},
+  {time:'2026-10-20 15:10', q:'快递面单 二维码区域', pair:'文搜图', task:'TASK261020H9P4KU', rs:'RST261020H9P4KU', total:0},
+  {time:'2026-10-20 11:35', q:'会议签到表 手写姓名', pair:'文搜图', task:'TASK261020K2R8LV', rs:'RST261020K2R8LV', total:133},
+  {time:'2026-10-20 09:00', q:'仓库盘点 手持终端画面', pair:'文搜视频', task:'TASK261020M5T1XA', rs:'RST261020M5T1XA', total:79},
+  {time:'2026-10-19 16:20', q:'保单首页 投保单号', pair:'文搜图', task:'TASK261019N7V6ZC', rs:'RST261019N7V6ZC', total:104}
+];
+
+/* 三个去向：都是平台能执行的动作。类型由入口决定（标记不匹配 / 零结果），去向由处理判断（judge）决定 */
+var TO_BLOCK = '屏蔽数据';
+var TO_STRATEGY = '调整策略';
+var TO_DEMAND = '补充数据';
+/* judge 取值：'data' 数据本身有问题 / 'match' 数据没问题，是匹配、排序问题；零结果没有 judge */
+function fbTo(cls, judge){
+  if(cls === '零结果'){ return TO_DEMAND; }
+  return judge === 'match' ? TO_STRATEGY : TO_BLOCK;
+}
+/* 列表「去向」列：未处理不预填去向（显示 —）；已处理才显示去向，屏蔽数据且已生效时加后缀 */
+function fbToText(f){
+  if(f.st !== '已处理') return '—';
+  var to = f.to || fbTo(f.cls, f.judge);
+  return (to === TO_BLOCK && f.blocked) ? (TO_BLOCK + ' · 已生效') : to;
+}
+/* 处理完成 toast：按去向给出平台实际做了什么 */
+var TOAST_BY_TO = {
+  '屏蔽数据': '已处理 · 该数据已屏蔽，检索结果不再出现',
+  '调整策略': '已处理 · 已记为匹配问题，供策略优化',
+  '补充数据': '已处理 · 已记录数据需求'
+};
+
+/* 反馈单：两种来源 —— 结果摘要「标记不匹配」（搜索结果摘要提交后由会话存储带入）/ 空结果「需求登记」（?zero= 带入） */
+var FEEDBACKS = [
+  {id:'FBK261107C2P8VD', time:'2026-11-07 13:58', q:'电子发票查验截图', note:'标记不匹配 2 条', cls:'标记不匹配', judge:'', to:'', st:'待处理', src:'结果摘要', srcRef:'TASK261023F2Q7NH', blocked:false, items:[{id:'ITM261023F2Q7N2', name:'电子发票_查验结果_截图_02.png'},{id:'ITM261023F2Q7N5', name:'电子发票_查验结果_截图_05.png'}], task:'TASK261023F2Q7NH'},
+  {id:'FBK261107Z3R4T5', time:'2026-11-07 10:12', q:'跨境包裹面单 手写编号', note:'检索无结果，疑似语料缺失', cls:'零结果', judge:'', to:'补充数据', st:'待处理', src:'空结果处置', srcRef:'TASK261024V2N6BQ', blocked:false},
+  {id:'FBK261106W6K3TN', time:'2026-11-06 18:26', q:'营业执照 法人代表字段', note:'标记不匹配 1 条', cls:'标记不匹配', judge:'data', to:'屏蔽数据', st:'已处理', src:'结果摘要', srcRef:'TASK261024P9W6ZS', blocked:true, items:[{id:'ITM261024P9W6Z5', name:'营业执照_法人代表字段_05.png'}], task:'TASK261024P9W6ZS'}
+];
+
+/* 搜索结果摘要「标记不匹配」提交的反馈（会话存储，按反馈单号去重后并入列表最前） */
+var MM_KEY = 'cm_mismatch_feedbacks';
+function readMismatchFeedbacks(){
+  var list = [];
+  try{
+    var raw = sessionStorage.getItem(MM_KEY);
+    if(raw){
+      var v = JSON.parse(raw);
+      if(Array.isArray(v)){ list = v; }
+    }
+  }catch(e){ list = []; }
+  return list;
+}
+function writeMismatchFeedbacks(list){
+  try{ sessionStorage.setItem(MM_KEY, JSON.stringify(list)); return true; }
+  catch(e){ return false; }
+}
+function loadMismatchFeedbacks(){
+  var raw = readMismatchFeedbacks();
+  if(!raw.length){ return; }
+  var known = {};
+  FEEDBACKS.forEach(function(f){ known[f.id] = true; });
+  var fresh = [];
+  raw.forEach(function(r){
+    if(!r || !r.id || known[r.id]){ return; }
+    known[r.id] = true;
+    var items = Array.isArray(r.items) ? r.items : [];
+    var judge = (r.judge === 'match') ? 'match' : ((r.judge === 'data') ? 'data' : '');
+    var blocked = !!r.blocked && judge !== 'match';
+    fresh.push({
+      id: String(r.id),
+      time: String(r.time || ''),
+      q: String(r.q || ''),
+      note: '标记不匹配 ' + items.length + ' 条',
+      cls: '标记不匹配',
+      judge: judge,
+      to: String(r.to || '') || fbTo('标记不匹配', judge),
+      st: (r.st === '已处理' ? '已处理' : '待处理'),
+      src: '结果摘要',
+      srcRef: String(r.task || ''),
+      blocked: blocked,
+      items: items,
+      task: String(r.task || '')
+    });
+  });
+  if(fresh.length){ FEEDBACKS = fresh.concat(FEEDBACKS); }
+}
+/* 处理结果回写存储：状态、judge、to 同步写入，刷新后该反馈单仍为已处理 */
+function syncMismatchFeedback(f){
+  var list = readMismatchFeedbacks();
+  var to = f.to || fbTo(f.cls, f.judge);
+  var hit = false;
+  list.forEach(function(r){
+    if(r && r.id === f.id){
+      r.st = f.st;
+      r.judge = (f.judge === 'match') ? 'match' : ((f.judge === 'data') ? 'data' : '');
+      r.to = to;
+      r.blocked = (to === TO_BLOCK) && !!f.blocked;
+      r.items = f.items || r.items;
+      hit = true;
+    }
+  });
+  if(!hit && f.blocked){
+    list.push({
+      id: f.id,
+      task: f.task || f.srcRef || '',
+      q: f.q,
+      items: f.items || [],
+      time: f.time,
+      cls: f.cls,
+      judge: f.judge || '',
+      to: to,
+      st: f.st,
+      src: f.src,
+      blocked: true
+    });
+    hit = true;
+  }
+  if(hit){ writeMismatchFeedbacks(list); }
+}
+
+/* ================= 屏蔽列表：条目 ID 数组（去重），结果页渲染前据此过滤，立即生效 ================= */
+var BLOCKED_KEY = 'cm_blocked_items';
+function readBlockedItems(){
+  try{
+    var raw = sessionStorage.getItem(BLOCKED_KEY);
+    if(!raw){ return []; }
+    var v = JSON.parse(raw);
+    return Array.isArray(v) ? v : [];
+  }catch(e){ return []; }
+}
+function writeBlockedItems(list){
+  try{ sessionStorage.setItem(BLOCKED_KEY, JSON.stringify(list)); return true; }
+  catch(e){ return false; }
+}
+/* 处理判断为「数据本身有问题」（去向 = 屏蔽数据）时，把该反馈单的条目 ID 并入屏蔽列表（去重） */
+function saveBlockedItems(f){
+  var items = Array.isArray(f.items) ? f.items : [];
+  if(!items.length){ return; }
+  var list = readBlockedItems();
+  var added = false;
+  items.forEach(function(it){
+    var id = (it && typeof it === 'object')
+      ? String(it.id == null ? '' : it.id).trim()
+      : String(it == null ? '' : it).trim();
+    if(!id || list.indexOf(id) >= 0){ return; }
+    list.push(id);
+    added = true;
+  });
+  if(added){ writeBlockedItems(list); }
+}
+
+/* ================= 基础件 ================= */
+var toastTimer = null;
+function toast(msg, type){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.className = 'toast'; }, 2600);
+}
+function esc(s){
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function val(id){
+  var el = document.getElementById(id);
+  return el ? String(el.value || '').trim() : '';
+}
+function nowFull(){
+  var d = new Date(), p = function(n){ return (n < 10 ? '0' : '') + n; };
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function newBizId(prefix){
+  var d = new Date(), p = function(n){ return (n < 10 ? '0' : '') + n; };
+  return prefix + String(d.getFullYear()).slice(2) + p(d.getMonth()+1) + p(d.getDate()) + Math.random().toString(36).slice(2,8).toUpperCase();
+}
+function openInfo(title, sub, body, foot){
+  document.getElementById('infoTitle').textContent = title;
+  var bodyEl = document.getElementById('infoBody');
+  bodyEl.innerHTML = (sub ? '<div class="mb-tip">' + sub + '</div>' : '') + body;
+  bodyEl.scrollTop = 0;
+  document.getElementById('infoFoot').innerHTML = foot || '<button class="btn-ghost" type="button" onclick="closeInfo()">关闭</button>';
+  document.getElementById('infoMask').classList.add('show');
+}
+function closeInfo(){
+  var m = document.getElementById('infoMask');
+  if(m) m.classList.remove('show');
+}
+/* 反馈状态只有两态：待处理 / 已处理 */
+var ST_CLASS = {'已处理':'ok', '待处理':'wait'};
+function badgeClass(st){ return ST_CLASS[st] || 'gray'; }
+function badge(st){ return '<span class="badge ' + badgeClass(st) + '">' + esc(st) + '</span>'; }
+
+/* ================= 研发说明抽屉（八页统一：头部胶囊入口 + 右侧 520px 抽屉） ================= */
+function openDev(){
+  var d = document.getElementById('devDrawer'), m = document.getElementById('devMask');
+  if(d) d.classList.add('open');
+  if(m) m.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeDev(){
+  var d = document.getElementById('devDrawer'), m = document.getElementById('devMask');
+  if(d) d.classList.remove('open');
+  if(m) m.classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeDev(); });
+
+/* ================= 渲染 ================= */
+/* ================= 分页组件（反馈列表 · 每页 10 条） ================= */
+var FB_LIST_PAGE = 1;
+var FB_LIST_SIZE = 10;
+var PAGER_GO = {};
+function pagerNumbers(page, pages){
+  var out = [], i;
+  if(pages <= 7){
+    for(i = 1; i <= pages; i++){ out.push(i); }
+  }else{
+    out.push(1);
+    var s = Math.max(2, page - 1), e = Math.min(pages - 1, page + 1);
+    if(s > 2){ out.push('...'); }
+    for(i = s; i <= e; i++){ out.push(i); }
+    if(e < pages - 1){ out.push('...'); }
+    out.push(pages);
+  }
+  return out;
+}
+function renderPager(containerId, total, page, pageSize){
+  var box = document.getElementById(containerId);
+  if(!box){ return; }
+  pageSize = pageSize || 10;
+  var pages = Math.max(1, Math.ceil(total / pageSize));
+  if(page > pages){ page = pages; }
+  if(page < 1){ page = 1; }
+  var go = PAGER_GO[containerId] || 'goPage';
+  var html = '<span class="pager-total">共 ' + total + ' 条</span>' +
+    '<button class="pager-btn" type="button" onclick="' + go + '(' + (page - 1) + ')"' + (page <= 1 ? ' disabled' : '') + '>上一页</button>';
+  pagerNumbers(page, pages).forEach(function(p){
+    if(p === '...'){ html += '<span class="pager-gap">…</span>'; }
+    else{
+      html += '<button class="pager-num' + (p === page ? ' is-cur' : '') + '" type="button" onclick="' + go + '(' + p + ')"' +
+        (p === page ? ' aria-current="page"' : '') + '>' + p + '</button>';
+    }
+  });
+  html += '<button class="pager-btn" type="button" onclick="' + go + '(' + (page + 1) + ')"' + (page >= pages ? ' disabled' : '') + '>下一页</button>';
+  box.innerHTML = html;
+}
+function goPage(n){
+  var pages = Math.max(1, Math.ceil(FEEDBACKS.length / FB_LIST_SIZE));
+  if(n < 1){ n = 1; }
+  if(n > pages){ n = pages; }
+  FB_LIST_PAGE = n;
+  renderFb();
+}
+
+/* 反馈列表默认按时间倒序（YYYY-MM-DD HH:mm 定长，可直接字符串比较） */
+function sortFbByTime(){
+  FEEDBACKS.sort(function(a, b){ return String(b.time || '').localeCompare(String(a.time || '')); });
+}
+
+function renderFb(){
+  var box = document.getElementById('fbRows');
+  if(!box) return;
+  sortFbByTime();
+  var total = FEEDBACKS.length;
+  var pages = Math.max(1, Math.ceil(total / FB_LIST_SIZE));
+  if(FB_LIST_PAGE > pages){ FB_LIST_PAGE = pages; }
+  if(FB_LIST_PAGE < 1){ FB_LIST_PAGE = 1; }
+  var start = (FB_LIST_PAGE - 1) * FB_LIST_SIZE;
+  if(total === 0){
+    box.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#9aa6bd;padding:20px">暂无反馈单</td></tr>';
+    renderPager('fbListPager', 0, 1, FB_LIST_SIZE);
+    return;
+  }
+  box.innerHTML = FEEDBACKS.slice(start, start + FB_LIST_SIZE).map(function(f){
+    var done = f.st === '已处理';
+    var act = done
+      ? '<button class="btn-ghost btn-xs" type="button" disabled>已处理</button>'
+      : '<button class="btn-ghost btn-xs" type="button" onclick="askProcessFeedback(\'' + f.id + '\')">处理</button>';
+    var items = Array.isArray(f.items) ? f.items : [];
+    var q = String(f.q == null ? '' : f.q);
+    return '<tr>' +
+      '<td class="fb-time">' + esc(f.time) + '</td>' +
+      '<td class="fb-no">' + esc(f.id) + '</td>' +
+      '<td class="fb-q" title="' + esc(q) + '">' + esc(q) + '</td>' +
+      '<td>' + esc(f.cls) + '</td>' +
+      '<td class="fb-cnt">' + items.length + ' 条</td>' +
+      '<td>' + esc(fbToText(f)) + '</td>' +
+      '<td>' + badge(f.st) + '</td>' +
+      '<td>' + act + '</td>' +
+    '</tr>';
+  }).join('');
+  renderPager('fbListPager', total, FB_LIST_PAGE, FB_LIST_SIZE);
+}
+function renderAll(){
+  renderFb();
+}
+
+/* ================= 反馈：搜索行为分页（每页 10 条 + 搜索 + 页码） ================= */
+var FB_PICK = null;
+var HIST_PAGE = 1;
+var HIST_SIZE = 10;
+var HIST_KW = '';
+
+/* 按 query 过滤，返回 {i, h}：i 为 HIST 中的稳定下标，分页不改变记录身份 */
+function histFiltered(){
+  var kw = HIST_KW.toLowerCase();
+  var out = [];
+  for(var i = 0; i < HIST.length; i++){
+    if(!kw || String(HIST[i].q).toLowerCase().indexOf(kw) >= 0) out.push({i:i, h:HIST[i]});
+  }
+  return out;
+}
+function histPageCount(total){ return Math.max(1, Math.ceil(total / HIST_SIZE)); }
+function pagerHtml(total, pages){
+  var html = '<button class="btn-ghost btn-xs" type="button" onclick="gotoHistPage(' + (HIST_PAGE - 1) + ')"' +
+    (HIST_PAGE <= 1 ? ' disabled' : '') + '>上一页</button>';
+  for(var p = 1; p <= pages; p++){
+    html += '<button class="pg-num' + (p === HIST_PAGE ? ' is-cur' : '') + '" type="button" onclick="gotoHistPage(' + p + ')"' +
+      (p === HIST_PAGE ? ' aria-current="page"' : '') + ' aria-label="第 ' + p + ' 页">' + p + '</button>';
+  }
+  html += '<button class="btn-ghost btn-xs" type="button" onclick="gotoHistPage(' + (HIST_PAGE + 1) + ')"' +
+    (HIST_PAGE >= pages ? ' disabled' : '') + '>下一页</button>' +
+    '<span class="pg-info">第 ' + HIST_PAGE + ' / ' + pages + ' 页</span>' +
+    '<span class="pg-info">共 ' + total + ' 条</span>';
+  return html;
+}
+function renderHist(){
+  var box = document.getElementById('fbPickList');
+  if(!box) return;
+  var matched = histFiltered();
+  var pages = histPageCount(matched.length);
+  if(HIST_PAGE > pages) HIST_PAGE = pages;
+  if(HIST_PAGE < 1) HIST_PAGE = 1;
+  var start = (HIST_PAGE - 1) * HIST_SIZE;
+  var slice = matched.slice(start, start + HIST_SIZE);
+  if(slice.length === 0){
+    box.innerHTML = '<div class="pick-empty">没有匹配的检索记录</div>';
+  }else{
+    box.innerHTML = slice.map(function(it){
+      var h = it.h;
+      var zero = h.total === 0;
+      var checked = !!(FB_PICK && FB_PICK.task === h.task);
+      return '<label class="pick-row' + (checked ? ' is-pick' : '') + '">' +
+        '<input class="pick-ck" type="radio" name="fbPick" value="' + esc(h.task) + '" data-i="' + it.i + '"' +
+          (checked ? ' checked' : '') + ' onchange="pickFbQuery(this)" aria-label="选择 ' + esc(h.q) + '">' +
+        '<span class="pick-main"><span class="pick-q">' + esc(h.q) + '</span>' +
+          '<span class="pick-sub">' + esc(h.time) + ' · 结果 ' + (zero ? '<span class="zero">0 条</span>' : h.total + ' 条') +
+            ' · ' + esc(h.task) + '</span></span>' +
+      '</label>';
+    }).join('');
+  }
+  var pager = document.getElementById('fbPager');
+  if(pager) pager.innerHTML = pagerHtml(matched.length, pages);
+}
+function gotoHistPage(p){
+  var matched = histFiltered();
+  var pages = histPageCount(matched.length);
+  if(p < 1) p = 1;
+  if(p > pages) p = pages;
+  HIST_PAGE = p;
+  renderHist();
+  var box = document.getElementById('fbPickList');
+  if(box) box.scrollTop = 0;
+}
+function onHistSearch(v){
+  HIST_KW = String(v || '');
+  HIST_PAGE = 1;
+  renderHist();
+}
+
+/* 来源带入：?zero= 任务号（空结果处置「需求登记」），登记类型固定「零结果」 */
+var FB_SRC_TEXT = '';
+var FB_SRC_REF = '';
+
+/* 按任务号 / query 找搜索行为记录 */
+function findHist(task, q){
+  var i, hit = null;
+  if(task){
+    for(i = 0; i < HIST.length; i++){ if(HIST[i].task === task){ hit = HIST[i]; break; } }
+  }
+  if(!hit && q){
+    for(i = 0; i < HIST.length; i++){ if(HIST[i].q === q){ hit = HIST[i]; break; } }
+  }
+  return hit;
+}
+/* 把选中的搜索行为填进登记表单 */
+function fillPick(h){
+  var qEl = document.getElementById('fbChosenQ');
+  if(qEl) qEl.textContent = h.q;
+  var srcEl = document.getElementById('fbChosenSrc');
+  if(srcEl) srcEl.textContent = h.rs + ' · 任务 ' + h.task + ' · ' + h.total + ' 条';
+  var roEl = document.getElementById('fbSrcText');
+  if(roEl) roEl.textContent = FB_SRC_TEXT || ('搜索行为 · ' + h.q);
+  var wrap = document.getElementById('fbFormWrap');
+  if(wrap) wrap.hidden = false;
+  var btn = document.getElementById('fbSubmitBtn');
+  if(btn) btn.disabled = false;
+}
+
+/* 登记反馈：只有「零结果」一种，类型由入口（空结果处置 · 需求登记）决定；处理时按固定判断记为「补充数据」 */
+function askRegisterFeedback(opt){
+  opt = (opt && typeof opt === 'object') ? opt : {};
+  var zeroTask = String(opt.zero == null ? '' : opt.zero).trim();
+  FB_PICK = null;
+  HIST_PAGE = 1;
+  HIST_KW = '';
+  FB_SRC_REF = zeroTask;
+  FB_SRC_TEXT = zeroTask ? ('空结果处置 · ' + zeroTask) : '';
+  var hit = zeroTask ? findHist(zeroTask, '') : null;
+  if(hit){ FB_PICK = hit; HIST_KW = hit.q; }
+  var srcLine = zeroTask
+    ? '<div class="mb-src">来自空结果处置 · <b>' + esc(zeroTask) + '</b></div>'
+    : '';
+  openInfo('登记反馈',
+    srcLine,
+    '<div class="fb-step">搜索行为</div>' +
+    '<input class="hist-search" type="text" id="fbSearch" placeholder="搜索 query" autocomplete="off" oninput="onHistSearch(this.value)" aria-label="搜索 query">' +
+    '<div class="pick-list" id="fbPickList"></div>' +
+    '<div class="pager" id="fbPager"></div>' +
+    '<div class="fb-form-wrap" id="fbFormWrap" hidden>' +
+      '<div class="pick-chosen">已选 <b id="fbChosenQ">—</b><br><span id="fbChosenSrc">—</span></div>' +
+      '<div class="form-grid">' +
+        '<label>类型</label><span class="ro">零结果</span>' +
+        '<label>来源</label><span class="ro" id="fbSrcText">—</span>' +
+        '<label>说明</label><input type="text" id="fbNote" placeholder="如：检索无结果，疑似语料缺失">' +
+      '</div>' +
+    '</div>',
+    '<button class="btn-ghost" type="button" onclick="closeInfo()">取消</button>' +
+    '<button class="btn-primary" type="button" id="fbSubmitBtn" onclick="saveRegisterFeedback()" disabled>提交登记</button>');
+  renderHist();
+  if(HIST_KW){
+    var sEl = document.getElementById('fbSearch');
+    if(sEl) sEl.value = HIST_KW;
+  }
+  if(hit){ fillPick(hit); }
+  else if(FB_SRC_TEXT){
+    var roEl = document.getElementById('fbSrcText');
+    if(roEl) roEl.textContent = FB_SRC_TEXT;
+  }
+  if(zeroTask){
+    var noteEl = document.getElementById('fbNote');
+    if(noteEl) noteEl.value = '检索无结果，疑似语料缺失';
+  }
+}
+function pickFbQuery(radio){
+  var i = parseInt(radio.getAttribute('data-i'), 10);
+  var h = HIST[i];
+  if(!h) return;
+  FB_PICK = h;
+  renderHist();
+  fillPick(h);
+  var note = document.getElementById('fbNote');
+  if(note) note.focus();
+}
+function saveRegisterFeedback(){
+  if(!FB_PICK){ toast('请先选择一条搜索记录', 'err'); return; }
+  var cls = '零结果';
+  var note = val('fbNote');
+  if(!note){ toast('请填写说明', 'err'); return; }
+  var id = newBizId('FBK');
+  FEEDBACKS.unshift({
+    id:id, time:nowFull(), q:FB_PICK.q, note:note, cls:cls, judge:'', to:TO_DEMAND,
+    st:'待处理', src:'空结果处置',
+    srcRef:(FB_SRC_REF || FB_PICK.q), blocked:false
+  });
+  FB_LIST_PAGE = 1;
+  closeInfo();
+  renderAll();
+  toast('反馈 ' + id + ' 已登记 · 零结果', 'ok');
+}
+/* 标记条目渲染：新格式 {id,name} 一行一条（ID 等宽 + 名称）；旧格式纯 ID 数组按 ID 显示，不报错 */
+function itemRows(items){
+  var arr = Array.isArray(items) ? items : [];
+  return arr.map(function(it){
+    var id = '', name = '';
+    if(it && typeof it === 'object'){
+      id = String(it.id == null ? '' : it.id).trim();
+      name = String(it.name == null ? '' : it.name).trim();
+    }else{
+      id = String(it == null ? '' : it).trim();
+    }
+    if(!id && !name){ return ''; }
+    return '<div class="it-row"><span class="it-id">' + esc(id) + '</span>' +
+      (name ? ' · <span class="it-name">' + esc(name) + '</span>' : '') + '</div>';
+  }).join('');
+}
+/* 处理判断的单选项：judge='data' → 屏蔽数据；judge='match' → 调整策略 */
+function judgeOptHtml(value, title, toText, cur){
+  return '<label class="judge-opt">' +
+    '<input type="radio" name="pfJudge" value="' + value + '"' + (cur === value ? ' checked' : '') +
+      ' onchange="onPfJudgeChange()">' +
+    '<span class="jo-txt"><b>' + esc(title) + '</b> → <span class="jo-to">' + esc(toText) + '</span></span>' +
+  '</label>';
+}
+function readJudge(){
+  var els = document.querySelectorAll('input[name="pfJudge"]');
+  for(var i = 0; i < els.length; i++){ if(els[i].checked){ return els[i].value; } }
+  return '';
+}
+/* 处理反馈：类型只读（由入口决定）；处理判断单选；去向只读，随判断变 */
+function askProcessFeedback(fid){
+  var f = null;
+  FEEDBACKS.forEach(function(x){ if(x.id === fid) f = x; });
+  if(!f){ toast('未找到该反馈单', 'err'); return; }
+  if(f.st === '已处理'){ toast('该反馈已处理', 'err'); return; }
+  var isZero = (f.cls === '零结果');
+  var curJudge = (f.judge === 'match') ? 'match' : 'data';
+  var to = isZero ? TO_DEMAND : fbTo(f.cls, curJudge);
+  var judgeLine = isZero
+    ? '<label>处理判断</label><div class="ro" id="pfJudgeRO">库里缺这类数据 → 补充数据</div>'
+    : '<label>处理判断</label><div class="judge-list" id="pfJudgeBox">' +
+        judgeOptHtml('data', '数据本身有问题', '屏蔽该数据（不再出现在检索结果）', curJudge) +
+        judgeOptHtml('match', '数据没问题，是匹配/排序问题', '调整策略（数据保留）', curJudge) +
+      '</div>';
+  var itemLine = (f.items && f.items.length)
+    ? '<label>标记条目</label><div class="ro item-list">' + itemRows(f.items) + '</div>'
+    : '';
+  openInfo('处理反馈 · ' + f.id, '',
+    '<div class="form-grid">' +
+      '<label>反馈单</label><span class="ro">' + esc(f.id) + ' · ' + esc(f.q) + '</span>' +
+      '<label>来源</label><span class="ro">' + esc(f.src) + (f.srcRef ? ' · ' + esc(f.srcRef) : '') + '</span>' +
+      '<label>类型</label><span class="ro" id="pfClsRO">' + esc(f.cls) + '</span>' +
+      itemLine +
+      judgeLine +
+      '<label>去向</label><span class="ro" id="pfTo">' + esc(to) + '</span>' +
+      '<input type="hidden" id="pfId" value="' + esc(f.id) + '">' +
+      '<input type="hidden" id="pfCls" value="' + esc(f.cls) + '">' +
+      '<input type="hidden" id="pfToVal" value="' + esc(to) + '">' +
+    '</div>',
+    '<button class="btn-ghost" type="button" onclick="closeInfo()">取消</button>' +
+    '<button class="btn-primary" type="button" onclick="saveProcessFeedback()">标记已处理</button>');
+}
+/* 处理判断变化：去向只读行跟着变（屏蔽数据 ⇄ 调整策略） */
+function onPfJudgeChange(){
+  var toEl = document.getElementById('pfTo');
+  var hidden = document.getElementById('pfToVal');
+  var to = fbTo(val('pfCls'), readJudge());
+  if(toEl) toEl.textContent = to;
+  if(hidden) hidden.value = to;
+}
+function saveProcessFeedback(){
+  var id = val('pfId');
+  var f = null;
+  FEEDBACKS.forEach(function(x){ if(x.id === id) f = x; });
+  if(!f){ toast('未找到该反馈单', 'err'); return; }
+  var cls = val('pfCls') || f.cls;
+  var judge = (cls === '零结果') ? '' : (readJudge() || 'data');
+  var to = fbTo(cls, judge);
+  f.st = '已处理';
+  f.judge = judge;
+  f.to = to;
+  f.blocked = (to === TO_BLOCK);
+  if(f.blocked){ saveBlockedItems(f); }   /* 只有「屏蔽数据」才写屏蔽列表 */
+  syncMismatchFeedback(f);
+  closeInfo();
+  renderAll();
+  toast(TOAST_BY_TO[to] || ('反馈 ' + f.id + ' 已处理'), 'ok');
+}
+
+/* ================= 启动 ================= */
+/* 读 URL 参数：?zero= 任务号（结果页空结果处置「需求登记」带入，登记类型固定「零结果」） */
+function readParam(name, max){
+  var raw = '';
+  try{
+    if(typeof URLSearchParams === 'function'){
+      raw = new URLSearchParams(location.search).get(name) || '';
+    }else{
+      var m = new RegExp('[?&]' + name + '=([^&#]*)').exec(location.search);
+      if(m){
+        raw = m[1].replace(/\+/g, ' ');
+        try{ raw = decodeURIComponent(raw); }catch(e2){}
+      }
+    }
+  }catch(e){ raw = ''; }
+  return String(raw).replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max || 120);
+}
+/* 兜底任务号：取本页在册反馈单的来源任务号 */
+function sourceTaskId(){
+  for(var i = 0; i < FEEDBACKS.length; i++){
+    var t = String(FEEDBACKS[i].task || FEEDBACKS[i].srcRef || '');
+    if(/^TASK/i.test(t)){ return t; }
+  }
+  return 'TASK261025A3F9KX';
+}
+/* 返回结果页：?back=P2 时在面包屑位显示「← 返回结果页」，带回本次任务号 */
+function initBackLink(){
+  var row = document.getElementById('backRow');
+  var link = document.getElementById('backLink');
+  if(!row || !link){ return; }
+  var back = readParam('back', 16).toUpperCase();
+  if(back !== 'P2'){ row.classList.remove('show'); return; }
+  var task = readParam('task', 64) || readParam('zero', 64) || sourceTaskId();
+  link.href = 'P2_结果页_v5.0_20261025.html?task=' + encodeURIComponent(task);
+  row.classList.add('show');
+}
+function initPage(){
+  loadMismatchFeedbacks();
+  /* 已屏蔽的反馈写入会话存储：反馈单回写 + 条目 ID 并入屏蔽列表（结果页据此过滤）；
+     只有去向 = 屏蔽数据的才写屏蔽列表，「调整策略」只记状态 */
+  FEEDBACKS.forEach(function(f){
+    if(!f.blocked){ return; }
+    if((f.to || fbTo(f.cls, f.judge)) !== TO_BLOCK){ return; }
+    syncMismatchFeedback(f);
+    saveBlockedItems(f);
+  });
+  renderAll();
+  initBackLink();
+  var mask = document.getElementById('infoMask');
+  if(mask){ mask.addEventListener('click', function(e){ if(e.target === mask) closeInfo(); }); }
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') closeInfo();
+  });
+  var zeroTask = readParam('zero', 64);
+  var srcEl = document.getElementById('fbSrcTask');
+  if(zeroTask && srcEl){
+    srcEl.innerHTML = '来自空结果处置 · <b>' + esc(zeroTask) + '</b>';
+    srcEl.hidden = false;
+  }
+  if(zeroTask){ askRegisterFeedback({zero:zeroTask}); }
+}
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', initPage);
+}else{
+  initPage();
+}
+
+/* ===== 系统门户桥接（index.html 壳用，单页直开无副作用）sysBridge v2 ===== */
+(function(){
+  try{
+    if(window.parent && window.parent !== window){
+      window.parent.postMessage({type:'sys-page', page:'P7', name:'结果运营'}, '*');
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据源库管理 · 跨模态检索中心</title>
+<style>
+:root{
+  /* 冷白蓝 token（与 P1 定稿基准一致） */
+  --workspace-bg:#f6f9fe;
+  --content-soft:#fbfdff;
+  --content-line:#e6edf8;
+  --system-blue:#4169f6;
+  --system-blue-weak:#f1f5ff;
+  --ink:#1f2937;
+  --muted:#667085;
+  --success:#34a853;
+  --warning:#f0a020;
+  --error:#e5484d;
+  --text-primary:#262626;
+  --radius:8px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--workspace-bg);color:var(--text-primary);font-size:14px;line-height:1.5;display:flex;
+}
+button{font-family:inherit;cursor:pointer}
+::selection{background:rgba(65,105,246,.16)}
+
+/* ============ 左侧全局导航（与 P1 同壳，不改） ============ */
+.sidebar{width:220px;flex-shrink:0;background:#fff;border-right:1px solid var(--content-line);display:flex;flex-direction:column;height:100vh;position:sticky;top:0}
+.nav-scroll{flex:1;overflow-y:auto;padding:10px 12px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 10px;margin-bottom:2px;border-radius:6px;color:#344054;font-size:13px;cursor:pointer;user-select:none;text-decoration:none}
+.nav-item .ico{width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:#8a96ad;flex-shrink:0}
+.nav-item .ico svg{width:16px;height:16px;display:block}
+.nav-item:hover{background:var(--system-blue-weak);color:var(--system-blue)}
+.nav-item.active{background:var(--system-blue-weak);color:var(--system-blue);font-weight:600;box-shadow:inset 2px 0 0 var(--system-blue)}
+.nav-item.active .ico{color:var(--system-blue)}
+.nav-divider{height:1px;background:var(--content-line);margin:8px 10px}
+
+/* ============ 主区 ============ */
+.main{flex:1;min-width:0;height:100vh;overflow-y:auto}
+.content{padding:18px 24px 40px;display:flex;flex-direction:column;gap:14px;max-width:1180px;width:100%;margin:0 auto}
+.page-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:18px 20px;
+  border:1px solid #e4edf8;
+  border-radius:10px;
+  background:#fff;
+}
+.ph-main{min-width:0}
+.page-head h1{font-size:20px;font-weight:700;color:#111827;line-height:1.3}
+
+/* ===== 研发说明入口（八页统一：头部胶囊按钮 + 右侧抽屉） ===== */
+.dev-entry{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px 0 5px;border:1px solid #d7e0f0;border-radius:999px;background:#fff;color:#667085;font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+.dev-entry:hover{border-color:#b9c9ff;background:var(--system-blue-weak);color:var(--system-blue)}
+.dev-entry:hover .de-q{background:var(--system-blue);color:#fff}
+.dev-entry:focus-visible{outline:2px solid #cdd9ff;outline-offset:1px}
+.dev-entry .de-q{width:20px;height:20px;border-radius:50%;flex:0 0 auto;background:var(--system-blue-weak);color:var(--system-blue);font-size:12px;font-weight:700;line-height:20px;text-align:center;transition:background .15s,color .15s}
+/* 右侧抽屉：720px / 全高 / 从右滑入 + 半透明遮罩 */
+.dev-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:10000;opacity:0;pointer-events:none;transition:opacity .22s}
+.dev-mask.open{opacity:1;pointer-events:auto}
+.dev-drawer{position:fixed;top:0;right:0;width:720px;max-width:100vw;height:100vh;background:#f6f8fc;z-index:10001;display:flex;flex-direction:column;transform:translateX(102%);transition:transform .28s ease;box-shadow:-8px 0 30px rgba(15,23,42,.18)}
+.dev-drawer.open{transform:translateX(0)}
+.dev-head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:#fff;border-bottom:1px solid #e4eaf3;flex:0 0 auto}
+.dev-head h3{margin:0;font-size:15px;color:#1f2937}
+.dev-head .dh-tag{font-size:11px;font-weight:600;color:#b54708;background:#fdf3e6;border-radius:4px;padding:2px 8px}
+.dev-close{margin-left:auto;width:28px;height:28px;border:none;background:#f2f4f8;border-radius:6px;font-size:15px;line-height:1;cursor:pointer;color:#475467;flex:0 0 auto}
+.dev-close:hover{background:#e6eaf2}
+.dev-body{flex:1;min-height:0;overflow:auto;padding:16px 18px 36px}
+.dev-stack{display:flex;flex-direction:column;gap:12px}
+
+/* ===== 黑名单入口（数据源块头胶囊，与研发说明一致） ===== */
+#blEntry,#contractEntry{height:30px;padding:0 13px;border:1px solid #d7e0f0;border-radius:999px;background:#fff;color:#667085;font-size:12px;font-weight:600;line-height:1;white-space:nowrap;transition:border-color .15s,color .15s,background .15s}
+#blEntry:hover,#contractEntry:hover{border-color:#b9c9ff;background:var(--system-blue-weak);color:var(--system-blue)}
+#blEntry:focus-visible,#contractEntry:focus-visible{outline:2px solid #cdd9ff;outline-offset:1px}
+/* 数据源块头右侧：黑名单入口 + 对接数据源 + 条数 */
+.ph-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0}
+
+/* ===== 黑名单抽屉：560px / 全高 / 从右滑入 + 半透明遮罩 ===== */
+.bl-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:10000;opacity:0;pointer-events:none;transition:opacity .22s}
+.bl-mask.open{opacity:1;pointer-events:auto}
+.bl-drawer{position:fixed;top:0;right:0;width:560px;max-width:100vw;height:100vh;background:#f6f8fc;z-index:10001;display:flex;flex-direction:column;transform:translateX(102%);transition:transform .28s ease;box-shadow:-8px 0 30px rgba(15,23,42,.18)}
+.bl-drawer.open{transform:translateX(0)}
+.bl-head{display:flex;align-items:flex-start;gap:10px;padding:14px 18px;background:#fff;border-bottom:1px solid #e4eaf3;flex:0 0 auto}
+.bl-head .bh-main{flex:1 1 auto;min-width:0}
+.bl-head h3{margin:0;font-size:15px;font-weight:700;color:#1f2937;line-height:1.4}
+.bl-head .bh-sub{margin-top:2px;font-size:11.5px;color:#9aa6bd;line-height:1.5}
+.bl-head .hint{flex:0 0 auto;margin-top:6px}
+.bl-close{width:28px;height:28px;flex:0 0 auto;border:none;border-radius:6px;background:#f2f4f8;color:#475467;font-size:15px;line-height:1;margin-top:1px}
+.bl-close:hover{background:#e6eaf2}
+.bl-body{flex:1;min-height:0;overflow:auto;padding:16px 18px}
+.bl-foot{flex:0 0 auto;display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:12px 18px;background:#fff;border-top:1px solid #e4eaf3}
+.bl-drawer table.dt.bl-table th{padding:7px 8px}
+.bl-drawer table.dt.bl-table td{padding:6px 8px}
+.bl-drawer table.dt.bl-table .mono{font-size:11.5px}
+.bl-drawer .dtable{background:#fff}
+#blMask{z-index:10002}
+
+/* 面板 */
+.panel{padding:14px 16px;border:1px solid #e4edf8;border-radius:var(--radius);background:#fff;display:flex;flex-direction:column;gap:10px}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.sec-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.sec-idx{width:18px;height:18px;flex:0 0 auto;border-radius:5px;background:var(--system-blue);color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center}
+.sec-title{font-size:15px;font-weight:700;color:#1f2a44;white-space:nowrap}
+.sec-sub{font-size:11.5px;color:#9aa6bd}
+.hint{font-size:11.5px;color:#8a96ad;font-variant-numeric:tabular-nums}
+
+/* 数据表 */
+.dtable{border:1px solid #eef2f8;border-radius:8px;overflow-x:auto}
+table.dt{width:100%;min-width:640px;border-collapse:collapse;font-size:12.5px}
+table.dt.src-table{min-width:900px}
+table.dt.bl-table{min-width:0}
+table.dt.help-table{min-width:0}
+table.dt th{background:#f4f6fb;color:#7a8493;font-weight:600;font-size:11px;text-align:left;padding:8px 11px;border-bottom:1px solid #e6edf8;white-space:nowrap}
+table.dt td{padding:7px 11px;border-bottom:1px solid #eef2f8;color:#344054;vertical-align:middle}
+table.dt tbody tr:last-child td{border-bottom:0}
+table.dt tbody tr:hover td{background:#f8fbff}
+table.dt td.empty-row{color:#9aa6bd;text-align:center;padding:18px 11px}
+
+.mono{font-family:ui-monospace,Consolas,"Courier New",monospace;font-variant-numeric:tabular-nums;word-break:break-all}
+.ds-id{font-size:12px;font-weight:600;color:#273244}
+.ds-nm{font-size:12.5px;color:#273244}
+.cell-time{font-variant-numeric:tabular-nums;color:#475467;white-space:nowrap}
+.cell-mute{color:#aab4c8}
+.row-ops{display:flex;flex-wrap:wrap;gap:4px}
+
+/* 按钮 */
+.btn-primary{height:30px;padding:0 14px;border:0;border-radius:6px;background:var(--system-blue);color:#fff;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px;box-shadow:0 2px 6px rgba(65,105,246,.2);transition:all .15s}
+.btn-primary:hover{background:#335be8}
+.btn-primary:disabled{opacity:.6;cursor:not-allowed}
+.btn-mini{height:24px;padding:0 10px;border:1px solid #d7e0f0;border-radius:5px;background:#fff;color:var(--system-blue);font-size:11.5px;font-weight:600;white-space:nowrap}
+.btn-mini:hover{border-color:#b9c9ff;background:var(--system-blue-weak)}
+.btn-mini:disabled{opacity:.5;cursor:not-allowed}
+.btn-mini.sync{height:24px;border-color:var(--system-blue);background:var(--system-blue);color:#fff}
+.btn-mini.sync:hover{background:#335be8;border-color:#335be8}
+.btn-ghost{height:32px;padding:0 16px;border:1px solid #d7e0f0;border-radius:6px;background:#fff;color:#475467;font-size:13px;font-weight:600}
+.btn-ghost:hover{border-color:#b9c9ff;background:var(--system-blue-weak);color:var(--system-blue)}
+
+/* 徽章 */
+.badge{font-size:10.5px;padding:1px 7px;border-radius:9px;font-weight:600;display:inline-block;white-space:nowrap;line-height:1.7}
+.badge.ok{background:#e8f7ec;color:var(--success)}
+.badge.off{background:#eef2f7;color:#667085}
+.badge.bad{background:#fdecec;color:var(--error)}
+
+/* 弹层 */
+.modal-mask{position:fixed;inset:0;z-index:180;background:rgba(20,32,70,.36);display:none;align-items:flex-start;justify-content:center;padding:44px 16px 24px;overflow-y:auto}
+.modal-mask.open{display:flex}
+.modal{width:100%;max-width:720px;background:#fff;border:1px solid #e4edf8;border-radius:12px;box-shadow:0 20px 50px rgba(20,32,70,.26);overflow:hidden;animation:modalIn .16s ease-out}
+.modal.narrow{max-width:460px}
+.modal.wide{max-width:780px}
+@keyframes modalIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;border-bottom:1px solid #eef2f8;background:#fbfdff}
+.modal-x{width:26px;height:26px;flex-shrink:0;border:0;border-radius:6px;background:transparent;color:#8a96ad;font-size:18px;line-height:1}
+.modal-x:hover{background:#eef2fb;color:#475467}
+.modal-body{display:flex;flex-direction:column;gap:11px;padding:12px 16px 16px;max-height:72vh;overflow-y:auto}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;border-top:1px dashed #eef2f8;padding-top:12px;margin-top:2px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field > label{font-size:12px;font-weight:600;color:#475467}
+.field input{height:32px;width:100%;border:1px solid #cfd8e8;border-radius:6px;padding:0 9px;font-size:12.5px;background:#fff;color:#1f2a44;outline:none;font-family:inherit}
+.field input:focus{border-color:#8fa3ff;box-shadow:0 0 0 2px rgba(65,105,246,.12)}
+.field input::placeholder{color:#b3bccd}
+.field .field-tip{font-size:11px;color:#9aa6bd;line-height:1.4}
+.bl-drawer .bl-src{display:block;max-width:158px;margin-top:1px;font-size:11px;color:#9aa6bd;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 研发说明内容 */
+.help-lead{font-size:12.5px;color:#475467;line-height:1.75;background:var(--system-blue-weak);border:1px dashed #cdd9f5;border-radius:8px;padding:9px 12px}
+.help-lead b{color:#1f2a44;font-weight:700}
+.hb-t{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:#1f2a44;margin-bottom:6px}
+.hb-t::before{content:"";width:3px;height:12px;border-radius:2px;background:var(--system-blue)}
+.help-table th{font-size:10.5px;padding:6px 9px}
+.help-table td{padding:5px 9px;font-size:11.5px;line-height:1.55}
+.map-table{width:100%;border-collapse:collapse;font-size:11.5px}
+.map-table th{background:#f4f6fb;color:#7a8493;font-weight:600;font-size:10.5px;text-align:left;padding:6px 9px;border:1px solid #e6edf8;white-space:nowrap}
+.map-table td{padding:5px 9px;border:1px solid #eef2f8;color:#475467;line-height:1.55;vertical-align:top}
+.map-table td.mk{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:10.5px;color:#5b6472;white-space:nowrap}
+.help-note{font-size:11.5px;color:#475467;line-height:1.75;border-top:1px dashed #eef2f8;padding-top:9px}
+.help-note b{color:#1f2a44;font-weight:700}
+.help-list{margin:0;padding-left:18px;font-size:11.5px;color:#475467;line-height:1.75}
+.help-list li{margin:2px 0}
+.help-list b{color:#1f2a44;font-weight:700}
+
+/* ===== 接口对接定义：只读契约弹窗 ===== */
+.contract-lead{font-size:12px;color:#475467;line-height:1.75;background:var(--system-blue-weak);border:1px dashed #cdd9f5;border-radius:8px;padding:9px 12px}
+.contract-table{width:100%;border-collapse:collapse;font-size:11.5px}
+.contract-table th{background:#f4f6fb;color:#7a8493;font-weight:600;font-size:10.5px;text-align:left;padding:6px 9px;border:1px solid #e6edf8;white-space:nowrap}
+.contract-table td{padding:5px 9px;border:1px solid #eef2f8;color:#475467;line-height:1.6;vertical-align:top}
+.contract-table td.mk{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:11px;color:#273244;font-weight:600;white-space:nowrap}
+.struct-box{border:1px solid #eef2f8;border-radius:8px;background:#fbfdff;padding:8px 10px;display:flex;flex-direction:column;gap:3px}
+.struct-box .struct-line{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:11px;color:#365070;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+.api-list{display:flex;flex-direction:column;gap:5px;border:1px solid #eef2f8;border-radius:8px;padding:8px 10px;background:#fbfdff}
+.api-row{display:flex;align-items:baseline;gap:9px;font-size:11.5px;line-height:1.65;min-width:0}
+.api-m{flex:0 0 auto;font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:10px;font-weight:700;color:#1d4ed8;background:#eef3ff;border:1px solid #dbe5ff;border-radius:4px;padding:1px 6px}
+.api-p{flex:0 0 auto;font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:11px;font-weight:600;color:#273244;white-space:nowrap}
+.api-d{color:#7a8493;min-width:0}
+.rule-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:#475467;line-height:1.7}
+.rule-list li{position:relative;padding-left:13px}
+.rule-list li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:#f0a020}
+.rule-list b{color:#1f2a44;font-weight:700}
+
+/* ===== 测试连接：逐字段检测弹窗 ===== */
+#probeBody{display:flex;flex-direction:column;gap:11px}
+.probe-list{display:flex;flex-direction:column;border:1px solid #eef2f8;border-radius:8px;overflow:hidden;background:#fff}
+.pf-row{display:grid;grid-template-columns:16px minmax(96px,132px) 1fr;gap:8px;padding:6px 11px;border-bottom:1px solid #f1f5fa;font-size:12px;line-height:1.55}
+.pf-row:last-child{border-bottom:0}
+.pf-mark{font-weight:700;text-align:center}
+.pf-row.ok .pf-mark{color:var(--success)}
+.pf-row.bad .pf-mark{color:var(--error)}
+.pf-label{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:11.5px;font-weight:600;color:#273244;word-break:break-all}
+.pf-val{color:#475467;min-width:0;word-break:break-word}
+.pf-val .pf-miss{color:var(--error);font-weight:600}
+.probe-concl{padding:9px 12px;border-radius:7px;font-size:12px;line-height:1.75}
+.probe-concl.ok{background:#eef9f1;border:1px solid #cdebd7;color:#1e7b3c}
+.probe-concl.bad{background:#fdf0f0;border:1px solid #f7d4d5;color:#b42318}
+.probe-concl b{font-weight:700}
+.probe-loading{display:flex;align-items:center;gap:8px;padding:12px;border:1px dashed #dbe5f5;border-radius:8px;color:#667085;font-size:12px}
+.probe-loading .dot{width:7px;height:7px;border-radius:50%;background:var(--system-blue);animation:probePulse 1s ease-in-out infinite}
+@keyframes probePulse{0%,100%{opacity:.25}50%{opacity:1}}
+
+/* 字段完备列 */
+.src-table th.fc-col,.src-table td.fc-col{width:72px;white-space:nowrap}
+.src-table .badge{cursor:default}
+/* 向量化列 */
+.src-table th.vc-col,.src-table td.vc-col{width:110px;white-space:nowrap}
+.vec-num{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:11.5px;font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+.vec-num.done{color:var(--success)}
+.vec-num.part{color:var(--warning)}
+.vec-num.none{color:#aab4c8}
+
+
+.toast{position:fixed;top:56px;left:50%;transform:translateX(-50%) translateY(-12px);z-index:200;background:#2b3245;color:#fff;font-size:13px;padding:9px 18px;border-radius:7px;box-shadow:0 8px 24px rgba(20,32,70,.25);opacity:0;pointer-events:none;transition:all .2s;max-width:80vw}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#c0392b}
+.toast.ok{background:#1e8e4a}
+
+@media (max-width:1000px){
+  .content{padding:14px 14px 28px}
+  .page-head{flex-direction:column;gap:8px}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ 左侧导航（八页互通 · 本页 active，不改） ============ -->
+<aside class="sidebar">
+  <div class="nav-scroll">
+    <a class="nav-item" href="P1_检索台_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span>检索台</a>
+    <div class="nav-divider"></div>
+    <a class="nav-item admin-nav active" href="P4_库管理_v5.2_20261026.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6"/><path d="M5 12v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6"/></svg></span>数据源库管理</a>
+    <a class="nav-item admin-nav" href="P5_策略管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="10" cy="17" r="1.6"/></svg></span>策略管理</a>
+    <a class="nav-item admin-nav" href="P6_任务管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="12" height="16" rx="2"/><path d="M9 5V3.5h6V5"/><path d="M9 10h6M9 14h6M9 18h4"/></svg></span>搜索行为</a>
+    <a class="nav-item admin-nav" href="P7_结果运营_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>结果运营</a>
+    <a class="nav-item admin-nav" href="P8_评测_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="13" width="3" height="4"/><rect x="12" y="9" width="3" height="8"/><rect x="17" y="5" width="3" height="12"/></svg></span>效果评测</a>
+  </div>
+</aside>
+
+<!-- ============ 主区 ============ -->
+<div class="main">
+<div class="content">
+
+  <header class="page-head">
+    <div class="ph-main">
+      <h1>数据源库管理</h1>
+    </div>
+    <button class="dev-entry" id="devEntry" type="button" onclick="openDev()" title="研发说明"><span class="de-q" aria-hidden="true">?</span>研发说明</button>
+  </header>
+
+  <!-- ============ ① 数据源 ============ -->
+  <section class="panel" aria-label="数据源">
+    <div class="panel-head">
+      <div class="sec-head">
+        <span class="sec-idx" aria-hidden="true">1</span>
+        <span class="sec-title">数据源</span>
+      </div>
+      <div class="ph-tools">
+        <button class="btn-ghost" id="contractEntry" type="button" onclick="openContract()">接口对接定义</button>
+        <button class="btn-ghost" id="blEntry" type="button" onclick="openBl()">黑名单 (3)</button>
+        <button class="btn-primary" type="button" onclick="openSrc()">＋ 对接数据源</button>
+        <span class="hint" id="srcHint">共 0 条</span>
+      </div>
+    </div>
+    <div class="dtable">
+      <table class="dt src-table">
+        <thead>
+          <tr><th>名称</th><th>地址</th><th>状态</th><th class="fc-col">字段完备</th><th class="vc-col">向量化</th><th>上次同步</th><th>操作</th></tr>
+        </thead>
+        <tbody id="srcBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ===== 对接数据源 ===== -->
+<div class="modal-mask" id="srcMask" onclick="closeSrc(event)">
+  <div class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="srcTitle">
+    <div class="modal-head">
+      <span class="sec-title" id="srcTitle">对接数据源</span>
+      <button class="modal-x" type="button" aria-label="关闭" onclick="closeSrc()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label for="srcName">名称</label>
+        <input id="srcName" type="text" maxlength="40" placeholder="高质量数据集平台" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="srcAddr">地址</label>
+        <input id="srcAddr" type="text" maxlength="160" placeholder="http://ds-platform/api" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="modal-foot">
+        <button class="btn-ghost" type="button" onclick="closeSrc()">取消</button>
+        <button class="btn-primary" type="button" onclick="saveSrcForm()">对接</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 接口对接定义（只读契约） ===== -->
+<div class="modal-mask" id="contractMask" onclick="closeContract(event)">
+  <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="contractTitle">
+    <div class="modal-head">
+      <span class="sec-title" id="contractTitle">接口对接定义</span>
+      <button class="modal-x" type="button" aria-label="关闭" onclick="closeContract()">×</button>
+    </div>
+    <div class="modal-body">
+      <p class="contract-lead">本平台通过 HTTP 接口从上游数据集平台拉取「原始数据集」，上游只需提供原始文件与元数据，不需要提供向量。</p>
+
+      <div>
+        <div class="hb-t">数据集级字段</div>
+        <table class="contract-table">
+          <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mk">dataset_id</td><td>string</td><td>必填</td><td>数据集唯一标识</td></tr>
+            <tr><td class="mk">name</td><td>string</td><td>必填</td><td>数据集名称</td></tr>
+            <tr><td class="mk">item_count</td><td>int</td><td>必填</td><td>条目数</td></tr>
+            <tr><td class="mk">modal_types</td><td>array</td><td>可选</td><td>声明包含哪些模态，仅用于展示</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <div class="hb-t">条目级字段</div>
+        <table class="contract-table">
+          <thead>
+            <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mk">item_id</td><td>string</td><td>必填</td><td>条目唯一标识</td></tr>
+            <tr><td class="mk">modals</td><td>array</td><td>必填</td><td>1~4 个模态，每条自己声明</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <div class="hb-t">modals 每项结构</div>
+        <div class="struct-box">
+          <div class="struct-line">{ type: "image", url: "…jpg" }</div>
+          <div class="struct-line">{ type: "text",  content: "…" } 或 { type: "text", url: "…" }</div>
+          <div class="struct-line">{ type: "audio", url: "…wav" }</div>
+          <div class="struct-line">{ type: "video", url: "…mp4" }</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="hb-t">接口</div>
+        <div class="api-list">
+          <div class="api-row"><span class="api-m">GET</span><span class="api-p">{base}/datasets</span><span class="api-d">列出数据集（dataset_id / name / item_count）</span></div>
+          <div class="api-row"><span class="api-m">GET</span><span class="api-p">{base}/datasets/{id}</span><span class="api-d">数据集详情</span></div>
+          <div class="api-row"><span class="api-m">GET</span><span class="api-p">{base}/datasets/{id}/items</span><span class="api-d">条目列表（item_id / modal_type / id / url），分页</span></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="hb-t">关键约束</div>
+        <ul class="rule-list">
+          <li>每个数据集的模态构成可以不同，由条目级 <b>modals</b> 声明</li>
+          <li>同一条目下的多个模态即对齐关系，无需额外字段</li>
+          <li>缺 <b>modals</b> → 无法确定模态，不可接入</li>
+        </ul>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn-ghost" type="button" onclick="closeContract()">关闭</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 测试连接（逐字段检测） ===== -->
+<div class="modal-mask" id="probeMask" onclick="closeProbe(event)">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="probeTitle">
+    <div class="modal-head">
+      <span class="sec-title" id="probeTitle">测试连接</span>
+      <button class="modal-x" type="button" aria-label="关闭" onclick="closeProbe()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="probeBody"></div>
+      <div class="modal-foot">
+        <button class="btn-ghost" type="button" onclick="closeProbe()">关闭</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 添加黑名单（从黑名单抽屉内打开） ===== -->
+<div class="modal-mask" id="blMask" onclick="closeAddBl(event)">
+  <div class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="blTitle">
+    <div class="modal-head">
+      <span class="sec-title" id="blTitle">添加黑名单</span>
+      <button class="modal-x" type="button" aria-label="关闭" onclick="closeAddBl()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label for="blId">数据集 ID</label>
+        <input id="blId" type="text" maxlength="40" placeholder="PKG261025F9K2VB" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="blName">名称</label>
+        <input id="blName" type="text" maxlength="40" placeholder="四模态产物" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="blSrc">来源名</label>
+        <input id="blSrc" type="text" maxlength="60" placeholder="产线作业语料包v2.3" autocomplete="off" spellcheck="false">
+        <span class="field-tip">与结果页「来源」一致才生效</span>
+      </div>
+      <div class="field">
+        <label for="blAddr">地址</label>
+        <input id="blAddr" type="text" maxlength="120" placeholder="/prod/4mod/v2" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="modal-foot">
+        <button class="btn-ghost" type="button" onclick="closeAddBl()">取消</button>
+        <button class="btn-primary" type="button" onclick="saveBlForm()">添加</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 黑名单（入口在页面右上角 · 右侧抽屉 560px） ===== -->
+<div class="bl-mask" id="blDrawerMask" onclick="closeBl()"></div>
+<div class="bl-drawer" id="blDrawer" role="dialog" aria-modal="true" aria-label="黑名单">
+  <div class="bl-head">
+    <div class="bh-main">
+      <h3>黑名单</h3>
+      <p class="bh-sub">被屏蔽的数据集不出现在检索结果中</p>
+    </div>
+    <span class="hint" id="blHint">共 0 条</span>
+    <button type="button" class="bl-close" id="blDrawerClose" title="关闭（Esc）" aria-label="关闭" onclick="closeBl()">×</button>
+  </div>
+  <div class="bl-body">
+    <div class="dtable">
+      <table class="dt bl-table">
+        <thead>
+          <tr><th>数据集 ID</th><th>名称</th><th>地址</th><th>加入时间</th><th>操作</th></tr>
+        </thead>
+        <tbody id="blBody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="bl-foot">
+    <button class="btn-primary" type="button" onclick="openAddBl()">＋ 添加黑名单</button>
+  </div>
+</div>
+
+<!-- ===== 研发说明（入口在头部卡片右上角 · 右侧抽屉） ===== -->
+<div class="dev-mask" id="devMask" onclick="closeDev()"></div>
+<div class="dev-drawer" id="devDrawer" role="dialog" aria-modal="true" aria-label="研发需求说明">
+  <div class="dev-head">
+    <h3>研发需求说明</h3>
+    <span class="dh-tag">给研发</span>
+    <button type="button" class="dev-close" id="devClose" title="关闭（Esc）" aria-label="关闭" onclick="closeDev()">×</button>
+  </div>
+  <div class="dev-body dev-stack">
+      <div>
+        <div class="hb-t">一、定位</div>
+        <ul class="help-list">
+          <li>把上游的<b>数据集平台</b>对接进来，作为检索的数据来源。</li>
+          <li>不需要被检索的数据集放进<b>黑名单</b>排除掉。</li>
+          <li>本页只有两块：数据源列表 + 黑名单抽屉；接口对接定义、测试连接、对接数据源都是数据源块内的弹窗。</li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="hb-t">二、数据源</div>
+        <table class="map-table">
+          <thead>
+            <tr><th>项</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mk">名称</td><td>数据源名称，必填</td></tr>
+            <tr><td class="mk">地址</td><td>以 <b>http://</b> 或 <b>https://</b> 开头，必填</td></tr>
+            <tr><td class="mk">连接状态</td><td>已连接 / 未连接 / 连接失败</td></tr>
+            <tr><td class="mk">上次同步</td><td>最近一次同步时间，格式 yyyy-MM-dd HH:mm</td></tr>
+            <tr><td class="mk">测试连接</td><td>每行都可发起；弹窗先输出 2 行接口检测（接口可达 / 返回数据集列表），再逐字段校验 4 个必填字段（dataset_id / name / item_count / modals）；全部通过才置为已连接并补上次同步时间，缺项则接入失败、状态不变</td></tr>
+            <tr><td class="mk">字段完备</td><td>4 个必填字段的提供比例；全提供为绿色 4/4，缺项为红色如 3/4，悬浮显示缺失字段</td></tr>
+            <tr><td class="mk">向量化</td><td>已连接的数据源显示「已完成 / 总数」（如 27,930 / 27,930），全部完成为绿色，未完成橙色并悬浮显示百分比；未连接显示「—」</td></tr>
+            <tr><td class="mk">操作</td><td>每行「测试连接」；已连接的数据源额外显示「同步」，点击刷新上次同步时间</td></tr>
+            <tr><td class="mk">对接</td><td>「＋ 对接数据源」在数据源块头右上角，填名称与地址，加入列表末尾，初始为未连接</td></tr>
+            <tr><td class="mk">列表列</td><td>名称 / 地址 / 状态 / 字段完备 / 向量化 / 上次同步 / 操作，共 7 列</td></tr>
+          </tbody>
+        </table>
+        <p class="help-note">地址属于<b>部署配置</b>；对接记录存 sessionStorage.cm_datasources，刷新保持。</p>
+      </div>
+
+      <div>
+        <div class="hb-t">三、黑名单</div>
+        <table class="map-table">
+          <thead>
+            <tr><th>字段</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mk">数据集 ID</td><td>必填，且不与已有记录重复</td></tr>
+            <tr><td class="mk">名称</td><td>必填</td></tr>
+            <tr><td class="mk">来源名</td><td>必填，与结果页结果条目的「来源」同名，如 <b>产线作业语料包v2.3</b>；P2 按它做数据源级排除</td></tr>
+            <tr><td class="mk">地址</td><td>必填，数据集在数据源中的路径，如 <b>/prod/4mod/v2</b></td></tr>
+            <tr><td class="mk">加入时间</td><td>提交时自动写入，格式 yyyy-MM-dd HH:mm</td></tr>
+          </tbody>
+        </table>
+        <ul class="help-list">
+          <li><b>入口</b>：数据源块头「黑名单 (N)」，点开为右侧抽屉，N 为黑名单条数；抽屉列表列为 数据集 ID / 名称（下方带来源名）/ 地址 / 加入时间 / 操作（移出）。</li>
+          <li><b>添加</b>：「＋ 添加黑名单」填数据集 ID / 名称 / 来源名 / 地址，提交后置顶。</li>
+          <li><b>生效</b>：结果页按「来源名」匹配结果条目的来源并排除其条目；可随时移出，刷新后按最新黑名单重算。</li>
+          <li><b>存储</b>：写入 sessionStorage.cm_blacklist，数组，元素 {id,name,src,addr,time}，刷新保持。</li>
+          <li><b>空态</b>：黑名单为空。</li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="hb-t">四、接口对接定义</div>
+        <p class="help-lead">上游只提供<b>原始文件与元数据</b>，<b>不提供向量</b>。下面是拉取原始数据集所需的字段与接口。</p>
+        <table class="map-table">
+          <thead>
+            <tr><th>项</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mk">上游提供</td><td><b>原始文件与元数据</b>；向量由平台自己抽，上游不需要提供</td></tr>
+            <tr><td class="mk">数据集级</td><td>3 个必填：<b>dataset_id</b>、<b>name</b>、<b>item_count</b>；1 个可选：<b>modal_types</b>（仅用于展示）</td></tr>
+            <tr><td class="mk">条目级</td><td>2 个必填：<b>item_id</b>、<b>modals</b>（1~4 个模态，每条自己声明）</td></tr>
+            <tr><td class="mk">modals</td><td>每项 <b>{ type:"image", url }</b> / <b>{ type:"text", content 或 url }</b> / <b>{ type:"audio", url }</b> / <b>{ type:"video", url }</b></td></tr>
+            <tr><td class="mk">对齐</td><td>同一条目下的多个模态即<b>天然对齐</b>，<b>不需要</b>额外字段；契约无 align_pairs / vec_model / storage_url，上游也不提供向量</td></tr>
+            <tr><td class="mk">接口</td><td><b>GET {base}/datasets</b> 列出数据集；<b>GET {base}/datasets/{id}</b> 数据集详情；<b>GET {base}/datasets/{id}/items</b> 条目列表（分页）</td></tr>
+            <tr><td class="mk">入口</td><td>数据源块头「接口对接定义」按钮，弹窗只读展示数据集级 / 条目级字段、modals 结构、接口与关键约束</td></tr>
+            <tr><td class="mk">测试连接</td><td>先检测 2 行接口（接口可达 / 返回数据集列表），再逐项检测 4 个必填字段；全部提供才接入成功，缺任一项（含 modals 只给 type 未给 url）则接入失败、状态不变</td></tr>
+          </tbody>
+        </table>
+        <ul class="help-list">
+          <li>每个数据集的<b>模态构成可以不同</b>，由条目级 <b>modals</b> 逐条声明。</li>
+          <li>同一条目下的多个模态即对齐关系，<b>无需额外字段</b>。</li>
+          <li>缺 <b>modals</b> → 无法确定模态，<b>不可接入</b>。</li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="hb-t">五、平台侧处理</div>
+        <p class="help-lead"><b>接入 → 检测契约 → 拉取原始数据集 → 自动向量化（图文对齐 · CLIP双塔 v3）→ 写入向量库 → 可检索</b></p>
+        <ul class="help-list">
+          <li>向量由平台抽取，上游不需要提供向量。</li>
+          <li>统一向量空间固定为「图文对齐 · CLIP双塔 v3」，不可切换（见 P5 策略管理的向量参数）。</li>
+        </ul>
+      </div>
+  </div>
+</div>
+
+<script>
+/* ================= 工具 ================= */
+var toastTimer;
+function byId(id){ return document.getElementById(id); }
+function setText(id, txt){
+  var el = byId(id);
+  if(el){ el.textContent = txt; }
+}
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function p2(n){ return (n < 10 ? '0' : '') + n; }
+function nowStr(){
+  var d = new Date();
+  return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+}
+function fmtNum(n){
+  var s = String(Math.round(Number(n) || 0));
+  return s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+function toast(msg, type){
+  var t = byId('toast');
+  if(!t){ return; }
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.className = 'toast'; }, 3000);
+}
+
+/* ================= 数据源：sessionStorage.cm_datasources =================
+   元素 {name,addr,status,count,items,vecDone,syncAt}；首次打开（键不存在）用五条演示数据，
+   之后以存储为准。count 为数据集个数；items 为条目总数、vecDone 为已完成向量化的条目数，
+   已连接的源演示为全部完成，未连接的源「向量化」列显示「—」。 */
+var SRC_KEY = 'cm_datasources';
+var ITEM_TOTAL = {
+  '高质量数据集平台':27930,
+  '工业质检数据集平台':15860,
+  '财税票据数据集平台':6420
+};
+var DEFAULT_SRC = [
+  { name:'高质量数据集平台',   addr:'http://ds-platform/api',   status:'已连接',   count:8,    items:27930, vecDone:27930, syncAt:'2026-11-09 10:30' },
+  { name:'备份数据集平台',     addr:'http://ds-backup/api',     status:'未连接',   count:null, items:null,  vecDone:null,  syncAt:'' },
+  { name:'工业质检数据集平台', addr:'http://ds-industrial/api', status:'已连接',   count:12,   items:15860, vecDone:15860, syncAt:'2026-11-08 16:20' },
+  { name:'安防视频数据集平台', addr:'http://ds-security/api',   status:'连接失败', count:null, items:null,  vecDone:null,  syncAt:'' },
+  { name:'财税票据数据集平台', addr:'http://ds-finance/api',    status:'已连接',   count:5,    items:6420,  vecDone:6420,  syncAt:'2026-11-07 09:45' }
+];
+function numOrNull(v){
+  return (typeof v === 'number' && isFinite(v)) ? v : null;
+}
+function cloneSrc(it){
+  return { name:it.name, addr:it.addr, status:it.status, count:it.count, items:it.items, vecDone:it.vecDone, syncAt:it.syncAt };
+}
+function normSrc(it){
+  if(!it || typeof it !== 'object'){ return null; }
+  var name = String(it.name || '').trim();
+  var addr = String(it.addr || '').trim();
+  if(!name || !addr){ return null; }
+  var status = (it.status === '已连接' || it.status === '连接失败') ? it.status : '未连接';
+  var count = numOrNull(it.count);
+  var items = numOrNull(it.items);
+  var vecDone = numOrNull(it.vecDone);
+  if(items === null && status === '已连接' && ITEM_TOTAL[name] != null){ items = ITEM_TOTAL[name]; }
+  if(items !== null && vecDone === null){ vecDone = items; }
+  return { name:name, addr:addr, status:status, count:count, items:items, vecDone:vecDone, syncAt:String(it.syncAt || '') };
+}
+function readSrc(){
+  var raw = null;
+  try{ raw = sessionStorage.getItem(SRC_KEY); }catch(e){ raw = null; }
+  if(raw === null){ return DEFAULT_SRC.map(cloneSrc); }
+  try{
+    var v = JSON.parse(raw);
+    if(!Array.isArray(v)){ return []; }
+    var out = [];
+    for(var i = 0; i < v.length; i++){
+      var n = normSrc(v[i]);
+      if(n){ out.push(n); }
+    }
+    return out;
+  }catch(e){ return []; }
+}
+function saveSrc(){
+  try{ sessionStorage.setItem(SRC_KEY, JSON.stringify(SRC)); return true; }
+  catch(e){ return false; }
+}
+var SRC = readSrc();
+
+/* ================= 黑名单：sessionStorage.cm_blacklist =================
+   元素 {id,name,src,addr,time}；src 为数据集来源名，P2 按它与结果条目「来源」匹配后排除。
+   首次打开（键不存在）用下面两条做演示数据，之后以存储为准，空数组也照实显示空态，不再回填。 */
+var BL_KEY = 'cm_blacklist';
+var DEFAULT_BL = [
+  { id:'PKG261025F9K2VB', name:'四模态产物', src:'产线作业语料包v2.3', addr:'/prod/4mod/v2',  time:'2026-11-08 14:20' },
+  { id:'PKG261018D6R2MK', name:'对齐语料包', src:'安全帽检测视频包v3', addr:'/prod/align/v1', time:'2026-11-06 09:10' }
+];
+function cloneItem(it){
+  return { id:it.id, name:it.name, src:it.src, addr:it.addr, time:it.time };
+}
+function readBL(){
+  var raw = null;
+  try{ raw = sessionStorage.getItem(BL_KEY); }catch(e){ raw = null; }
+  if(raw === null){ return DEFAULT_BL.map(cloneItem); }
+  try{
+    var v = JSON.parse(raw);
+    if(!Array.isArray(v)){ return []; }
+    var out = [];
+    for(var i = 0; i < v.length; i++){
+      var it = v[i];
+      if(!it || !it.id){ continue; }
+      out.push({ id:String(it.id), name:String(it.name || ''), src:String(it.src || ''), addr:String(it.addr || ''), time:String(it.time || '') });
+    }
+    return out;
+  }catch(e){ return []; }
+}
+function saveBL(){
+  try{ sessionStorage.setItem(BL_KEY, JSON.stringify(BL)); return true; }
+  catch(e){ return false; }
+}
+var BL = readBL();
+
+/* ================= 渲染 ================= */
+function srcRowIndex(btn){
+  var tr = btn && btn.closest ? btn.closest('tr') : null;
+  if(!tr){ return -1; }
+  return parseInt(tr.getAttribute('data-idx'), 10);
+}
+function blIndexOf(id){
+  for(var i = 0; i < BL.length; i++){ if(BL[i].id === id){ return i; } }
+  return -1;
+}
+function statusBadge(status){
+  if(status === '已连接'){ return '<span class="badge ok">已连接</span>'; }
+  if(status === '连接失败'){ return '<span class="badge bad">连接失败</span>'; }
+  return '<span class="badge off">未连接</span>';
+}
+function vecCell(s){
+  if(!s || s.status !== '已连接'){ return '<span class="vec-num none">—</span>'; }
+  var total = (typeof s.items === 'number') ? s.items : null;
+  if(total === null){ return '<span class="vec-num none">—</span>'; }
+  var done = (typeof s.vecDone === 'number') ? s.vecDone : total;
+  var full = total === 0 ? true : done >= total;
+  var pct = total > 0 ? Math.round(done / total * 100) : 100;
+  var hint = '平台接入后自动抽取向量写入向量库，使用「图文对齐 · CLIP双塔 v3」';
+  var title = full ? hint : hint + '；已完成 ' + pct + '%';
+  return '<span class="vec-num ' + (full ? 'done' : 'part') + '" title="' + title + '">' + fmtNum(done) + ' / ' + fmtNum(total) + '</span>';
+}
+function renderSrcBody(){
+  var body = byId('srcBody');
+  if(!body){ return; }
+  if(!SRC.length){
+    body.innerHTML = '<tr><td class="empty-row" colspan="7">暂无数据源</td></tr>';
+    updateSrcHint();
+    return;
+  }
+  var html = '';
+  for(var i = 0; i < SRC.length; i++){
+    var s = SRC[i];
+    var ops = '<div class="row-ops">' +
+      '<button class="btn-mini" type="button" onclick="testSrc(this)">测试连接</button>' +
+      (s.status === '已连接' ? '<button class="btn-mini sync" type="button" onclick="syncSrc(this)">同步</button>' : '') +
+    '</div>';
+    var fc = srcCompleteness(s);
+    var fcCell = fc.missing.length
+      ? '<span class="badge bad" title="缺少：' + esc(fc.missing.join('、')) + '">' + fc.pass + '/' + fc.total + '</span>'
+      : '<span class="badge ok" title="' + fc.total + ' 个必填字段全部提供">' + fc.pass + '/' + fc.total + '</span>';
+    html += '<tr data-idx="' + i + '">' +
+      '<td><span class="ds-nm">' + esc(s.name) + '</span></td>' +
+      '<td><span class="mono">' + esc(s.addr) + '</span></td>' +
+      '<td>' + statusBadge(s.status) + '</td>' +
+      '<td class="fc-col">' + fcCell + '</td>' +
+      '<td class="vc-col">' + vecCell(s) + '</td>' +
+      '<td><span class="cell-time">' + (s.syncAt ? esc(s.syncAt) : '—') + '</span></td>' +
+      '<td>' + ops + '</td>' +
+    '</tr>';
+  }
+  body.innerHTML = html;
+  updateSrcHint();
+}
+function renderBlBody(){
+  var body = byId('blBody');
+  if(!body){ return; }
+  if(!BL.length){
+    body.innerHTML = '<tr><td class="empty-row" colspan="5">黑名单为空</td></tr>';
+    updateBlHint();
+    return;
+  }
+  var html = '';
+  for(var i = 0; i < BL.length; i++){
+    var it = BL[i];
+    html += '<tr data-id="' + esc(it.id) + '">' +
+      '<td><span class="mono ds-id">' + esc(it.id) + '</span></td>' +
+      '<td><span class="ds-nm">' + esc(it.name) + '</span>' +
+        (it.src ? '<span class="bl-src" title="' + esc(it.src) + '">来源：' + esc(it.src) + '</span>' : '') +
+      '</td>' +
+      '<td><span class="mono">' + esc(it.addr) + '</span></td>' +
+      '<td><span class="cell-time">' + esc(it.time) + '</span></td>' +
+      '<td><button class="btn-mini" type="button" onclick="removeBl(this)">移出</button></td>' +
+    '</tr>';
+  }
+  body.innerHTML = html;
+  updateBlHint();
+}
+function updateSrcHint(){ setText('srcHint', '共 ' + SRC.length + ' 条'); }
+function updateBlHint(){
+  setText('blHint', '共 ' + BL.length + ' 条');
+  setText('blEntry', '黑名单 (' + BL.length + ')');
+}
+function renderAll(){
+  renderSrcBody();
+  renderBlBody();
+}
+
+/* ================= 数据源：必填字段 / 测试连接 =================
+   上游只给原始内容与元数据；向量由平台用「图文对齐 · CLIP双塔 v3」抽取。
+   数据集级 3 必填 + 1 可选，条目级 2 必填；检测只校验 4 个必填项。 */
+var REQUIRED_FIELDS = [
+  { key:'dataset_id' },
+  { key:'name'       },
+  { key:'item_count' },
+  { key:'modals'     }
+];
+var PROBE_MAP = {
+  '高质量数据集平台':   { count:8,  itemTotal:27930, modalsDesc:'单条目 1~4 个模态', missing:[] },
+  '工业质检数据集平台': { count:12, itemTotal:15860, modalsDesc:'单条目 1~2 个模态', missing:[] },
+  '财税票据数据集平台': { count:5,  itemTotal:6420,  modalsDesc:'单条目 1~2 个模态', missing:[] },
+  '备份数据集平台':     { count:6,  itemTotal:null,  modalsDesc:'', missing:['item_count','modals'] },
+  '安防视频数据集平台': { count:4,  itemTotal:null,  modalsDesc:'', missing:['modals'], modalsNote:'只给了 type，未提供 url' }
+};
+function probeProfile(s){
+  var p = (s && PROBE_MAP[s.name]) || null;
+  if(p){ return p; }
+  return {
+    count: (s && typeof s.count === 'number') ? s.count : 6,
+    itemTotal:1200,
+    modalsDesc:'单条目 1~2 个模态',
+    missing:[]
+  };
+}
+function srcCompleteness(s){
+  var p = probeProfile(s);
+  var missing = p.missing || [];
+  return { pass:REQUIRED_FIELDS.length - missing.length, total:REQUIRED_FIELDS.length, missing:missing };
+}
+function fieldProbeValue(f, p){
+  var missing = p.missing || [];
+  if(missing.indexOf(f.key) >= 0){
+    if(f.key === 'modals'){ return p.modalsNote ? p.modalsNote : '未提供'; }
+    return '未提供';
+  }
+  if(f.key === 'item_count'){ return '已提供（合计 ' + fmtNum(p.itemTotal) + ' 条）'; }
+  if(f.key === 'modals'){ return '已提供（' + p.modalsDesc + '）'; }
+  return '已提供';
+}
+function buildProbe(s){
+  var p = probeProfile(s);
+  var rows = [
+    { ok:true, key:'接口可达', val:s.addr },
+    { ok:true, key:'返回数据集列表', val:p.count + ' 个数据集' }
+  ];
+  for(var i = 0; i < REQUIRED_FIELDS.length; i++){
+    var f = REQUIRED_FIELDS[i];
+    var miss = (p.missing || []).indexOf(f.key) >= 0;
+    rows.push({ ok:!miss, key:f.key, val:fieldProbeValue(f, p) });
+  }
+  return { rows:rows, missing:p.missing || [], count:p.count, itemTotal:p.itemTotal, ok:!(p.missing && p.missing.length) };
+}
+
+var probeTimer = null;
+function testSrc(btn){
+  var idx = srcRowIndex(btn);
+  var s = SRC[idx];
+  if(!s || (btn && btn.disabled)){ return; }
+  if(btn){ btn.disabled = true; btn.textContent = '测试中…'; }
+  openProbe(s);
+}
+function openProbe(s){
+  if(probeTimer){ clearTimeout(probeTimer); probeTimer = null; }
+  var t = byId('probeTitle');
+  if(t){ t.textContent = '测试连接 · ' + s.name; }
+  var body = byId('probeBody');
+  if(body){ body.innerHTML = '<div class="probe-loading"><span class="dot"></span>正在逐字段检测…</div>'; }
+  var mask = byId('probeMask');
+  if(mask){ mask.classList.add('open'); }
+  probeTimer = setTimeout(function(){ probeTimer = null; runProbe(s); }, 800);
+}
+function runProbe(s){
+  var r = buildProbe(s);
+  renderProbeResult(r);
+  if(r.ok){
+    s.status = '已连接';
+    s.syncAt = nowStr();
+    if(typeof r.count === 'number'){ s.count = r.count; }
+    if(typeof r.itemTotal === 'number'){ s.items = r.itemTotal; s.vecDone = r.itemTotal; }
+    saveSrc();
+    renderSrcBody();
+    toast('连接成功，已开始向量化', 'ok');
+  }else{
+    saveSrc();
+    renderSrcBody();
+    toast('接入失败：缺少 ' + r.missing.length + ' 个必填字段', 'err');
+  }
+}
+function renderProbeResult(r){
+  var html = '<div class="probe-list">';
+  for(var i = 0; i < r.rows.length; i++){
+    var row = r.rows[i];
+    html += '<div class="pf-row ' + (row.ok ? 'ok' : 'bad') + '">' +
+      '<span class="pf-mark" aria-hidden="true">' + (row.ok ? '✓' : '✗') + '</span>' +
+      '<span class="pf-label">' + esc(row.key) + '</span>' +
+      '<span class="pf-val">' + esc(row.val) + '</span>' +
+    '</div>';
+  }
+  html += '</div>';
+  if(r.ok){
+    html += '<div class="probe-concl ok"><b>结论：接入成功</b> —— ' + r.count + ' 个数据集已接入，开始向量化。</div>';
+  }else{
+    html += '<div class="probe-concl bad"><b>结论：接入失败</b> —— 上游缺少 ' + r.missing.length + ' 个必填字段（' + esc(r.missing.join('、')) + '），补齐后可重新测试。</div>';
+  }
+  var body = byId('probeBody');
+  if(body){ body.innerHTML = html; }
+}
+function closeProbe(ev){
+  if(ev && ev.target && ev.target.closest && ev.target.closest('.modal')){ return; }
+  if(probeTimer){ clearTimeout(probeTimer); probeTimer = null; }
+  var mask = byId('probeMask');
+  if(mask){ mask.classList.remove('open'); }
+  renderSrcBody();
+}
+function syncSrc(btn){
+  var idx = srcRowIndex(btn);
+  var s = SRC[idx];
+  if(!s || s.status !== '已连接' || (btn && btn.disabled)){ return; }
+  if(btn){ btn.disabled = true; btn.textContent = '同步中…'; }
+  setTimeout(function(){
+    s.syncAt = nowStr();
+    saveSrc();
+    renderSrcBody();
+    toast('已同步 ' + (s.count == null ? 0 : s.count) + ' 个数据集', 'ok');
+  }, 700);
+}
+
+/* ================= 数据源：对接弹窗 ================= */
+function clearSrcForm(){
+  var a = byId('srcName'), b = byId('srcAddr');
+  if(a){ a.value = ''; }
+  if(b){ b.value = ''; }
+}
+function openSrc(){
+  clearSrcForm();
+  var mask = byId('srcMask');
+  if(mask){ mask.classList.add('open'); }
+  var a = byId('srcName');
+  if(a){ setTimeout(function(){ try{ a.focus(); }catch(e){} }, 30); }
+}
+function closeSrc(ev){
+  if(ev && ev.target && ev.target.closest && ev.target.closest('.modal')){ return; }
+  var mask = byId('srcMask');
+  if(mask){ mask.classList.remove('open'); }
+  clearSrcForm();
+}
+function saveSrcForm(){
+  var a = byId('srcName'), b = byId('srcAddr');
+  var name = a ? a.value.trim() : '';
+  var addr = b ? b.value.trim() : '';
+  if(!name){
+    toast('请填写名称', 'err');
+    if(a){ a.focus(); }
+    return;
+  }
+  if(!addr){
+    toast('请填写地址', 'err');
+    if(b){ b.focus(); }
+    return;
+  }
+  if(!/^https?:\/\//i.test(addr)){
+    toast('地址需以 http:// 或 https:// 开头', 'err');
+    if(b){ b.focus(); }
+    return;
+  }
+  if(/\s/.test(addr)){
+    toast('地址中不能有空格', 'err');
+    if(b){ b.focus(); }
+    return;
+  }
+  SRC.push({ name:name, addr:addr, status:'未连接', count:null, items:null, vecDone:null, syncAt:'' });
+  saveSrc();
+  renderSrcBody();
+  closeSrc();
+  toast('已对接数据源', 'ok');
+}
+
+/* ================= 黑名单抽屉（页头入口 + 右侧抽屉） ================= */
+function syncScrollLock(){
+  var d1 = byId('devDrawer'), d2 = byId('blDrawer');
+  var open = (d1 && d1.classList.contains('open')) || (d2 && d2.classList.contains('open'));
+  document.body.style.overflow = open ? 'hidden' : '';
+}
+function openBl(){
+  var d = byId('blDrawer'), m = byId('blDrawerMask');
+  renderBlBody();
+  if(d){ d.classList.add('open'); }
+  if(m){ m.classList.add('open'); }
+  syncScrollLock();
+}
+function closeBl(){
+  var d = byId('blDrawer'), m = byId('blDrawerMask');
+  if(d){ d.classList.remove('open'); }
+  if(m){ m.classList.remove('open'); }
+  syncScrollLock();
+}
+
+/* ================= 黑名单：添加 / 移出 ================= */
+function clearBlForm(){
+  var a = byId('blId'), b = byId('blName'), s = byId('blSrc'), c = byId('blAddr');
+  if(a){ a.value = ''; }
+  if(b){ b.value = ''; }
+  if(s){ s.value = ''; }
+  if(c){ c.value = ''; }
+}
+function openAddBl(){
+  clearBlForm();
+  var mask = byId('blMask');
+  if(mask){ mask.classList.add('open'); }
+  var a = byId('blId');
+  if(a){ setTimeout(function(){ try{ a.focus(); }catch(e){} }, 30); }
+}
+function closeAddBl(ev){
+  if(ev && ev.target && ev.target.closest && ev.target.closest('.modal')){ return; }
+  var mask = byId('blMask');
+  if(mask){ mask.classList.remove('open'); }
+  clearBlForm();
+}
+function saveBlForm(){
+  var a = byId('blId'), b = byId('blName'), s = byId('blSrc'), c = byId('blAddr');
+  var id = a ? a.value.trim() : '';
+  var name = b ? b.value.trim() : '';
+  var src = s ? s.value.trim() : '';
+  var addr = c ? c.value.trim() : '';
+  if(!id){
+    toast('请填写数据集 ID', 'err');
+    if(a){ a.focus(); }
+    return;
+  }
+  if(!name){
+    toast('请填写名称', 'err');
+    if(b){ b.focus(); }
+    return;
+  }
+  if(!src){
+    toast('请填写来源名', 'err');
+    if(s){ s.focus(); }
+    return;
+  }
+  if(!addr){
+    toast('请填写地址', 'err');
+    if(c){ c.focus(); }
+    return;
+  }
+  if(blIndexOf(id) >= 0){
+    toast('该数据集已在黑名单', 'err');
+    return;
+  }
+  BL.unshift({ id:id, name:name, src:src, addr:addr, time:nowStr() });
+  saveBL();
+  renderBlBody();
+  closeAddBl();
+  toast('已加入黑名单', 'ok');
+}
+function removeBl(btn){
+  var tr = btn && btn.closest ? btn.closest('tr') : null;
+  if(!tr){ return; }
+  var id = tr.getAttribute('data-id') || '';
+  var i = blIndexOf(id);
+  if(i < 0){ return; }
+  BL.splice(i, 1);
+  saveBL();
+  renderBlBody();
+  toast('已移出黑名单', 'ok');
+}
+
+/* ================= 接口对接定义（只读契约） ================= */
+function openContract(){
+  var mask = byId('contractMask');
+  if(mask){ mask.classList.add('open'); }
+}
+function closeContract(ev){
+  if(ev && ev.target && ev.target.closest && ev.target.closest('.modal')){ return; }
+  var mask = byId('contractMask');
+  if(mask){ mask.classList.remove('open'); }
+}
+
+/* ================= 研发说明抽屉（八页统一：头部胶囊入口 + 右侧抽屉） ================= */
+function openDev(){
+  var d = byId('devDrawer'), m = byId('devMask');
+  if(d){ d.classList.add('open'); }
+  if(m){ m.classList.add('open'); }
+  syncScrollLock();
+}
+function closeDev(){
+  var d = byId('devDrawer'), m = byId('devMask');
+  if(d){ d.classList.remove('open'); }
+  if(m){ m.classList.remove('open'); }
+  syncScrollLock();
+}
+
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){
+    var m1 = byId('blMask');
+    if(m1 && m1.classList.contains('open')){ closeAddBl(); }
+    var d1 = byId('blDrawer');
+    if(d1 && d1.classList.contains('open')){ closeBl(); }
+    var m2 = byId('srcMask');
+    if(m2 && m2.classList.contains('open')){ closeSrc(); }
+    var m3 = byId('probeMask');
+    if(m3 && m3.classList.contains('open')){ closeProbe(); }
+    var m4 = byId('contractMask');
+    if(m4 && m4.classList.contains('open')){ closeContract(); }
+    closeDev();
+  }
+});
+
+/* ===== 初始化 ===== */
+renderAll();
+
+/* ===== 系统门户桥接（index.html 壳用，单页直开无副作用） ===== */
+(function(){
+  try{
+    if(window.parent && window.parent !== window){
+      window.parent.postMessage({type:'sys-page', page:'P4', name:'数据源库管理'}, '*');
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

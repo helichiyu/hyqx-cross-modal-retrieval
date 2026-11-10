@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>搜索结果摘要 · 跨模态检索中心</title>
+<style>
+:root{
+  /* 清爽冷白蓝 token（与 P1 定稿基准一致） */
+  --workspace-bg:#f6f9fe;
+  --module-bg:#f3f8ff;
+  --content-card:#ffffff;
+  --content-soft:#fbfdff;
+  --content-line:#e6edf8;
+  --content-line-strong:#d9e7f8;
+  --system-blue:#4169f6;
+  --system-blue-weak:#f1f5ff;
+  --ink:#1f2937;
+  --muted:#667085;
+  --success:#34a853;
+  --error:#e5484d;
+  --text-primary:#262626;
+  --text-secondary:#8c8c8c;
+  --radius:8px;
+  --shadow-card:0 2px 8px rgba(31,58,122,.05);
+  --shadow-pop:0 10px 22px rgba(64,80,112,.14);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--workspace-bg);
+  color:var(--text-primary);
+  font-size:14px;
+  line-height:1.5;
+  display:flex;
+}
+button{font-family:inherit;cursor:pointer}
+::selection{background:rgba(65,105,246,.16)}
+
+/* ============ 左侧全局导航（壳层，与 P1 一致） ============ */
+.sidebar{
+  width:220px;flex-shrink:0;
+  background:#fff;border-right:1px solid var(--content-line);
+  display:flex;flex-direction:column;
+  height:100vh;position:sticky;top:0;
+}
+.brand{
+  padding:18px 18px 14px;
+  display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid var(--content-line);
+}
+.brand .logo{
+  width:30px;height:30px;border-radius:7px;flex-shrink:0;
+  background:linear-gradient(135deg,#4169f6,#6e8cff);
+  display:grid;place-items:center;color:#fff;font-size:15px;font-weight:700;
+}
+.brand b{font-size:14px;color:#16204a;display:block;line-height:1.25}
+.brand span{font-size:11px;color:var(--text-secondary)}
+.nav-scroll{flex:1;overflow-y:auto;padding:10px 12px}
+.nav-item{
+  display:flex;align-items:center;gap:9px;
+  padding:9px 10px;margin-bottom:2px;
+  border-radius:6px;color:#344054;font-size:13px;
+  cursor:pointer;user-select:none;text-decoration:none;
+}
+.nav-item .ico{width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:#8a96ad;flex-shrink:0}
+.nav-item .ico svg{width:16px;height:16px;display:block}
+.nav-item.active .ico{color:var(--system-blue)}
+.nav-item:hover{background:var(--system-blue-weak);color:var(--system-blue)}
+.nav-item.active{
+  background:var(--system-blue-weak);color:var(--system-blue);font-weight:600;
+  box-shadow:inset 2px 0 0 var(--system-blue);
+}
+.nav-divider{height:1px;background:var(--content-line);margin:8px 10px}
+
+/* ============ 主区 ============ */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+
+.content{padding:20px 24px 32px;display:flex;flex-direction:column;gap:16px;max-width:1280px;width:100%;margin:0 auto}
+.card{border:1px solid #e4edf8;border-radius:var(--radius);background:#fff}
+
+.module-intro{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:18px 20px;
+  border:1px solid #e4edf8;
+  border-radius:10px;
+  background:#fff;
+}
+.module-intro h2{font-size:20px;font-weight:700;color:#111827;display:flex;align-items:center;gap:10px}
+
+.sec-head{display:flex;align-items:center;gap:8px}
+.sec-head .sec-title{font-size:15px;font-weight:700;color:#1f2a44}
+.sec-head .sec-sub{font-size:12px;color:#9aa6bd}
+.sec-head::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--system-blue)}
+
+/* 重放标注条（面包屑下方、任务信息上方） */
+.replay-bar{
+  display:flex;flex-direction:column;gap:2px;
+  padding:9px 12px;margin-bottom:12px;
+  border:1px solid #f0dfb2;border-radius:7px;background:#fffbf0;
+  font-size:12px;line-height:1.6;color:#8a6a1f;
+}
+.replay-bar .rp-main{font-weight:700;color:#8a5a00}
+.replay-bar b{color:#8a5a00;font-weight:700;font-variant-numeric:tabular-nums}
+
+.btn-primary{
+  height:34px;padding:0 20px;border:0;border-radius:6px;
+  background:var(--system-blue);color:#fff;font-size:13px;font-weight:600;
+  display:inline-flex;align-items:center;gap:7px;text-decoration:none;
+  box-shadow:0 3px 8px rgba(65,105,246,.25);transition:all .15s;
+}
+.btn-primary:hover{background:#335be8;box-shadow:0 4px 12px rgba(65,105,246,.32)}
+.btn-primary:disabled{opacity:.45;box-shadow:none;cursor:not-allowed}
+.btn-primary:disabled:hover{background:var(--system-blue);box-shadow:none}
+
+.badge{font-size:11px;padding:2px 9px;border-radius:10px;font-weight:600;display:inline-block}
+.badge.ok{background:#e8f7ec;color:var(--success)}
+.badge.fail{background:#fdecec;color:var(--error)}
+
+/* 任务信息卡 */
+.task-card{padding:16px 18px}
+.tc-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.tc-crumb{font-size:12.5px;color:var(--muted)}
+.tc-crumb a{color:var(--system-blue);text-decoration:none}
+.tc-crumb a:hover{text-decoration:underline}
+.task-card .sec-head{margin-bottom:12px}
+.tc-grid{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 18px;
+  padding:13px 14px;border:1px solid #eaf0f9;border-radius:8px;background:var(--content-soft);
+}
+.tc-field .k{font-size:11px;color:#9aa6bd;margin-bottom:3px}
+.tc-field .v{font-size:13px;color:#1f2a44;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-field .v.mono{font-family:var(--mono);font-size:14px;letter-spacing:.3px;user-select:all}
+
+/* 结果摘要 */
+.sum-card{padding:16px 18px}
+.sum-wrap{margin-top:12px;border:1px solid #eef2f8;border-radius:8px;overflow:auto;background:#fff}
+.sum-table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:720px}
+.sum-table th{
+  padding:9px 12px;background:#f4f6fb;color:#7a8493;
+  font-size:11.5px;font-weight:700;text-align:left;white-space:nowrap;
+}
+.sum-table td{
+  padding:9px 12px;border-top:1px solid #eef2f8;
+  font-size:12.5px;color:#475467;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.sum-table tbody tr:hover{background:#f9fbff}
+.sum-table tbody tr.is-checked{background:#f4f8ff}
+.sum-table th.c-rank,.sum-table td.c-rank{width:56px;color:#8a96ad;font-variant-numeric:tabular-nums}
+.sum-table th.c-id,.sum-table td.c-id{width:162px}
+.sum-table th.c-sim,.sum-table td.c-sim{width:82px}
+.sum-table th.c-sel,.sum-table td.c-sel{width:56px;text-align:center}
+.sum-table td.c-id .mono{font-family:var(--mono);font-size:12px;color:#1f2a44;letter-spacing:.2px}
+.sum-table td.c-name{color:#1f2a44;font-weight:600}
+.sum-table td.c-sim b{font-size:13px;font-weight:700;color:var(--system-blue);font-variant-numeric:tabular-nums}
+.sum-ck{
+  -webkit-appearance:none;appearance:none;width:15px;height:15px;vertical-align:middle;
+  border:1.5px solid #c3d0e8;border-radius:4px;background:#fff;cursor:pointer;position:relative;
+}
+.sum-ck:checked{background:var(--system-blue);border-color:var(--system-blue)}
+.sum-ck:checked::after{
+  content:"✓";position:absolute;inset:0;display:grid;place-items:center;
+  color:#fff;font-size:10px;font-weight:700;line-height:1;
+}
+.sum-ck:focus-visible{outline:2px solid #cdd9ff;outline-offset:1px}
+.sum-ck:disabled{border-color:#dbe2ef;background:#f3f6fb;cursor:not-allowed}
+.sum-ck:disabled:checked{background:#b9c6e6;border-color:#b9c6e6}
+.sealed-tip{display:none;font-size:12px;color:#98a2b3;white-space:nowrap}
+.btn-primary.is-sealed,.btn-primary.is-sealed:hover{background:#c2ccdd;color:#fff;box-shadow:none;opacity:1;cursor:not-allowed}
+
+.sum-empty{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin-top:12px;padding:13px 15px;
+  border:1px solid #f3c4c6;border-radius:8px;background:#fff7f7;
+  font-size:12.5px;color:#8c5560;
+}
+.sum-empty b{color:#b42318;font-weight:700}
+/* 未找到摘要：中性空态，与失败态区分 */
+.sum-empty.is-none{border-color:#e4edf8;background:#fbfdff;color:#475467}
+.sum-empty.is-none b{color:#1f2a44}
+.sum-empty .sum-sub{font-size:12px;color:#98a2b3}
+.st-link{font-size:12.5px;color:var(--system-blue);text-decoration:none;border-bottom:1px dashed #aebdf5;margin-left:auto;white-space:nowrap}
+.st-link:hover{border-bottom-style:solid}
+
+.sum-foot{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding-top:12px;margin-top:10px;border-top:1px solid #eef2f8;
+}
+.sel-info{font-size:12.5px;color:var(--muted)}
+.sel-info b{color:#1f2a44;font-weight:700;font-variant-numeric:tabular-nums;margin:0 2px}
+.sum-foot .btn-primary{margin-left:auto}
+
+/* toast */
+.toast{
+  position:fixed;top:56px;left:50%;transform:translateX(-50%) translateY(-12px);
+  z-index:200;background:#2b3245;color:#fff;font-size:13px;
+  padding:9px 18px;border-radius:7px;box-shadow:0 8px 24px rgba(20,32,70,.25);
+  opacity:0;pointer-events:none;transition:all .2s;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.ok{background:#1e8e4a}
+
+/* ===== 研发说明入口（八页统一：头部胶囊按钮 + 右侧抽屉） ===== */
+.dev-entry{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px 0 5px;border:1px solid #d7e0f0;border-radius:999px;background:#fff;color:#667085;font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+.dev-entry:hover{border-color:#b9c9ff;background:var(--system-blue-weak);color:var(--system-blue)}
+.dev-entry:hover .de-q{background:var(--system-blue);color:#fff}
+.dev-entry:focus-visible{outline:2px solid #cdd9ff;outline-offset:1px}
+.dev-entry .de-q{width:20px;height:20px;border-radius:50%;flex:0 0 auto;background:var(--system-blue-weak);color:var(--system-blue);font-size:12px;font-weight:700;line-height:20px;text-align:center;transition:background .15s,color .15s}
+/* 右侧抽屉：520px / 全高 / 从右滑入 + 半透明遮罩 */
+.dev-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:10000;opacity:0;pointer-events:none;transition:opacity .22s}
+.dev-mask.open{opacity:1;pointer-events:auto}
+.dev-drawer{position:fixed;top:0;right:0;width:720px;max-width:100vw;height:100vh;background:#f6f8fc;z-index:10001;display:flex;flex-direction:column;transform:translateX(102%);transition:transform .28s ease;box-shadow:-8px 0 30px rgba(15,23,42,.18)}
+.dev-drawer.open{transform:translateX(0)}
+.dev-head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:#fff;border-bottom:1px solid #e4eaf3;flex:0 0 auto}
+.dev-head h3{margin:0;font-size:15px;color:#1f2937}
+.dev-head .dh-tag{font-size:11px;font-weight:600;color:#b54708;background:#fdf3e6;border-radius:4px;padding:2px 8px}
+.dev-close{margin-left:auto;width:28px;height:28px;border:none;background:#f2f4f8;border-radius:6px;font-size:15px;line-height:1;cursor:pointer;color:#475467;flex:0 0 auto}
+.dev-close:hover{background:#e6eaf2}
+.dev-body{flex:1;min-height:0;overflow:auto;padding:16px 18px 36px}
+.dev-ov{background:#fff;border:1px solid #e4eaf3;border-radius:10px;padding:12px 14px;margin-bottom:12px}
+.dev-ov h4{margin:0 0 5px;font-size:12.5px;color:var(--system-blue)}
+.dev-ov p{margin:0;line-height:1.7;color:#475467;font-size:12px}
+.dev-card{background:#fff;border:1px solid #e4eaf3;border-radius:10px;margin-bottom:12px;overflow:hidden;scroll-margin-top:12px}
+.dc-head{display:flex;align-items:center;gap:7px;padding:10px 14px;background:#fbfcfe;border-bottom:1px solid #eef2f8;flex-wrap:wrap}
+.dc-id{font-size:11px;font-weight:700;color:#fff;background:#b54708;border-radius:4px;padding:1px 7px;flex:0 0 auto}
+.dc-id.blue{background:#1f5fd4}
+.dc-name{font-size:13px;font-weight:700;color:#1f2937}
+.dc-body{padding:6px 14px 12px}
+.dc-row{display:flex;gap:10px;padding:6px 0;border-bottom:1px dashed #f0f3f8;font-size:12px;line-height:1.7}
+.dc-row:last-child{border-bottom:none}
+.dc-k{flex:0 0 74px;font-weight:700;color:#344054}
+.dc-v{flex:1;color:#475467}
+.dc-v ul{margin:0;padding-left:16px}
+.dc-v li{margin:2px 0}
+.k-in .dc-k{color:#027a48}.k-out .dc-k{color:#1f5fd4}.k-err .dc-k{color:#c0362c}.k-dep .dc-k{color:#7a5af8}
+.dev-xref{color:#1f5fd4;font-weight:700;text-decoration:none;border-bottom:1px dashed #9dbcf5;padding:0 1px;white-space:nowrap}
+.dev-xref:hover{background:#eaf1fe;border-bottom-style:solid}
+
+@media (max-width:1100px){
+  .tc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ 左侧导航（八页互通 · 搜索结果摘要不在导航，无 active 项） ============ -->
+<aside class="sidebar">
+    <div class="nav-scroll">
+    <a class="nav-item" href="P1_检索台_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span>检索台</a>
+    <div class="nav-divider"></div>
+    <a class="nav-item admin-nav" href="P4_库管理_v5.2_20261026.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6"/><path d="M5 12v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6"/></svg></span>数据源库管理</a>
+    <a class="nav-item admin-nav" href="P5_策略管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="10" cy="17" r="1.6"/></svg></span>策略管理</a>
+    <a class="nav-item admin-nav" href="P6_任务管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="12" height="16" rx="2"/><path d="M9 5V3.5h6V5"/><path d="M9 10h6M9 14h6M9 18h4"/></svg></span>搜索行为</a>
+    <a class="nav-item admin-nav" href="P7_结果运营_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>结果运营</a>
+    <a class="nav-item admin-nav" href="P8_评测_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="13" width="3" height="4"/><rect x="12" y="9" width="3" height="8"/><rect x="17" y="5" width="3" height="12"/></svg></span>效果评测</a>
+  </div>
+</aside>
+
+<!-- ============ 主区 ============ -->
+<div class="main">
+
+  <div class="content">
+
+    <section class="module-intro">
+      <div>
+        <h2>搜索结果摘要</h2>
+      </div>
+      <button class="dev-entry" id="devEntry" type="button" onclick="openDev()" title="研发说明"><span class="de-q" aria-hidden="true">?</span>研发说明</button>
+    </section>
+
+    <!-- 任务信息 -->
+    <section class="card task-card">
+      <div class="tc-top">
+        <span class="tc-crumb"><a href="P6_任务管理_v5.0_20261025.html">搜索行为</a> / 搜索结果摘要</span>
+      </div>
+      <div class="replay-bar" id="replayBar" style="display:none">
+        <div class="rp-main">⟳ 重放结果 · 当时 <b id="rpWas">130</b> 条 → 现在 <b id="rpNow">127</b> 条</div>
+      </div>
+      <div class="sec-head"><span class="sec-title">任务信息</span></div>
+      <div class="tc-grid">
+        <div class="tc-field"><div class="k">任务号</div><div class="v mono" id="fTaskId">—</div></div>
+        <div class="tc-field"><div class="k">搜索词</div><div class="v" id="fQuery">—</div></div>
+        <div class="tc-field"><div class="k">模态对</div><div class="v" id="fPair">—</div></div>
+        <div class="tc-field"><div class="k">检索策略</div><div class="v" id="fStg">—</div></div>
+        <div class="tc-field"><div class="k">时间</div><div class="v" id="fTime">—</div></div>
+        <div class="tc-field"><div class="k">结果数（当时）</div><div class="v" id="fCount">—</div></div>
+        <div class="tc-field"><div class="k">状态</div><div class="v"><span class="badge" id="fStatus">—</span></div></div>
+        <div class="tc-field"><div class="k">记录方式</div><div class="v" id="fStore">轻量摘要（Top-20）· 保留 30 天</div></div>
+      </div>
+    </section>
+
+    <!-- 结果摘要 -->
+    <section class="card sum-card">
+      <div class="sec-head"><span class="sec-title" id="sumTitle">结果摘要（Top-20 / 共 127 条）</span></div>
+      <div class="sum-wrap" id="sumWrap">
+        <table class="sum-table">
+          <thead>
+            <tr>
+              <th class="c-rank" scope="col">排名</th>
+              <th class="c-id" scope="col">条目 ID</th>
+              <th class="c-name" scope="col">名称</th>
+              <th class="c-sim" scope="col">相似度</th>
+              <th class="c-sel" scope="col">勾选</th>
+            </tr>
+          </thead>
+          <tbody id="sumRows"></tbody>
+        </table>
+      </div>
+      <div class="sum-empty" id="sumEmpty" style="display:none">
+        <span><b>本次运行失败</b>，未生成结果摘要</span>
+        <span id="failReason">—</span>
+        <a class="st-link" id="failLink" href="P6_任务管理_v5.0_20261025.html?task=TASK261024K7M2PQ&amp;tab=fail">查看失败任务</a>
+      </div>
+      <div class="sum-empty is-none" id="sumNotFound" style="display:none">
+        <span><b>未找到该任务的摘要</b></span>
+        <span class="sum-sub">摘要仅保留 30 天，或该任务已过期</span>
+      </div>
+      <div class="sum-foot" id="sumFoot">
+        <span class="sel-info">已选 <b id="selCount">0</b> 条</span>
+        <span class="sealed-tip" id="sealedTip">已提交，不可重复标记</span>
+        <button class="btn-primary" id="markBtn" type="button" onclick="markMismatch()" disabled>标记不匹配</button>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 研发需求说明（入口在头部卡片右上角 · 右侧抽屉） -->
+<div class="dev-mask" id="devMask" onclick="closeDev()"></div>
+<div class="dev-drawer" id="devDrawer" role="dialog" aria-modal="true" aria-label="研发需求说明">
+  <div class="dev-head">
+    <h3>研发需求说明</h3>
+    <span class="dh-tag">给研发</span>
+    <button type="button" class="dev-close" id="devClose" title="关闭（Esc）" aria-label="关闭" onclick="closeDev()">×</button>
+  </div>
+  <div class="dev-body">
+      <div class="dev-card" id="dc-ov">
+        <div class="dc-head"><span class="dc-id blue">总览</span><span class="dc-name">页面定位 / 记录口径 / 闭环 / 重放</span></div>
+        <div class="dc-body">
+          <div class="dev-ov"><h4>本页定位【设计】</h4><p>搜索结果摘要页，由两块组成：任务信息（任务号、状态、当时条件、检索策略与结果数）+ 结果摘要（Top-20）。</p></div>
+          <div class="dev-ov"><h4>记录口径【研发】</h4><p>搜索结果只存 Top-20 摘要（条目 ID + 名称 + 分数），不存图片本体。用途＝判断匹配度、勾选不匹配条目 → 提交到结果运营做反馈处理。摘要保留 30 天，30 天后过期；只保留任务记录里的条数与赞踩汇总。</p></div>
+          <div class="dev-ov"><h4>页面闭环【研发】</h4><p><a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">搜索行为</a> 任务列表「详情」进入 → 本页任务信息 / 结果摘要 → 勾选不匹配 → 「标记不匹配」写入反馈单，<a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">结果运营</a> 读取并处理。</p></div>
+          <div class="dev-ov"><h4>重放与编号【研发】</h4><p>?replay=1 或 ?from=replay 时顶部显示重放条：当时 ?was=（缺省取任务记录条数）→ 现在本次重放条数，结果摘要展示本次重放的摘要条目；?task= 载入任务，摘要优先读会话存储 <code>cm_task_summary</code>（键=任务号，值含 q / time / n / pair / stg / thr / items）。有记录时展示真实任务信息与摘要表；无记录时显示「未找到该任务的摘要」空态，不复用其他任务记录；仅 TASK261025A3F9KX / TASK261024K7M2PQ 两个内置演示任务号在无记录时保留演示摘要。任务 TASK / 条目 ITM 等宽可复制；本页为页内模拟，不请求真实引擎。</p></div>
+        </div>
+      </div>
+      <div class="dev-card" id="dc-info">
+        <div class="dc-head"><span class="dc-id">核心</span><span class="dc-name">任务信息</span></div>
+        <div class="dc-body">
+          <div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">展示任务号、状态与当时的检索条件、检索策略、结果数、记录方式。</div></div>
+          <div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">从 <a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">搜索行为</a> 任务列表「详情」进入（携 ?task=）。</div></div>
+          <div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>任务记录：任务号、搜索词、模态对、检索策略（策略 ID 或名称）、时间、结果数（当时）、状态；记录方式固定为轻量摘要。</li></ul></div></div>
+          <div class="dc-row"><div class="dc-k">处理规则</div><div class="dc-v">按 ?task= 载入；优先读 <code>cm_task_summary</code>，有记录用其中的 q / time / n / pair / stg / thr 与 items 渲染（结果数（当时）取 n）；无记录且不是内置演示任务时显示「未找到该任务的摘要」空态。?replay=1 或 ?from=replay 时显示重放条，当时条数取 ?was=（缺省摘要条数），现在条数取本次摘要条数。</div></div>
+          <div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>任务信息卡内 8 项字段（任务号 / 搜索词 / 模态对 / 检索策略 / 时间 / 结果数（当时）/ 状态 / 记录方式）+（重放时）重放条</li></ul></div></div>
+          <div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v">优先读 <code>cm_task_summary</code>；无记录且 ?task= 不是内置演示任务号时显示「未找到该任务的摘要」空态（不复用其他任务记录），任务号仍显示 URL 中的真实任务号，封存按真实任务号判定；失败任务同样展示任务信息。</div></div>
+          <div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">成功 / 失败 / 未找到摘要。</div></div>
+          <div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=<a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">搜索行为</a> 任务列表与结果页写入的摘要；下游=结果摘要区。</div></div>
+          <div class="dc-row"><div class="dc-k">检查点</div><div class="dc-v">任务号、状态均在任务信息卡内（不在面包屑行），任务号为等宽字体且可整段复制；检索策略显示摘要里的策略 ID 或名称（取不到显示「—」）；记录方式文案为「轻量摘要（Top-20）· 保留 30 天」；?task= 正确载入；无摘要的未知任务显示空态、不出现演示数据；重放条当时/现在条数正确。</div></div>
+        </div>
+      </div>
+      <div class="dev-card" id="dc-sum">
+        <div class="dc-head"><span class="dc-id">核心</span><span class="dc-name">结果摘要</span></div>
+        <div class="dc-body">
+          <div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">展示本次检索的 Top-20 摘要条目，支持勾选不匹配条目并标记，提交后进入结果运营反馈处理。</div></div>
+          <div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">任务信息卡下方常驻。</div></div>
+          <div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>摘要条目（结果页写入的 items，最多 20 条）：排名、条目 ID、名称、相似度；本次摘要的实际条数。</li></ul></div></div>
+          <div class="dc-row"><div class="dc-k">处理规则</div><div class="dc-v"><ul><li>按相似度降序渲染摘要条目；有摘要时标题为「结果摘要（共 N 条）」，N = items 条数。</li><li>勾选实时更新「已选 N 条」，0 条时「标记不匹配」禁用。</li><li>点「标记不匹配」→ 勾选条目写入会话存储的反馈单（cm_mismatch_feedbacks），每条含 id / task / q / items[{id,name}] / time / cls:'标记不匹配' / judge:'data' / st:'待处理' / src:'结果摘要'；任务号记入 cm_marked_tasks 并封存本页，toast「已提交 N 条不匹配记录」。</li><li>封存后勾选框与按钮全部禁用、按钮变灰；加载时任务号已在 cm_marked_tasks 内则直接封存。</li><li>无摘要且不是内置演示任务号时显示空态，不渲染演示摘要。</li></ul></div></div>
+          <div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>摘要表（N 行）+ 已选计数 + 反馈单落盘 + 封存态</li></ul></div></div>
+          <div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>失败任务未生成结果摘要：只展示失败原因与「查看失败任务」，不显示表格与勾选。</li><li>无 cm_task_summary 记录且不是内置演示任务号：显示「未找到该任务的摘要」+「摘要仅保留 30 天，或该任务已过期」，不复用其他任务记录。</li><li>名称超长省略并保留 title；勾选为空时不产生标记动作。</li></ul></div></div>
+          <div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">有摘要 / 未生成 / 未找到摘要。</div></div>
+          <div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=任务记录、结果页写入的 cm_task_summary 与本次重放；下游=<a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">结果运营</a>（勾选条目的反馈处理入口）。</div></div>
+          <div class="dc-row"><div class="dc-k">检查点</div><div class="dc-v">有摘要时按 items 行数渲染（结果页 12 条即 12 行）；演示任务无摘要时保持 20 行；相似度降序；已选计数与按钮可用态一致；提交后复选框全部禁用、按钮变灰并显示「已提交，不可重复标记」，重复标记不再产生记录；<a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">结果运营</a> 列表最前出现「query · 标记不匹配 N 条」。</div></div>
+        </div>
+      </div>
+  </div>
+</div>
+
+<script>
+/* ================= 示例数据（成功 / 失败演示任务） ================= */
+var TASKS = {
+  'TASK261025A3F9KX': {
+    id:'TASK261025A3F9KX',
+    query:'含发票代码的扫描件',
+    pair:'文搜图',
+    stg:'训练取样检索策略 v3',
+    status:'成功',
+    statusCls:'ok',
+    time:'2026-10-25 00:30',
+    count:130,
+    now:127,
+    failReason:'',
+    summary:[
+      {id:'ITM261025A3F9KX', name:'增值税专用发票_扫描件_20261012.jpg', sim:0.94},
+      {id:'ITM261025B7X2Q9', name:'机动车销售统一发票_票面_01.jpg', sim:0.92},
+      {id:'ITM261025C4M8T2', name:'电子发票_全电票_代码校验截图.png', sim:0.91},
+      {id:'ITM261025D9P3W7', name:'发票代码区_局部放大_01.png', sim:0.89},
+      {id:'ITM261025E6R2Y5', name:'增值税普通发票_卷式_扫描_003.jpg', sim:0.87},
+      {id:'ITM261025F3N7K8', name:'发票_骑缝章_票面平铺_02.jpg', sim:0.86},
+      {id:'ITM261025G8T4H6', name:'专用发票_发票号码_清晰版.jpg', sim:0.84},
+      {id:'ITM261025H5W9M3', name:'发票扫描页_倾斜校正后_005.jpg', sim:0.82},
+      {id:'ITM261025J2K6P4', name:'发票查验结果_网页截图_20261015.png', sim:0.81},
+      {id:'ITM261025K7Q3R9', name:'发票清单_打印件_财务归档.jpg', sim:0.79},
+      {id:'ITM261025L4Z8N2', name:'报销单_附发票粘贴_01.jpg', sim:0.76},
+      {id:'ITM261025M9V5X7', name:'费用报销凭证_装订_扫描.jpg', sim:0.74},
+      {id:'ITM261025N6B2C8', name:'付款申请单_审批签字_02.jpg', sim:0.73},
+      {id:'ITM261025P3D7F5', name:'采购合同_首末页_扫描.png', sim:0.71},
+      {id:'ITM261025Q8G4H9', name:'营业执照_副本_复印件.jpg', sim:0.70},
+      {id:'ITM261025R5J9K3', name:'身份证_人像面_复印件_01.jpg', sim:0.68},
+      {id:'ITM261025S2L6M7', name:'手写收据_便签_拍照.jpg', sim:0.67},
+      {id:'ITM261025T7N3P8', name:'财务室团建_海边合影_01.jpg', sim:0.65},
+      {id:'ITM261025U4Q8R2', name:'海边礁石_视频帧.png', sim:0.63},
+      {id:'ITM261025V9S5T6', name:'海景_日出_海南.jpg', sim:0.61}
+    ]
+  },
+  'TASK261024K7M2PQ': {
+    id:'TASK261024K7M2PQ',
+    query:'窗口办事人员操作特写',
+    pair:'文搜视频',
+    stg:'系统默认策略（兜底） v3',
+    status:'失败',
+    statusCls:'fail',
+    time:'2026-10-24 17:50',
+    count:0,
+    now:0,
+    failReason:'执行等待 30 秒仍未返回结果，自动重试 1 次仍失败，判定为检索服务超时。',
+    summary:[]
+  }
+};
+
+/* 演示任务：仅用于无摘要时的演示；未知任务号不再回落 */
+var DEFAULT_ID = 'TASK261025A3F9KX';
+var state = { taskId: DEFAULT_ID, replay:false, was:null, sealed:false, q:'', items:[] };
+var toastTimer;
+function byId(id){ return document.getElementById(id); }
+function demoTask(){
+  var t = TASKS[state.taskId];
+  return (t && t.id) ? t : null;
+}
+
+/* ================= 结果摘要：优先读结果页落盘的 cm_task_summary ================= */
+var SUMMARY_KEY = 'cm_task_summary';
+function loadSummary(taskId){
+  try{
+    var all = JSON.parse(sessionStorage.getItem(SUMMARY_KEY) || '{}');
+    return (all && typeof all === 'object' && all[taskId]) ? all[taskId] : null;
+  }catch(e){ return null; }
+}
+function escHtml(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(ch){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
+  });
+}
+function simText(v){
+  var x = Number(v);
+  return isFinite(x) ? x.toFixed(2) : '—';
+}
+
+/* ================= 标记不匹配：会话存储（结果运营读取同源同会话数据） ================= */
+var MK_FEED_KEY = 'cm_mismatch_feedbacks';
+var MK_TASK_KEY = 'cm_marked_tasks';
+
+function readStore(key){
+  try{
+    var raw = sessionStorage.getItem(key);
+    if(!raw){ return []; }
+    var v = JSON.parse(raw);
+    return Array.isArray(v) ? v : [];
+  }catch(e){ return []; }
+}
+function writeStore(key, arr){
+  try{ sessionStorage.setItem(key, JSON.stringify(arr)); return true; }
+  catch(e){ return false; }
+}
+function isMarkedTask(taskId){
+  var list = readStore(MK_TASK_KEY);
+  for(var i = 0; i < list.length; i++){ if(list[i] === taskId){ return true; } }
+  return false;
+}
+function pad2(n){ return (n < 10 ? '0' : '') + n; }
+function nowMinute(){
+  var d = new Date();
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) +
+    ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+}
+function newFbId(){
+  var d = new Date();
+  return 'FBK' + String(d.getFullYear()).slice(2) + pad2(d.getMonth() + 1) + pad2(d.getDate()) +
+    Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+function toast(msg, type){
+  var t = byId('toast');
+  if(!t){ return; }
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.className = 'toast'; }, 2600);
+}
+
+/* ================= 结果摘要表 ================= */
+function fillTable(items){
+  var body = byId('sumRows');
+  body.innerHTML = (items || []).map(function(it, i){
+    var id = String((it && it.id) || '');
+    var name = String((it && it.name) || '');
+    var tip = (it && it.src) ? String(it.src) + (it.mod ? ' · ' + it.mod : '') : name;
+    return '<tr data-id="' + escHtml(id) + '">' +
+      '<td class="c-rank">' + (i + 1) + '</td>' +
+      '<td class="c-id"><span class="mono">' + escHtml(id) + '</span></td>' +
+      '<td class="c-name" title="' + escHtml(tip) + '">' + escHtml(name) + '</td>' +
+      '<td class="c-sim"><b>' + simText(it && it.sim) + '</b></td>' +
+      '<td class="c-sel"><input type="checkbox" class="sum-ck" value="' + escHtml(id) + '" aria-label="勾选第 ' + (i + 1) + ' 条 ' + escHtml(name) + '"></td>' +
+      '</tr>';
+  }).join('');
+  updateSel();
+  applySealState();
+}
+function showTable(title, items){
+  byId('sumTitle').textContent = title;
+  byId('sumWrap').style.display = 'block';
+  byId('sumFoot').style.display = 'flex';
+  byId('sumEmpty').style.display = 'none';
+  byId('sumNotFound').style.display = 'none';
+  fillTable(items);
+}
+function showFail(t){
+  byId('sumTitle').textContent = '结果摘要（未生成）';
+  byId('sumRows').innerHTML = '';
+  byId('sumWrap').style.display = 'none';
+  byId('sumFoot').style.display = 'none';
+  byId('sumNotFound').style.display = 'none';
+  byId('sumEmpty').style.display = 'flex';
+  byId('failReason').textContent = t.failReason || '';
+  byId('failLink').href = 'P6_任务管理_v5.0_20261025.html?task=' + encodeURIComponent(state.taskId) + '&tab=fail';
+  updateSel();
+}
+function showNotFound(){
+  byId('sumTitle').textContent = '结果摘要（未找到）';
+  byId('sumRows').innerHTML = '';
+  byId('sumWrap').style.display = 'none';
+  byId('sumFoot').style.display = 'none';
+  byId('sumEmpty').style.display = 'none';
+  byId('sumNotFound').style.display = 'flex';
+  updateSel();
+}
+
+function updateSel(){
+  var n = document.querySelectorAll('#sumRows .sum-ck:checked').length;
+  byId('selCount').textContent = n;
+  byId('markBtn').disabled = (n === 0);
+}
+
+/* 封存态：勾选框全禁用、按钮置灰、显示不可重复标记提示 */
+function applySealState(){
+  var tip = byId('sealedTip');
+  var btn = byId('markBtn');
+  if(!state.sealed){
+    if(tip){ tip.style.display = 'none'; }
+    if(btn){ btn.classList.remove('is-sealed'); }
+    return;
+  }
+  var cks = document.querySelectorAll('#sumRows .sum-ck');
+  for(var i = 0; i < cks.length; i++){ cks[i].disabled = true; }
+  if(btn){ btn.disabled = true; btn.classList.add('is-sealed'); }
+  if(tip){ tip.style.display = 'inline'; }
+}
+
+function markMismatch(){
+  if(state.sealed){ toast('已提交，不可重复标记'); return; }
+  var cks = document.querySelectorAll('#sumRows .sum-ck:checked');
+  if(!cks.length){ return; }
+
+  /* 标记条目带上名称：{id, name}，名称取当前摘要表，便于结果运营看出是哪条数据 */
+  var items = [];
+  for(var i = 0; i < cks.length; i++){
+    var itemId = String(cks[i].value || '');
+    var itemName = '';
+    for(var n = 0; n < state.items.length; n++){
+      if(state.items[n].id === itemId){ itemName = String(state.items[n].name || ''); break; }
+    }
+    items.push({id:itemId, name:itemName});
+  }
+
+  var feed = readStore(MK_FEED_KEY);
+  feed.push({
+    id: newFbId(),
+    task: state.taskId,
+    q: state.q,
+    items: items,
+    time: nowMinute(),
+    cls: '标记不匹配',
+    judge: 'data',
+    st: '待处理',
+    src: '结果摘要'
+  });
+  if(!writeStore(MK_FEED_KEY, feed)){ toast('本地存储不可用，提交未保存', 'err'); return; }
+
+  var marked = readStore(MK_TASK_KEY);
+  if(!isMarkedTask(state.taskId)){
+    marked.push(state.taskId);
+    writeStore(MK_TASK_KEY, marked);
+  }
+  state.sealed = true;
+
+  for(i = 0; i < cks.length; i++){
+    cks[i].checked = false;
+    var tr = cks[i].closest('tr');
+    if(tr){ tr.classList.remove('is-checked'); }
+  }
+  updateSel();
+  applySealState();
+  toast('已提交 ' + items.length + ' 条不匹配记录', 'ok');
+}
+
+/* ================= 渲染 ================= */
+function setField(id, text, title){
+  var el = byId(id);
+  if(!el) return;
+  el.textContent = (text == null || text === '') ? '—' : String(text);
+  el.title = title || '';
+}
+function setStatus(text, cls){
+  var el = byId('fStatus');
+  el.className = 'badge ' + cls;
+  el.textContent = text;
+}
+function renderRealSummary(s){
+  var items = Array.isArray(s.items) ? s.items : [];
+  var n = items.length;
+  state.q = String(s.q || '');
+  state.items = items;
+  var thr = Number(s.thr);
+  var thrTxt = isFinite(thr) ? '相似度阈值 ≥ ' + thr.toFixed(2) : '';
+
+  setField('fTaskId', state.taskId);
+  setField('fQuery', s.q);
+  setField('fPair', s.pair);
+  setField('fStg', s.stg, thrTxt);
+  setField('fTime', s.time);
+  setField('fCount', n);
+  setStatus('成功', 'ok');
+
+  var bar = byId('replayBar');
+  if(bar){ bar.style.display = state.replay ? 'flex' : 'none'; }
+  if(state.replay){
+    byId('rpWas').textContent = (state.was || n);
+    byId('rpNow').textContent = n;
+  }
+  showTable('结果摘要（共 ' + n + ' 条）', items);
+}
+function renderDemo(t){
+  state.q = String(t.query || '');
+  state.items = Array.isArray(t.summary) ? t.summary : [];
+
+  setField('fTaskId', state.taskId);
+  setField('fQuery', t.query);
+  setField('fPair', t.pair);
+  setField('fStg', t.stg || '系统默认策略（兜底） v3');
+  setField('fTime', t.time);
+  setField('fCount', (t.status === '成功') ? t.count : '—');
+  setStatus(t.status, t.statusCls);
+
+  var ok = (t.status === '成功');
+  var bar = byId('replayBar');
+  if(bar){ bar.style.display = (state.replay && ok) ? 'flex' : 'none'; }
+  if(state.replay && ok){
+    byId('rpWas').textContent = (state.was || t.count);
+    byId('rpNow').textContent = t.now;
+  }
+  if(ok){ showTable('结果摘要（Top-20 / 共 ' + t.now + ' 条）', t.summary); }
+  else{ showFail(t); }
+}
+function renderNotFound(){
+  state.q = '';
+  state.items = [];
+  setField('fTaskId', state.taskId);
+  setField('fQuery', '');
+  setField('fPair', '');
+  setField('fStg', '');
+  setField('fTime', '');
+  setField('fCount', '');
+  setStatus('未找到', 'fail');
+  var bar = byId('replayBar');
+  if(bar){ bar.style.display = 'none'; }
+  showNotFound();
+}
+function render(){
+  var sum = loadSummary(state.taskId);
+  var demo = demoTask();
+  if(sum && typeof sum === 'object' && !Array.isArray(sum)){
+    renderRealSummary(sum);
+  }else if(demo){
+    renderDemo(demo);
+  }else{
+    renderNotFound();
+  }
+}
+
+/* ================= URL 参数：?task= / ?replay=1 或 ?from=replay / ?was= ================= */
+(function(){
+  var qs = new URLSearchParams(location.search);
+  var tk = qs.get('task');
+  if(tk){ state.taskId = tk; }
+  state.replay = (qs.get('replay') === '1' || qs.get('from') === 'replay');
+  var was = parseInt(qs.get('was'), 10);
+  state.was = (isFinite(was) && was > 0) ? was : null;
+  state.sealed = isMarkedTask(state.taskId);
+})();
+
+/* 勾选变更：行高亮 + 已选计数 + 按钮可用态 */
+document.getElementById('sumRows').addEventListener('change', function(e){
+  var el = e.target;
+  if(!el || !el.classList || !el.classList.contains('sum-ck')){ return; }
+  var tr = el.closest('tr');
+  if(tr){ tr.classList.toggle('is-checked', el.checked); }
+  updateSel();
+});
+
+render();
+
+/* ===== 系统门户桥接（index.html 壳用，单页直开无副作用）sysBridge v2 ===== */
+(function(){
+  try{
+    if(window.parent && window.parent!==window){
+      window.parent.postMessage({type:'sys-page',page:'P3',name:'搜索结果摘要'},'*');
+    }
+  }catch(e){}
+})();
+
+/* ===== 研发说明抽屉（八页统一：头部胶囊入口 + 右侧 720px 抽屉） ===== */
+function openDev(){
+  var d = document.getElementById('devDrawer'), m = document.getElementById('devMask');
+  if(d) d.classList.add('open');
+  if(m) m.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeDev(){
+  var d = document.getElementById('devDrawer'), m = document.getElementById('devMask');
+  if(d) d.classList.remove('open');
+  if(m) m.classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeDev(); });
+</script>
+</body>
+</html>

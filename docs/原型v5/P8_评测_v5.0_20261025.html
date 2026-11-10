@@ -1,0 +1,2002 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>效果评测 · 跨模态检索中心</title>
+<style>
+:root{
+  --workspace-bg:#f6f9fe;
+  --content-line:#e6edf8;
+  --system-blue:#4169f6;
+  --system-blue-weak:#f1f5ff;
+  --success:#1e8e4a;
+  --error:#c0392b;
+  --text-primary:#262626;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Mono",Consolas,"Liberation Mono",monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--workspace-bg);
+  color:var(--text-primary);
+  font-size:14px;
+  line-height:1.55;
+  display:flex;
+}
+button{font-family:inherit;cursor:pointer}
+button[disabled]{cursor:default}
+a{color:inherit;text-decoration:none}
+::selection{background:rgba(65,105,246,.16)}
+[hidden]{display:none !important}
+
+/* ============ 左侧全局导航（壳层，未改） ============ */
+.sidebar{
+  width:220px;flex-shrink:0;
+  background:#fff;border-right:1px solid var(--content-line);
+  display:flex;flex-direction:column;
+  height:100vh;position:sticky;top:0;
+}
+.nav-scroll{flex:1;overflow-y:auto;padding:14px 12px}
+.nav-item{
+  display:flex;align-items:center;gap:9px;
+  padding:9px 10px;margin-bottom:2px;border-radius:6px;color:#344054;font-size:13px;
+  cursor:pointer;user-select:none;
+}
+.nav-item .ico{width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:#8a96ad;flex-shrink:0}
+.nav-item .ico svg{width:16px;height:16px;display:block}
+.nav-item:hover{background:var(--system-blue-weak);color:var(--system-blue)}
+.nav-item.active{
+  background:var(--system-blue-weak);color:var(--system-blue);font-weight:600;
+  box-shadow:inset 2px 0 0 var(--system-blue);
+}
+.nav-item.active .ico{color:var(--system-blue)}
+.nav-divider{height:1px;background:var(--content-line);margin:8px 10px}
+
+/* ============ 主区 ============ */
+.main{flex:1;min-width:0;height:100vh;overflow-y:auto}
+.content{padding:22px 28px 40px;display:flex;flex-direction:column;gap:14px;max-width:1180px;width:100%;margin:0 auto}
+
+/* 页头 = 评测块头：标题 + 右上动作 */
+.page-head{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  padding:15px 18px;
+  border:1px solid #e4edf8;
+  border-radius:10px;
+  background:#fff;
+}
+.page-head h1{font-size:20px;font-weight:700;color:#111827;line-height:1.3}
+.ph-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* 按钮体系 */
+.btn-primary{
+  height:34px;padding:0 18px;border:0;border-radius:6px;
+  background:var(--system-blue);color:#fff;font-size:13px;font-weight:600;
+  display:inline-flex;align-items:center;gap:7px;
+  box-shadow:0 3px 8px rgba(65,105,246,.25);transition:all .15s;
+}
+.btn-primary:hover{background:#335be8;box-shadow:0 4px 12px rgba(65,105,246,.32)}
+.btn-primary[disabled]{opacity:.5;box-shadow:none;background:#a8b6f7;cursor:default}
+.btn-ghost{
+  height:32px;padding:0 16px;border-radius:6px;border:1px solid #d7e0f0;
+  background:#fff;color:#475467;font-size:12.5px;display:inline-flex;align-items:center;gap:6px;
+  flex:0 0 auto;white-space:nowrap;
+}
+.btn-ghost:hover{border-color:var(--system-blue);color:var(--system-blue)}
+
+/* ============ 评测表格 + 搜索 + 分页 ============ */
+.eval-panel{
+  border:1px solid #e4edf8;border-radius:10px;background:#fff;
+  box-shadow:0 1px 2px rgba(31,58,122,.04);overflow:hidden;
+}
+/* 列表标题行：竖条 + 标题（统计只放分页器，标题行右侧不重复） */
+.eval-head{
+  display:flex;align-items:center;padding:13px 18px;min-height:48px;
+  border-bottom:1px solid #eef2f8;
+}
+.eval-head h2{
+  display:flex;align-items:center;gap:8px;
+  font-size:15px;font-weight:700;color:#1f2a44;line-height:1.4;
+}
+.eval-head h2::before{
+  content:"";width:3px;height:14px;border-radius:2px;background:var(--system-blue);flex:0 0 auto;
+}
+.eval-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid #eef2f8}
+.eval-tools .eval-search{width:260px;max-width:100%;margin:0}
+.eval-table-wrap{overflow-x:auto}
+.eval-tbl{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12.5px;min-width:1000px}
+.eval-tbl th{
+  padding:9px 14px;background:#f6f8fc;color:#8c98ad;font-size:11.5px;font-weight:600;
+  text-align:left;border-bottom:1px solid #e6edf8;white-space:nowrap;vertical-align:middle;
+}
+.eval-tbl td{
+  padding:10px 14px;border-top:1px solid #eef2f8;color:#475467;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;
+}
+.eval-tbl tbody tr:first-child td{border-top:0}
+.eval-tbl tbody tr:hover td{background:#f8fbff}
+/* 已劣化的行整行浅红底，便于扫读（不改变任何数据） */
+.eval-tbl tbody tr.row-bad td{background:#fdf6f5}
+.eval-tbl tbody tr.row-bad:hover td{background:#fbeeec}
+.eval-tbl .num{text-align:center}
+.eval-tbl th:nth-child(1),.eval-tbl td:nth-child(1){width:auto;min-width:180px}
+.eval-tbl th:nth-child(2),.eval-tbl td:nth-child(2){width:260px}
+.eval-tbl th:nth-child(3),.eval-tbl td:nth-child(3){width:80px}
+.eval-tbl th:nth-child(4),.eval-tbl td:nth-child(4){width:200px}
+.eval-tbl th:nth-child(5),.eval-tbl td:nth-child(5){width:96px}
+.eval-tbl th:nth-child(6),.eval-tbl td:nth-child(6){width:200px}
+.ev-q{font-weight:600;color:#273244}
+.ev-q span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-idx{color:#98a2b3;font-weight:400;font-family:var(--mono);font-size:11px;margin-right:6px}
+.ev-ops{text-align:right;white-space:nowrap}
+.eval-tbl th.ev-ops-h{text-align:right}
+.ev-ops .btn-ghost{height:28px;padding:0 10px;font-size:12px;margin-left:6px}
+.ev-empty{text-align:center !important;color:#9aa6bd !important;padding:40px 14px !important;font-size:12.5px}
+.eval-pager{padding:12px 14px;border-top:1px solid #f2f5fa}
+
+/* ============ 回归劣化阻断：列表筛选 / 结论小标 / 对比提示 ============ */
+.v-filter{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.v-chip{
+  height:26px;padding:0 10px;border:1px solid #dde4f0;border-radius:999px;
+  background:#fff;color:#5b6577;font-size:12px;display:inline-flex;align-items:center;gap:5px;
+  white-space:nowrap;transition:all .15s;
+}
+.v-chip b{font-weight:700;font-variant-numeric:tabular-nums;color:#8a96ad}
+.v-chip:hover{border-color:#b9c9ff;color:var(--system-blue)}
+.v-chip.is-on{background:var(--system-blue-weak);border-color:#b9c9ff;color:var(--system-blue);font-weight:600}
+.v-chip.is-on b{color:var(--system-blue)}
+.v-chip.bad.is-on{background:#fdf1ef;border-color:#f3c8c1;color:#b3261e}
+.v-chip.bad.is-on b{color:#b3261e}
+.v-chip.ok.is-on{background:#eef8f2;border-color:#c6e6d3;color:#177a3f}
+.v-chip.ok.is-on b{color:#177a3f}
+.v-chip.none.is-on{background:#f4f5f8;border-color:#dfe3ea;color:#5b6577}
+.eval-hint{margin-left:auto;font-size:11.5px;color:#98a2b3;white-space:nowrap;font-variant-numeric:tabular-nums}
+.v-badge{
+  display:inline-block;font-size:11.5px;font-weight:600;line-height:1.7;
+  padding:0 8px;border-radius:4px;white-space:nowrap;
+}
+.v-badge.bad{background:#fdecea;border:1px solid #f5cdc8;color:#a93226}
+.v-badge.ok{background:#eaf7ef;border:1px solid #cfe9da;color:#177a3f}
+.v-badge.none{background:#f2f4f8;border:1px solid #e4e8ef;color:#8c98ad}
+.regress{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:12.5px;line-height:1.6}
+.regress.bad{background:#fdf4f3;border:1px solid #f6d8d4;color:#a93226}
+.regress.ok{background:#f1faf4;border:1px solid #d5eedf;color:#177a3f}
+.regress-line{font-weight:700;font-variant-numeric:tabular-nums}
+.regress-line .rg-ico{margin-right:5px}
+.regress-tip{margin-top:3px;font-size:12px;font-weight:400;color:#8a3a31}
+.regress.ok .rg-ico{margin-right:5px}
+@media (max-width:760px){
+  .eval-hint{margin-left:0;width:100%;white-space:normal}
+}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ============ 难例样本集（自动汇总） ============ */
+.sample-block{
+  position:relative;border:1px solid #e4edf8;border-radius:10px;background:#fff;
+  box-shadow:0 1px 2px rgba(31,58,122,.04);overflow:visible;
+}
+.sb-head{
+  display:flex;align-items:center;gap:8px;
+  padding:13px 18px;border-bottom:1px solid #eef2f8;min-height:48px;
+}
+.sb-head h2{font-size:15px;font-weight:700;color:#1f2a44;line-height:1.4}
+.sb-q{
+  width:18px;height:18px;flex:0 0 auto;margin-left:auto;padding:0;border:1px solid #d7e0f0;border-radius:50%;
+  background:#fff;color:#8c98ad;font-size:11px;font-weight:700;line-height:1;
+  display:inline-flex;align-items:center;justify-content:center;transition:all .15s;
+}
+.sb-q:hover,.sb-q[aria-expanded="true"]{border-color:#b9c9ff;background:var(--system-blue-weak);color:var(--system-blue)}
+.sb-help{
+  position:absolute;top:52px;left:18px;z-index:6;width:440px;max-width:calc(100% - 36px);
+  background:#fff;border:1px solid #dbe4f5;border-radius:8px;padding:12px 14px;
+  box-shadow:0 10px 30px rgba(20,32,70,.14);
+}
+.sb-help p{font-size:12px;color:#5b6577;line-height:1.7}
+.sb-help p + p{margin-top:6px}
+.sb-help b{color:#344054}
+.sb-help code{font-family:var(--mono);font-size:10.5px;color:#475467;background:#f2f5fa;border-radius:4px;padding:1px 5px}
+.sb-scroll{overflow-x:auto;border-radius:0 0 10px 10px}
+.sb-tbl{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}
+.sb-tbl th{
+  padding:8px 14px;background:#f6f8fc;color:#8c98ad;font-size:11.5px;font-weight:600;
+  text-align:left;border-bottom:1px solid #e6edf8;white-space:nowrap;
+}
+.sb-tbl td{
+  padding:10px 14px;border-bottom:1px solid #eef2f8;color:#344054;
+  vertical-align:middle;line-height:1.6;
+}
+.sb-tbl tbody tr:last-child td{border-bottom:0}
+.sb-tbl tbody tr:hover td{background:#f8fbff}
+.sb-tbl .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sb-tbl th:nth-child(1),.sb-tbl td:nth-child(1){width:21%}
+.sb-tbl th:nth-child(2),.sb-tbl td:nth-child(2){width:35%}
+.sb-tbl th:nth-child(3),.sb-tbl td:nth-child(3){width:13%}
+.sb-tbl th:nth-child(4),.sb-tbl td:nth-child(4){width:14%}
+.sb-tbl th:nth-child(5),.sb-tbl td:nth-child(5){width:17%}
+.sb-q-cell{
+  font-weight:600;color:#273244;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.sb-items{color:#475467}
+/* 被踩条目：只显示一行、超出省略号；完整列表挂 title，悬浮可看全部 */
+.sample-items{
+  display:-webkit-box;
+  -webkit-line-clamp:1;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:normal;
+  line-height:1.6;
+  word-break:break-all;
+}
+.sb-item{color:#475467}
+.sb-count{font-weight:700;color:#a93226}
+.sb-time{font-family:var(--mono);font-size:11.5px;color:#667085}
+.sb-op{text-align:right;white-space:nowrap}
+.sb-add{
+  height:26px;padding:0 11px;border:1px solid #c9d6ff;border-radius:5px;
+  background:#f5f8ff;color:var(--system-blue);font-size:12px;font-weight:600;
+  white-space:nowrap;transition:all .15s;
+}
+.sb-add:hover{background:var(--system-blue);border-color:var(--system-blue);color:#fff}
+.sb-add:focus-visible{outline:2px solid #cdd9ff;outline-offset:1px}
+.sb-done{
+  height:26px;padding:0 10px;border:1px solid #eef1f6;border-radius:5px;
+  background:#f5f6f9;color:#a3adc0;font-size:12px;white-space:nowrap;cursor:default;
+}
+.sb-empty{text-align:center;color:#9aa6bd;padding:34px 14px !important;font-size:12.5px}
+
+/* 难例样本集分页器（与 P6 / P7 同款：共 N 条 · 上一页 · 页码 · 下一页） */
+.pager-bar{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;font-size:12px;color:#667085}
+.pager-total{color:#8a96ad;margin-right:4px;font-variant-numeric:tabular-nums}
+.pager-btn,.pager-num{height:28px;border:1px solid #d7e0f0;background:#fff;border-radius:5px;color:#475467;font-size:12px;cursor:pointer;font-family:inherit}
+.pager-btn{padding:0 10px}
+.pager-num{min-width:28px;padding:0 6px;font-variant-numeric:tabular-nums}
+.pager-btn:hover:not(:disabled),.pager-num:hover:not(.is-cur){border-color:var(--system-blue);color:var(--system-blue)}
+.pager-btn:disabled{opacity:.45;cursor:not-allowed}
+.pager-num.is-cur{background:var(--system-blue);border-color:var(--system-blue);color:#fff;font-weight:700;cursor:default}
+.pager-gap{color:#98a2b3;padding:0 2px}
+.sb-pager{padding:12px 18px 14px;border-top:1px solid #f2f5fa;background:#fff;border-radius:0 0 10px 10px}
+
+/* ============ 评测列表标题行右侧次按钮 ============ */
+.eval-head .btn-ghost{margin-left:auto;height:28px;padding:0 12px;font-size:12px}
+@media (max-width:760px){
+  .eval-head{gap:8px;flex-wrap:wrap}
+  .eval-head .btn-ghost{margin-left:0}
+}
+
+/* ============ 评测数据检查（4 项只读） ============ */
+.chk-sum{display:flex;align-items:center;gap:7px;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:700;line-height:1.5;margin-bottom:8px}
+.chk-sum.ok{background:#f1faf4;border:1px solid #d5eedf;color:#177a3f}
+.chk-sum.warn{background:#fdf6ef;border:1px solid #f5e0c8;color:#b25e09}
+.chk-list{display:flex;flex-direction:column}
+.chk-item{display:flex;align-items:flex-start;gap:9px;padding:10px 2px;border-bottom:1px solid #f2f5fa}
+.chk-item:last-child{border-bottom:0}
+.chk-ico{flex:0 0 auto;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:700;line-height:16px;text-align:center;margin-top:2px}
+.chk-ico.ok{background:#eaf7ef;border:1px solid #cfe9da;color:#177a3f}
+.chk-ico.warn{background:#fdf3e6;border:1px solid #f6dfc2;color:#b25e09}
+.chk-main{flex:1;min-width:0}
+.chk-t{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 10px;font-size:13px;font-weight:600;color:#273244}
+.chk-v{margin-left:auto;font-weight:400;font-size:12.5px;color:#5b6577;font-variant-numeric:tabular-nums;text-align:right}
+.chk-d{margin-top:3px;font-size:12px;line-height:1.65;color:#8a5a1f;word-break:break-all}
+.chk-d + .chk-d{margin-top:1px}
+.chk-adv{margin-top:12px;padding:9px 12px;border-radius:8px;border:1px solid #e6e9f0;background:#f7f8fb;font-size:12.5px;color:#5b6577}
+.chk-adv.warn{background:#fdf6ef;border-color:#f5e0c8;color:#8a5a1f;font-weight:600}
+
+/* ============ 弹窗 ============ */
+.modal-mask{
+  position:fixed;inset:0;background:rgba(23,33,66,.42);z-index:100;
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+.modal-mask.show{display:flex}
+.modal-box{
+  width:760px;max-width:100%;max-height:calc(100vh - 40px);background:#fff;border-radius:10px;
+  box-shadow:0 16px 48px rgba(20,32,70,.28);overflow:hidden;display:flex;flex-direction:column;
+  animation:pop .18s ease;
+}
+@keyframes pop{from{transform:translateY(8px) scale(.98);opacity:0}to{transform:none;opacity:1}}
+.modal-head{padding:16px 20px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex:0 0 auto}
+.modal-head h3{font-size:16px;color:#1f2a44;line-height:1.45;min-width:0}
+.modal-close{border:0;background:transparent;color:#b3bccc;font-size:18px;line-height:1;flex:0 0 auto}
+.modal-close:hover{color:#667085}
+.modal-body{padding:12px 20px 4px;font-size:13px;color:#475467;overflow:auto;flex:1 1 auto;min-height:0}
+.modal-foot{
+  padding:14px 20px 18px;display:flex;justify-content:flex-end;gap:10px;
+  border-top:1px solid #f0f4fb;margin-top:10px;flex:0 0 auto;
+}
+
+/* 发起评测：搜索行为记录单选列表 */
+.mb-step{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#475467;margin:2px 0 8px}
+.mb-step::before{content:"";width:3px;height:12px;border-radius:2px;background:var(--system-blue)}
+.hist-search{
+  width:100%;height:32px;border:1px solid #cfd8e8;border-radius:6px;padding:0 10px;
+  font-size:12.5px;color:#273244;background:#fff;outline:none;margin-bottom:8px;
+}
+.hist-search:focus{border-color:#8fa3ff;box-shadow:0 0 0 2px rgba(65,105,246,.12)}
+.pick-list{
+  display:flex;flex-direction:column;border:1px solid #e6edf8;border-radius:8px;
+  overflow:hidden;max-height:min(52vh,420px);overflow-y:auto;background:#fff;
+}
+.pick-head,.pick-row{
+  display:grid;grid-template-columns:18px 118px minmax(0,1fr) 70px 58px;
+  gap:10px;align-items:center;padding:8px 12px;
+}
+.pick-head{
+  position:sticky;top:0;z-index:1;background:#f6f8fc;border-bottom:1px solid #e6edf8;
+  font-size:11.5px;font-weight:600;color:#8c98ad;
+}
+.pick-row{border-bottom:1px solid #eef2f8;cursor:pointer;min-width:0}
+.pick-row:last-child{border-bottom:0}
+.pick-row:hover{background:#f8fbff}
+.pick-row.is-pick{background:#f4f8ff}
+.pick-row input{width:14px;height:14px;margin:0;accent-color:var(--system-blue);cursor:pointer}
+.pk-time{font-family:var(--mono);font-size:11.5px;color:#667085;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pk-q{font-size:12.5px;font-weight:600;color:#273244;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pk-flag{
+  display:inline-block;font-size:10px;font-weight:600;color:#8c98ad;background:#f0f2f7;
+  border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:1px;
+}
+.pk-n,.pk-d{text-align:right;font-size:12px;color:#475467;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ta-r{text-align:right}
+.pick-empty{padding:26px 12px;text-align:center;font-size:12px;color:#9aa6bd;background:#fff}
+
+/* 对比视图（指标对比表：行 = 指标，列 = 基准 + 最近 3 次重放 + 变化） */
+.cmp-note{
+  font-size:11.5px;color:#98a2b3;line-height:1.6;margin-bottom:7px;
+  font-variant-numeric:tabular-nums;
+}
+.cmp-wrap{border:1px solid #e6edf8;border-radius:8px;overflow:hidden;overflow-x:auto}
+.cmp-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.cmp-tbl th{
+  background:#f6f8fc;color:#8c98ad;font-weight:600;font-size:11.5px;text-align:left;
+  padding:9px 12px;border-bottom:1px solid #e6edf8;white-space:nowrap;
+}
+.cmp-tbl th.num,.cmp-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cmp-tbl th.is-basecol{background:#eef4ff;color:#5f73a8}
+.cmp-tbl td{padding:10px 12px;border-bottom:1px solid #eef2f8;color:#344054;vertical-align:middle}
+.cmp-tbl tbody tr:last-child td{border-bottom:0}
+.cmp-tbl td.is-basecol{background:#f8fbff;color:#1f2a44;font-weight:700}
+.cmp-tbl td.m-name{font-weight:600;color:#273244;white-space:nowrap}
+.cmp-tbl td.chg-cell{width:1%}
+/* 演示值角标：结果数 / 平均相似度 / Top-1 / 重合率 在当前离线版没有真实来源 */
+.demo-badge{
+  display:inline-block;font-size:11px;font-weight:600;color:#8c98ad;background:#f0f2f7;
+  border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:1px;
+}
+.cmp-demo{font-size:11px;color:#98a2b3;line-height:1.6;margin-top:7px}
+.th-sub{display:block;font-style:normal;font-size:10px;font-weight:400;color:#a4aec2;letter-spacing:0}
+.chg{font-weight:700;font-variant-numeric:tabular-nums}
+.chg.good{color:var(--success)}
+.chg.bad{color:var(--error)}
+.chg.flat{color:#98a2b3}
+.conclusion{
+  display:flex;align-items:center;gap:8px;margin-top:12px;
+  padding:11px 14px;border-radius:8px;font-size:13px;font-weight:700;line-height:1.5;
+}
+.conclusion.good{background:#f1faf4;border:1px solid #d5eedf;color:#177a3f}
+.conclusion.bad{background:#fdf4f3;border:1px solid #f6d8d4;color:#a93226}
+.conclusion.flat{background:#f7f8fb;border:1px solid #e6e9f0;color:#5b6577}
+
+/* ===== 研发说明入口（八页统一：头部胶囊按钮 + 右侧抽屉） ===== */
+.dev-entry{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px 0 5px;border:1px solid #d7e0f0;border-radius:999px;background:#fff;color:#667085;font-size:12px;line-height:1;white-space:nowrap;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+.dev-entry:hover{border-color:#b9c9ff;background:var(--system-blue-weak);color:var(--system-blue)}
+.dev-entry:hover .de-q{background:var(--system-blue);color:#fff}
+.dev-entry:focus-visible{outline:2px solid #cdd9ff;outline-offset:1px}
+.dev-entry .de-q{width:20px;height:20px;border-radius:50%;flex:0 0 auto;background:var(--system-blue-weak);color:var(--system-blue);font-size:12px;font-weight:700;line-height:20px;text-align:center;transition:background .15s,color .15s}
+
+/* 右侧抽屉：720px / 全高 / 从右滑入 + 半透明遮罩 */
+.dev-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:10000;opacity:0;pointer-events:none;transition:opacity .22s}
+.dev-mask.open{opacity:1;pointer-events:auto}
+.dev-drawer{position:fixed;top:0;right:0;width:720px;max-width:100vw;height:100vh;background:#f6f8fc;z-index:10001;display:flex;flex-direction:column;transform:translateX(102%);transition:transform .28s ease;box-shadow:-8px 0 30px rgba(15,23,42,.18)}
+.dev-drawer.open{transform:translateX(0)}
+.dev-head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:#fff;border-bottom:1px solid #e4eaf3;flex:0 0 auto}
+.dev-head h3{margin:0;font-size:15px;color:#1f2937}
+.dev-head .dh-tag{font-size:11px;font-weight:600;color:#b54708;background:#fdf3e6;border-radius:4px;padding:2px 8px}
+.dev-close{margin-left:auto;width:28px;height:28px;border:none;background:#f2f4f8;border-radius:6px;font-size:15px;line-height:1;cursor:pointer;color:#475467;flex:0 0 auto}
+.dev-close:hover{background:#e6eaf2}
+.dev-body{flex:1;min-height:0;overflow:auto;padding:16px 18px 36px}
+.dev-lead{font-size:11.5px;color:#667085;line-height:1.65;margin-bottom:10px}
+.dev-block{background:#fff;border:1px solid #e4eaf3;border-radius:8px;padding:11px 13px;margin-bottom:10px}
+.dev-block h4{font-size:12px;color:#1f2934;margin-bottom:5px}
+.dev-block p{font-size:11.5px;color:#667085;line-height:1.7}
+.dev-block p + p{margin-top:6px}
+.dev-block ul{margin:2px 0 0 16px}
+.dev-block li{font-size:11.5px;color:#667085;line-height:1.7;margin-bottom:3px}
+.dev-block li b{color:#344054}
+.dev-block code{font-family:var(--mono);font-size:10.5px;color:#475467;background:#f2f5fa;border-radius:4px;padding:1px 5px}
+.dev-block a{color:var(--system-blue);text-decoration:underline;text-underline-offset:2px}
+.dev-tbl{width:100%;border-collapse:collapse;margin:2px 0 6px;font-size:11.5px;table-layout:auto}
+.dev-tbl th{text-align:left;color:#98a2b3;font-weight:600;padding:5px 7px;background:#f8fafd;border-bottom:1px solid #e4eaf3;white-space:nowrap}
+.dev-tbl td{padding:5px 7px;border-bottom:1px solid #eef2f8;color:#667085;line-height:1.6;vertical-align:top}
+.dev-tbl tr:last-child td{border-bottom:0}
+.dev-tbl td.k{color:#344054;font-weight:600;white-space:nowrap}
+
+/* 全局消息 */
+.toast{
+  position:fixed;top:56px;left:50%;transform:translateX(-50%) translateY(-12px);
+  z-index:200;background:#2b3245;color:#fff;font-size:13px;
+  padding:9px 18px;border-radius:7px;box-shadow:0 8px 24px rgba(20,32,70,.25);
+  opacity:0;pointer-events:none;transition:all .2s;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#c0392b}
+.toast.ok{background:#1e8e4a}
+
+@media (max-width:760px){
+  .sidebar{display:none}
+  .content{padding:16px 14px 30px}
+  .eval-head{padding:12px 14px}
+  .eval-tools .eval-search{width:100%}
+  .eval-tbl{min-width:900px}
+  .pick-head,.pick-row{grid-template-columns:18px 96px minmax(0,1fr) 60px 48px;gap:8px;padding:8px 10px}
+  .sb-help{left:12px;right:12px;width:auto;max-width:none}
+  .sb-tbl{min-width:640px}
+  .sb-pager{padding:10px 12px 12px}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ 左侧导航（壳层，未改） ============ -->
+<aside class="sidebar" aria-label="全局导航">
+  <div class="nav-scroll">
+    <a class="nav-item" href="P1_检索台_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span>检索台</a>
+    <div class="nav-divider"></div>
+    <a class="nav-item" href="P4_库管理_v5.2_20261026.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6"/><path d="M5 12v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6"/></svg></span>数据源库管理</a>
+    <a class="nav-item" href="P5_策略管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="10" cy="17" r="1.6"/></svg></span>策略管理</a>
+    <a class="nav-item" href="P6_任务管理_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="12" height="16" rx="2"/><path d="M9 5V3.5h6V5"/><path d="M9 10h6M9 14h6M9 18h4"/></svg></span>搜索行为</a>
+    <a class="nav-item" href="P7_结果运营_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>结果运营</a>
+    <a class="nav-item active" aria-current="page" href="P8_评测_v5.0_20261025.html"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="13" width="3" height="4"/><rect x="12" y="9" width="3" height="8"/><rect x="17" y="5" width="3" height="12"/></svg></span>效果评测</a>
+  </div>
+</aside>
+
+<!-- ============ 主区 ============ -->
+<div class="main">
+  <div class="content" id="pageBody">
+
+    <!-- 评测块头 -->
+    <section class="page-head">
+      <h1>效果评测</h1>
+      <div class="ph-right">
+        <button class="dev-entry" id="devEntry" type="button" onclick="openDev()" title="研发说明"><span class="de-q" aria-hidden="true">?</span>研发说明</button>
+        <button class="btn-primary" type="button" onclick="openAddEval()">＋ 发起评测</button>
+      </div>
+    </section>
+
+    <!-- 评测列表：表格 + 按 Query 搜索 + 分页 -->
+    <section class="eval-panel" aria-labelledby="evalListTitle">
+      <div class="eval-head">
+        <h2 id="evalListTitle">评测列表</h2>
+        <button class="btn-ghost" type="button" onclick="openDataCheck()">检查评测数据</button>
+      </div>
+      <div class="eval-tools">
+        <input class="hist-search eval-search" type="text" id="evalListSearch" placeholder="按 Query 搜索" autocomplete="off" oninput="onEvalListSearch(this.value)" aria-label="按 Query 搜索">
+        <div class="v-filter" id="evalVerdictChips" role="group" aria-label="按结论筛选"></div>
+        <span class="eval-hint">劣化阈值：踩数上升 / 踩率 +5% / 结果数 −10%</span>
+      </div>
+      <div class="eval-table-wrap">
+        <table class="eval-tbl">
+          <thead>
+            <tr>
+              <th scope="col">Query</th>
+              <th scope="col">基准（该次任务）<i class="th-sub">时间 · 条数 · 踩数</i></th>
+              <th scope="col" class="num">重放</th>
+              <th scope="col">最新（条数 · 踩数）</th>
+              <th scope="col" class="num">结论</th>
+              <th scope="col" class="ev-ops-h">操作</th>
+            </tr>
+          </thead>
+          <tbody id="evalBody"></tbody>
+        </table>
+      </div>
+      <div class="pager-bar eval-pager" id="evalPager"></div>
+    </section>
+
+    <!-- 难例样本集：从结果页单条点踩自动汇总，无需人工标注 -->
+    <section class="sample-block" aria-labelledby="sampleTitle">
+      <div class="sb-head">
+        <h2 id="sampleTitle">难例样本集</h2>
+        <button class="sb-q" type="button" id="sampleHelpBtn" onclick="toggleSampleHelp()" aria-expanded="false" aria-controls="sampleHelp" title="难例样本集说明">?</button>
+      </div>
+      <div class="sb-help" id="sampleHelp" hidden>
+        <p><b>定位：</b>难例样本集 = 从结果页单条点踩自动汇总的<b>难例</b>，用于<b>专测薄弱点</b>。</p>
+        <p><b>列表：</b>一行 = 一个 query；被踩条目只显示 1 行，悬浮看全部；每页 10 条。</p>
+        <p><b>被踩条目数：</b>该 query 下被点踩的数据条数（去重）。<b>不统计点踩次数</b>——同一条被踩多次只算 1 条。</p>
+        <p><b>计算方式：</b><code>COUNT(DISTINCT item_id) WHERE task ∈ 该 query 的所有任务 AND vote = 'down'</code></p>
+        <p><b>数据来源：</b><code>cm_item_votes</code>（点踩）+ <code>cm_task_meta</code> / <code>cm_task_summary</code>（任务号还原 query、条目名称）；无数据时显示空态。</p>
+      </div>
+      <div class="sb-scroll">
+        <table class="sb-tbl">
+          <thead>
+            <tr>
+              <th scope="col">Query</th>
+              <th scope="col">被踩条目</th>
+              <th scope="col" class="num">被踩条目数</th>
+              <th scope="col" class="num">最近时间</th>
+              <th scope="col" class="sb-op">操作</th>
+            </tr>
+          </thead>
+          <tbody id="sampleBody"></tbody>
+        </table>
+      </div>
+      <div class="pager-bar sb-pager" id="samplePager"></div>
+    </section>
+
+  </div>
+</div>
+
+<!-- 研发需求说明（入口在头部右上角 · 右侧抽屉） -->
+<div class="dev-mask" id="devMask" onclick="closeDev()"></div>
+<div class="dev-drawer" id="devDrawer" role="dialog" aria-modal="true" aria-label="研发需求说明">
+  <div class="dev-head">
+    <h3>研发需求说明</h3>
+    <span class="dh-tag">给研发</span>
+    <button type="button" class="dev-close" id="devClose" title="关闭（Esc）" aria-label="关闭" onclick="closeDev()">×</button>
+  </div>
+  <div class="dev-body">
+    <p class="dev-lead">以一条历史搜索记录为基准，追踪后续每次重新执行的效果变化。</p>
+
+    <div class="dev-block">
+      <h4>1 定位</h4>
+      <p>一条评测 = 一条历史搜索记录（基准）+ 之后每次重新执行的结果（重放）。它只回答一个问题：这条搜索现在比当时好，还是差。</p>
+      <p>评测列表用表格展示，每行一个评测，<b>6 列</b>：Query / 基准（该次任务：时间 · 条数 · 踩数）/ 重放（显示「N 次」）/ 最新（条数 · 踩数，无重放为「—」）/ 结论 / 操作（重新执行 · 查看对比）。表格上方可按 Query 搜索（不区分大小写、包含匹配）+ 结论筛选 chip（全部 / 已劣化 / 正常 / 未评测，带数量），每页 10 条，底部给「共 N 条」+ 上一页 / 页码 / 下一页。</p>
+      <p><b>结论列：</b>已劣化（红字 + 整行浅红底）/ 正常（绿）/ 未评测（灰，无重放）；鼠标悬停显示判定原因。</p>
+      <p><b>检查评测数据：</b>「评测列表」标题行右侧的按钮，打开后只读检查 4 项，弹窗给「✓ 评测数据检查通过」或「⚠ 发现 N 项问题 + 第 X 项需处理」，不改任何数据、不写存储：</p>
+      <ul>
+        <li><b>样本够不够</b>：评测数 ≥ 1 且各评测基准的摘要条目合计 ≥ 10 条；显示「N 个评测 · 共 M 条样本」。</li>
+        <li><b>有没有重复用</b>：同一个条目 ID 出现在 ≥ 2 个评测的基准里，列出被共用的条目。</li>
+        <li><b>样本还有效吗</b>：基准条目在 <code>cm_blocked_items</code>（已屏蔽）或其来源在 <code>cm_blacklist</code>（来源进黑名单）。</li>
+        <li><b>评价矛盾吗</b>：同一个条目 ID 在不同任务里既被赞过又被踩过。</li>
+      </ul>
+      <p>不统计大盘：没有汇总指标、没有趋势图、没有排行。</p>
+    </div>
+
+    <div class="dev-block">
+      <h4>2 数据来源</h4>
+      <ul>
+        <li><b>基准</b>：<a href="P6_任务管理_v5.0_20261025.html">搜索行为</a>里的一条记录 —— 时间、query、结果数、该次结果的赞数 / 踩数；也可从难例样本集点「加入评测」设为基准（query 不在搜索记录里时按样本信息补一条基准）。结果页落盘摘要后，结果数 / 平均相似度 / Top-1 / 重合率按摘要真算。</li>
+        <li><b>重放</b>：同一条 query 点「重新执行」生成的记录；每执行一次，该评测重放次数 +1（结果页返回后合并 <code>cm_eval_replays</code>）。</li>
+        <li><b>赞数 / 踩数</b>：<a href="P2_结果页_v5.0_20261025.html">结果页</a>单条结果的赞 / 踩，按任务号归到对应搜索记录后求和（取 <code>cm_item_votes</code> 的 up / down 条目数）。</li>
+        <li><b>无摘要时</b>：结果数、Top-20 平均相似度、Top-1 分数、Top-20 重合率走演示规则并带 <code>demo</code>，不请求真实引擎。</li>
+      </ul>
+    </div>
+
+    <div class="dev-block">
+      <h4>3 指标与来源</h4>
+      <table class="dev-tbl">
+        <thead><tr><th scope="col">指标</th><th scope="col">来源</th></tr></thead>
+        <tbody>
+          <tr><td class="k">结果数</td><td>该次摘要的 items 条数（<code>cm_task_summary</code>）；无摘要时回落演示值</td></tr>
+          <tr><td class="k">赞数</td><td>该次搜索结果里被点赞的条目数</td></tr>
+          <tr><td class="k">踩数</td><td>该次搜索结果里被点踩的条目数</td></tr>
+          <tr><td class="k">踩率</td><td>踩数 ÷ 结果数；赞数与踩数都为 0 时显示「—」</td></tr>
+          <tr><td class="k">Top-20 平均相似度</td><td>摘要 items 的相似度均值；无摘要时回落演示值</td></tr>
+          <tr><td class="k">Top-1 分数</td><td>摘要 items 的相似度最大值；无摘要时回落演示值</td></tr>
+          <tr><td class="k">Top-20 重合率</td><td>本次与基准 items 的条目 ID 交集 ÷ 基准条数；无摘要时回落演示值</td></tr>
+        </tbody>
+      </table>
+      <p><b>演示角标：</b>只有<b>结果数 / Top-20 平均相似度 / Top-1 分数 / Top-20 重合率</b> 4 项会带「演示」角标；赞数、踩数、踩率不在角标范围内（赞 / 踩有记录时取 <code>cm_item_votes</code> 的条目数，种子评测的基准赞踩为演示值）。角标按行判断 —— 基准没有 <code>cm_task_summary</code>，或该行显示的重放记录里只要还有一条带 <code>demo</code>，就标「演示」；两边摘要齐全、指标真算时不标。</p>
+      <p><b>真实实现：</b>结果页写 <code>cm_task_summary</code>（任务号 + q / time / n / pair / stg / thr + items：ID / 名称 / 来源 / 相似度 / 模态）→ 评测按基准与重放两边摘要重算结果数、平均相似度、Top-1、重合率。</p>
+      <p><b>相似度可比性：</b>当前向量模型固定（CLIP双塔 v3），同一 query 的相似度分数跨次可比；模型不变的前提下，分数变化才代表效果变化。</p>
+      <p><b>踩率口径：</b>踩率 = 踩数 ÷ 结果数；当赞数与踩数都为 0 时显示「—」（表示没有用户评价，不代表效果好）。</p>
+    </div>
+
+    <div class="dev-block">
+      <h4>4 指标如何算</h4>
+      <ul>
+        <li><b>赞数、踩数</b>：该次搜索直接产生，取 <code>cm_item_votes</code>；</li>
+        <li><b>踩率</b> = 踩数 ÷ 结果数；赞数与踩数都为 0 时显示「—」；</li>
+        <li><b>结果数</b> = 本次摘要 <code>items.length</code>（基准与重放同口径）；</li>
+        <li><b>Top-20 平均相似度</b> = <code>items.map(sim)</code> 之和 ÷ <code>n</code>；</li>
+        <li><b>Top-1 分数</b> = <code>Math.max(...sims)</code>；</li>
+        <li><b>Top-20 重合率</b> = |本次 items 的 ID ∩ 基准 items 的 ID| ÷ 基准条数；</li>
+        <li>无摘要时上述 4 项回落演示值并带 <code>demo</code> 标记（结果数＝基准结果数 − 3；平均相似度 / Top-1 在基准上 +0.01；重合率约 0.80 或在上一基础上 −0.05）；有摘要时记录里不写 <code>demo</code>。</li>
+      </ul>
+    </div>
+
+    <div class="dev-block">
+      <h4>5 对比与着色</h4>
+      <ul>
+        <li>对比视图是<b>指标对比表</b>：行 = 指标，列 = 基准 + 最近 3 次重放 + 变化（最新 vs 基准）。</li>
+        <li>对比视图固定显示「基准 + 最近 3 次重放」，历史重放不逐列铺开，避免列无限增长；完整重放记录以列表行内的「重放 N 次」为准。</li>
+        <li><b>赞数</b>上升为绿、下降为红；<b>踩数、踩率</b>下降为绿、上升为红。</li>
+        <li><b>Top-20 平均相似度、Top-1 分数</b>上升为绿，下降为红；两者带「演示」角标时，颜色只示意口径，不代表真实变化。</li>
+        <li><b>结果数</b>只作参考，不按好坏着色：结果数受筛选条件影响，↓ 不一定坏。</li>
+        <li><b>Top-20 重合率</b>基准为「—」，只比重放与基准的重合程度，不参与好坏判定。</li>
+        <li>结论一句话按<b>最新一次重放 vs 基准</b>生成，同时写出踩数与平均相似度的变化，固定显示在对比表下方（有效 / 变差 / 改善 / 退步 / 无明显变化 5 种文案）。</li>
+        <li>劣化时对比表下方先出现阻断提示「本次重放相较基准已劣化：踩数 / 踩率 / 结果数 …」，再是结论句；正常时提示「本次重放未发现劣化」。阻断只提示、不拦截操作。</li>
+      </ul>
+    </div>
+
+    <div class="dev-block">
+      <h4>6 重新执行与会话记录</h4>
+      <ul>
+        <li>「＋ 发起评测」→ 从搜索行为记录里选一条 →「设为基准」，进入列表最前。候选列表 4 列（时间 / 查询 / 结果数 / 踩数），可按查询或时间搜索，已在评测中的 query 标「已在评测中」；同一 query 只保留一条评测，重复选择提示「该搜索已在评测中」。</li>
+        <li>行内「重新执行」→ 结果页：带 query、replay=1、基准结果数（was）、新任务号与 back=P8；任务号 = TASK + yyMMdd + 6 位大写字母数字，避开已有号。</li>
+        <li>基准有 <code>cm_task_summary</code> 时按摘要真算指标；基准无摘要时走演示规则（结果数＝基准 − 3、平均相似度 / Top-1 约基准 +0.01、重合率约 0.80）并带 <code>demo</code>；结果页落盘新任务摘要后回到本页，两边摘要齐全再重算并去掉 <code>demo</code>。</li>
+        <li>在结果页点赞 / 踩后回到本页，该评测<b>重放次数 +1</b>，最新赞数 / 踩数取该任务号下被赞 / 踩的条目数。</li>
+        <li>评测列表存在 <code>sessionStorage</code> 的 <code>cm_evals</code>：加入评测 / 发起评测后持久，刷新与返回不丢；清空该键回到内置种子列表。</li>
+        <li>重放记录按 query 分组写入 <code>sessionStorage</code> 的 <code>cm_eval_replays</code>：任务号、时间、结果数、赞数、踩数、平均相似度、Top-1、重合率、演示标记（<code>demo</code>）；本页加载 / 结果页返回时合并。基准与重放任务两边都有 <code>cm_task_summary</code> 时按摘要重算并去掉 <code>demo</code>；任一没有摘要时保留演示值并带 <code>demo</code>。赞数 / 踩数取该任务号下的真实赞踩。</li>
+      </ul>
+    </div>
+
+    <div class="dev-block">
+      <h4>7 难例样本集</h4>
+      <p><b>定位：</b>从结果页单条点踩自动汇总的<b>难例</b>，用于专测薄弱点，不做人工标注；一行 = 一个 query。标题行「?」展开页内同一份口径。</p>
+      <p><b>5 列：</b>Query / 被踩条目 / 被踩条目数 / 最近时间 / 操作（加入评测）。被踩条目只显示 1 行，超出截断，悬停看全部；<b>被踩条目数</b> = 该 query 下去重后的被踩条目数（同一条被踩多次只算 1 条），不统计点踩次数。</p>
+      <p><b>排序与分页：</b>被踩条目数降序（最差在前），同数量按最近时间倒序；每页 10 条（「共 N 条」+ 上一页 / 页码 / 下一页）；无数据显示「暂无被踩的数据」。</p>
+      <p><b>数据来源：</b><code>cm_item_votes</code>（点踩）+ <code>cm_task_meta</code> / <code>cm_task_summary</code> / <code>cm_replay_records</code> / <code>cm_eval_replays</code>（任务号还原 query、时间、条数与条目名称）；无数据时显示空态。</p>
+      <p><b>加入评测：</b>点「加入评测」复用「设为基准」逻辑，直接进评测列表最前；已在评测中的 query 按钮禁用并显示「已在评测」。</p>
+      <p><b>局限：</b>只覆盖被点踩的样本，不能代表整体效果；平台不做标注，因此不构成评测集。</p>
+    </div>
+
+    <div class="dev-block">
+      <h4>8 说明</h4>
+      <p>基准与重放取自真实搜索记录；赞数 / 踩数 / 踩率有赞踩记录时为真实值（种子评测的基准值除外）；结果数、Top-20 平均相似度、Top-1 分数、Top-20 重合率在有摘要时为真算，无摘要时回落演示值并在对比表标「演示」角标。</p>
+      <p>本期只做单条评测的判断与提示，不做大盘汇总、趋势与排行。</p>
+      <p><b>边界：</b>只对已有基准做重放对比，不自动回滚、不改策略、不改上游数据；一次重放对应一个新任务号，可凭 <code>cm_task_summary</code> / <code>cm_item_votes</code> 追溯。</p>
+      <p><b>上下游：</b>上游 <a href="P6_任务管理_v5.0_20261025.html">搜索行为</a>（基准候选）与 <a href="P2_结果页_v5.0_20261025.html">结果页</a>（写 <code>cm_task_summary</code> / <code>cm_item_votes</code>）；下游 <a href="P5_策略管理_v5.0_20261025.html">策略管理</a>（把劣化提示作为调参输入）。</p>
+    </div>
+
+    <div class="dev-block">
+      <h4>9 回归阻断</h4>
+      <p><b>目的：</b>重放后自动比对基准，判断是否劣化，避免「越改越差」还照常发布。</p>
+      <p><b>判定：</b>踩数上升 / 踩率 +5% / 结果数 −10%，任一成立即劣化；都不成立为正常，无重放为未评测。</p>
+      <p><b>处置：</b>劣化时在对比视图给出阻断提示（提示，不强制拦截）；列表可按「已劣化」筛选。</p>
+      <p><b>说明：</b>本期只做判断与提示，不做自动回滚。</p>
+    </div>
+  </div>
+</div>
+
+<!-- 通用弹窗（发起评测 / 查看对比） -->
+<div class="modal-mask" id="infoMask">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="infoTitle">功能详情</h3>
+      <button class="modal-close" type="button" onclick="closeInfo()" aria-label="关闭">×</button>
+    </div>
+    <div class="modal-body" id="infoBody"></div>
+    <div class="modal-foot" id="infoFoot"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= 演示数据：评测（一条评测 = 一条基准 + N 次重放） ================= */
+/* 种子评测：首次访问或 cm_evals 损坏 / 为空时兜底 */
+var EVAL_SEED = [
+  {
+    q: '含发票代码的扫描件',
+    base: {task: 'TASK261025A3F9KX', time: '2026-10-25 00:30', n: 130, up: 3, down: 5, avg: 0.86, top1: 0.94},
+    replays: [
+      {time: '2026-10-27 09:15', n: 127, up: 0, down: 0, avg: 0.89, top1: 0.97, ov: 0.85, demo: true},
+      {time: '2026-10-29 14:20', n: 125, up: 6, down: 0, avg: 0.90, top1: 0.97, ov: 0.80, demo: true},
+      {time: '2026-10-31 10:05', n: 127, up: 4, down: 2, avg: 0.91, top1: 0.98, ov: 0.75, demo: true}
+    ]
+  },
+  {
+    q: '生产线作业安全帽佩戴',
+    base: {task: 'TASK261024M7V4YC', time: '2026-10-24 18:05', n: 87, up: 1, down: 3, avg: 0.82, top1: 0.91},
+    replays: [
+      {time: '2026-10-29 10:05', n: 84, up: 2, down: 1, avg: 0.84, top1: 0.93, ov: 0.90, demo: true}
+    ]
+  },
+  {
+    q: '窗口办事人员操作特写',
+    base: {task: 'TASK261024K7M2PQ', time: '2026-10-24 17:50', n: 42, up: 0, down: 8, avg: 0.71, top1: 0.88},
+    replays: [
+      {time: '2026-10-29 11:40', n: 42, up: 0, down: 8, avg: 0.71, top1: 0.88, ov: 1.00, demo: true}
+    ]
+  }
+];
+
+/* 评测列表持久化：sessionStorage.cm_evals（与重放记录 cm_eval_replays 是两个独立的键） */
+var EVALS_KEY = 'cm_evals';
+/* 本次列表是否来自存储：来自种子时不再用重放记录反建评测行，避免清空 cm_evals 后又被旧重放补回 */
+var EVALS_FROM_SEED = true;
+function loadEvals(){
+  try{
+    var raw = sessionStorage.getItem(EVALS_KEY);
+    if(raw){
+      var arr = JSON.parse(raw);
+      if(Array.isArray(arr) && arr.length){ EVALS_FROM_SEED = false; return arr; }
+    }
+  }catch(e){}
+  EVALS_FROM_SEED = true;
+  return EVAL_SEED.slice();
+}
+function saveEvals(){
+  try{ sessionStorage.setItem(EVALS_KEY, JSON.stringify(EVALS)); }catch(e){}
+}
+var EVALS = loadEvals();
+
+/* 搜索行为记录：发起评测时的基准候选（时间 / 查询 / 结果数 / 赞数 / 踩数） */
+var SEARCHES = [
+  {task: 'TASK261025A3F9KX', time: '2026-10-25 00:30', q: '含发票代码的扫描件', n: 130, up: 3, down: 5},
+  {task: 'TASK261024M7V4YC', time: '2026-10-24 18:05', q: '生产线作业安全帽佩戴', n: 87, up: 1, down: 3},
+  {task: 'TASK261024P9W6ZS', time: '2026-10-24 14:20', q: '营业执照 法人代表字段', n: 210, up: 4, down: 2},
+  {task: 'TASK261024R3X8TA', time: '2026-10-24 09:15', q: '红章文件 归档编号', n: 64, up: 2, down: 1},
+  {task: 'TASK261024K7M2PQ', time: '2026-10-24 17:50', q: '窗口办事人员操作特写', n: 42, up: 0, down: 8},
+  {task: 'TASK261023F2Q7NH', time: '2026-10-23 17:25', q: '电子发票查验截图', n: 96, up: 5, down: 4},
+  {task: 'TASK261023J8T3MB', time: '2026-10-23 15:50', q: '合同骑缝章 高清图', n: 41, up: 1, down: 1},
+  {task: 'TASK261023L6R9PK', time: '2026-10-23 11:30', q: '车间流水线 质检工序', n: 73, up: 0, down: 0}
+];
+
+/* ================= 难例样本集：从结果页单条点踩自动汇总 ================= */
+/* 条目号 → 名称：结果页 / 任务详情里的演示条目；未收录的条目回退为「未命名条目」 */
+var ITEM_NAMES = {
+  'ITM261025A3F9KX': '发票代码_扫描件_01.jpg',
+  'ITM261025B7X2Q9': '增值税发票_发票联_02.jpg',
+  'ITM261025K2L8P1': '办税窗口_收据特写_1025.jpg',
+  'ITM261025D8N3QR': '监控_窗口A_关键帧03.mp4',
+  'ITM261025H5T6UW': '监控_窗口B_关键帧17.mp4',
+  'ITM261025M7V4YC': '叫号_3号窗口_A107.wav',
+  'ITM261025P9W6ZS': '设备运转_声纹_0112.wav',
+  'ITM261025R3X8TA': '税控设备_面板_1025.jpg',
+  'ITM261025C4M8T2': '电子发票_全电票_代码校验截图.png',
+  'ITM261025D9P3W7': '发票代码区_局部放大_01.png',
+  'ITM261025E6R2Y5': '增值税普通发票_卷式_扫描_003.jpg',
+  'ITM261025F3N7K8': '发票_骑缝章_票面平铺_02.jpg',
+  'ITM261025G8T4H6': '专用发票_发票号码_清晰版.jpg',
+  'ITM261025H5W9M3': '发票扫描页_倾斜校正后_005.jpg',
+  'ITM261025J2K6P4': '发票查验结果_网页截图_20261015.png',
+  'ITM261025K7Q3R9': '发票清单_打印件_财务归档.jpg',
+  'ITM261025L4Z8N2': '报销单_附发票粘贴_01.jpg',
+  'ITM261025M9V5X7': '费用报销凭证_装订_扫描.jpg',
+  'ITM261025N6B2C8': '付款申请单_审批签字_02.jpg',
+  'ITM261025P3D7F5': '采购合同_首末页_扫描.png',
+  'ITM261025Q8G4H9': '营业执照_副本_复印件.jpg',
+  'ITM261025R5J9K3': '身份证_人像面_复印件_01.jpg',
+  'ITM261025S2L6M7': '手写收据_便签_拍照.jpg',
+  'ITM261025T7N3P8': '财务室团建_海边合影_01.jpg',
+  'ITM261025U4Q8R2': '海边礁石_视频帧.png',
+  'ITM261025V9S5T6': '海景_日出_海南.jpg',
+  'ITM261024W4H7Z1': '发票扫描页_平铺_01.jpg',
+  'ITM261024W4H7Z2': '发票扫描页_倾斜_02.jpg',
+  'ITM261024W4H7Z3': '发票扫描页_反光_03.jpg',
+  'ITM261024M7V4Y1': '产线_安全帽佩戴_工位A.mp4',
+  'ITM261024M7V4Y2': '产线_未戴安全帽_抓拍.mp4',
+  'ITM261024M7V4Y3': '车间通道_人员通行.mp4',
+  'ITM261024M7V4Y4': '仓库门口_装卸作业.mp4',
+  'ITM261024P9W6Z1': '营业执照_正本_01.jpg',
+  'ITM261024P9W6Z2': '营业执照_副本_02.jpg',
+  'ITM261024P9W6Z3': '营业执照_法人页_03.jpg',
+  'ITM261024P9W6Z4': '办公室_工位_全景.jpg',
+  'ITM261024P9W6Z5': '会议室_长桌_01.jpg',
+  'ITM261024P9W6Z6': '前台_接待区.jpg',
+  'ITM261024P9W6Z7': '园区_外景_01.jpg',
+  'ITM261023F2Q7N1': '电子发票_查验页_01.png',
+  'ITM261023F2Q7N2': '电子发票_查验页_02.png'
+};
+
+/* 任务号 → query / 时间 / 结果数：把点踩按任务号归并到 query，取最近一次时间 */
+var TASK_META = {
+  'TASK261025A3F9KX': {q: '含发票代码的扫描件', time: '2026-10-25 00:30', n: 130},
+  'TASK261024W4H7ZR': {q: '发票扫描页_01.jpg', time: '2026-10-24 21:12', n: 87},
+  'TASK261024M7V4YC': {q: '生产线作业安全帽佩戴', time: '2026-10-24 18:05', n: 87},
+  'TASK261024K7M2PQ': {q: '窗口办事人员操作特写', time: '2026-10-24 17:50', n: 0},
+  'TASK261024Q6T2NX': {q: '营业执照_正本.jpg', time: '2026-10-24 16:40', n: 42},
+  'TASK261024P9W6ZS': {q: '营业执照 法人代表字段', time: '2026-10-24 14:20', n: 210},
+  'TASK261024S8K3LY': {q: '合同骑缝章_局部.jpg', time: '2026-10-24 13:05', n: 42},
+  'TASK261024R3X8TA': {q: '红章文件 归档编号', time: '2026-10-24 09:15', n: 64},
+  'TASK261023F2Q7NH': {q: '电子发票查验截图', time: '2026-10-23 17:25', n: 96},
+  'TASK261023J8T3MB': {q: '合同骑缝章 高清图', time: '2026-10-23 15:50', n: 41},
+  'TASK261023G5J8QC': {q: '手写签收单.jpg', time: '2026-10-23 15:20', n: 0},
+  'TASK261023L6R9PK': {q: '车间流水线 质检工序', time: '2026-10-23 11:30', n: 73}
+};
+
+var EVAL_PICK = null;
+var EVAL_KW = '';
+var toastTimer = null;
+/* 会话存储：重放记录按 query 分组；赞踩记录由结果页按任务号写入 */
+var REPLAY_KEY = 'cm_eval_replays';
+var VOTE_KEY = 'cm_item_votes';
+/* 结果页落盘的结果摘要：任务号 → {q,time,n,pair,stg,thr,items} */
+var SUMMARY_KEY = 'cm_task_summary';
+
+/* ================= 结果摘要读取与真实指标 ================= */
+function summaryOf(task){
+  if(!task) return null;
+  var all = readJsonStore(SUMMARY_KEY);
+  if(!all || typeof all !== 'object' || Array.isArray(all)) return null;
+  var s = all[String(task)];
+  return (s && typeof s === 'object' && !Array.isArray(s)) ? s : null;
+}
+function summaryItems(s){
+  return (s && Array.isArray(s.items)) ? s.items : [];
+}
+/* 真实指标：n=条目数；avg=相似度均值；top1=最高分；ov=本次与基准条目 ID 交集 ÷ 基准条数 */
+function metricsOf(baseSum, curSum){
+  var baseItems = summaryItems(baseSum);
+  var items = summaryItems(curSum);
+  var sims = [];
+  items.forEach(function(it){ sims.push(clamp01(toNum(it && it.sim, 0))); });
+  var n = items.length;
+  var sum = 0;
+  sims.forEach(function(v){ sum += v; });
+  var ids = {};
+  baseItems.forEach(function(it){ if(it && it.id) ids[String(it.id)] = 1; });
+  var hit = 0;
+  items.forEach(function(it){ if(it && it.id && ids[String(it.id)]) hit++; });
+  return {
+    n: n,
+    avg: n ? Number((sum / n).toFixed(2)) : 0,
+    top1: n ? Number(Math.max.apply(null, sims).toFixed(2)) : 0,
+    ov: baseItems.length ? Number((hit / baseItems.length).toFixed(2)) : 0
+  };
+}
+/* 基准任务有摘要时，基准的结果数 / 平均相似度 / Top-1 也用摘要真值 */
+function applyBaseSummary(e, baseSum){
+  var items = summaryItems(baseSum);
+  if(!items.length) return false;
+  var m = metricsOf(baseSum, baseSum);
+  var changed = false;
+  if(e.base.n !== m.n){ e.base.n = m.n; changed = true; }
+  if(e.base.avg !== m.avg){ e.base.avg = m.avg; changed = true; }
+  if(e.base.top1 !== m.top1){ e.base.top1 = m.top1; changed = true; }
+  return changed;
+}
+
+/* ================= 基础件 ================= */
+function $(id){ return document.getElementById(id); }
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+function pad2(n){ return n < 10 ? '0' + n : String(n); }
+function toNum(v, d){
+  var x = Number(v);
+  return isFinite(x) ? x : d;
+}
+function clamp01(v){ return Math.min(1, Math.max(0, v)); }
+function two(v){ return Number(v).toFixed(2); }
+function nowText(){
+  var d = new Date();
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) +
+    ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+}
+function toast(msg, type){
+  var t = $('toast');
+  if(!t) return;
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.className = 'toast'; }, 2600);
+}
+function openInfo(title, sub, body, foot){
+  $('infoTitle').textContent = title;
+  var bodyEl = $('infoBody');
+  bodyEl.innerHTML = (sub || '') + body;
+  bodyEl.scrollTop = 0;
+  $('infoFoot').innerHTML = foot || '<button class="btn-ghost" type="button" onclick="closeInfo()">关闭</button>';
+  $('infoMask').classList.add('show');
+}
+function closeInfo(){
+  var m = $('infoMask');
+  if(m) m.classList.remove('show');
+}
+function openDev(){
+  var d = $('devDrawer'), m = $('devMask');
+  if(d) d.classList.add('open');
+  if(m) m.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeDev(){
+  var d = $('devDrawer'), m = $('devMask');
+  if(d) d.classList.remove('open');
+  if(m) m.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+/* ================= 重放记录（sessionStorage: cm_eval_replays） ================= */
+function readReplayStore(){
+  try{
+    var raw = sessionStorage.getItem(REPLAY_KEY);
+    if(!raw) return {};
+    var obj = JSON.parse(raw);
+    return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+  }catch(e){ return {}; }
+}
+function writeReplayStore(store){
+  try{ sessionStorage.setItem(REPLAY_KEY, JSON.stringify(store)); }catch(e){}
+}
+/* 结果页按「任务号 + 条目号」落 cm_item_votes；这里取该任务号下被赞 / 被踩的条目数 */
+function votesOf(task){
+  if(!task) return null;
+  try{
+    var raw = sessionStorage.getItem(VOTE_KEY);
+    if(!raw) return null;
+    var all = JSON.parse(raw);
+    var mine = (all && typeof all === 'object') ? all[task] : null;
+    if(!mine || typeof mine !== 'object') return null;
+    var up = 0, down = 0;
+    Object.keys(mine).forEach(function(k){
+      if(mine[k] === 'up') up++;
+      else if(mine[k] === 'down') down++;
+    });
+    return {up: up, down: down};
+  }catch(e){ return null; }
+}
+function findEval(q){
+  for(var i = 0; i < EVALS.length; i++){
+    if(EVALS[i].q === q) return EVALS[i];
+  }
+  return null;
+}
+function searchByQuery(q){
+  for(var i = 0; i < SEARCHES.length; i++){
+    if(SEARCHES[i].q === q) return SEARCHES[i];
+  }
+  return null;
+}
+/* 两边都有摘要时，把一条重放记录改为真实计算值，并去掉 demo 标记 */
+function applyRealMetrics(recObj, baseSum, task){
+  var curSum = summaryOf(task);
+  if(!baseSum || !curSum) return false;
+  var items = summaryItems(curSum);
+  if(!items.length) return false;
+  var m = metricsOf(baseSum, curSum);
+  var ch = false;
+  if(recObj.n !== m.n){ recObj.n = m.n; ch = true; }
+  if(recObj.avg !== m.avg){ recObj.avg = m.avg; ch = true; }
+  if(recObj.top1 !== m.top1){ recObj.top1 = m.top1; ch = true; }
+  if(recObj.ov !== m.ov){ recObj.ov = m.ov; ch = true; }
+  if(recObj.demo){ delete recObj.demo; ch = true; }
+  return ch;
+}
+/* 加载时并入会话里的重放记录；任务号去重，赞数 / 踩数按结果页的赞踩重新算；两边摘要齐全则重算指标 */
+function mergeReplayStore(){
+  var store = readReplayStore();
+  var changed = false;
+  var evalsChanged = false;
+  Object.keys(store).forEach(function(q){
+    var arr = store[q];
+    if(!Array.isArray(arr)) return;
+    var e = findEval(q);
+    if(!e){
+      if(EVALS_FROM_SEED) return;
+      var s = searchByQuery(q);
+      if(!s) return;
+      e = {q: q, base: {task: s.task || '', time: s.time, n: s.n, up: s.up, down: s.down, avg: 0.82, top1: 0.91}, replays: []};
+      EVALS.push(e);
+      evalsChanged = true;
+    }
+    var baseSum = summaryOf(e.base.task);
+    if(baseSum && applyBaseSummary(e, baseSum)){ changed = true; evalsChanged = true; }
+    arr.forEach(function(rec){
+      if(!rec || typeof rec !== 'object') return;
+      var task = rec.task ? String(rec.task) : '';
+      if(!task) return;
+      /* 先把会话里的原始记录升级为真实口径，写回时不再保留 demo */
+      if(applyRealMetrics(rec, baseSum, task)) changed = true;
+      var dupAt = -1;
+      for(var j = 0; j < e.replays.length; j++){
+        if(e.replays[j].task === task){ dupAt = j; break; }
+      }
+      if(dupAt >= 0){
+        var dupRec = e.replays[dupAt];
+        var vs2 = votesOf(task);
+        if(vs2 && dupRec.down !== vs2.down){ dupRec.down = vs2.down; changed = true; evalsChanged = true; }
+        if(vs2 && dupRec.up !== vs2.up){ dupRec.up = vs2.up; changed = true; evalsChanged = true; }
+        if(applyRealMetrics(dupRec, baseSum, task)){ changed = true; evalsChanged = true; }
+        return;
+      }
+      var vs = votesOf(task);
+      if(vs){
+        if(rec.down !== vs.down){ rec.down = vs.down; changed = true; }
+        if(rec.up !== vs.up){ rec.up = vs.up; changed = true; }
+      }
+      var nr = {
+        task: task,
+        time: rec.time ? String(rec.time) : nowText(),
+        n: Math.max(0, Math.round(toNum(rec.n, e.base.n))),
+        up: Math.max(0, Math.round(toNum(rec.up, 0))),
+        down: Math.max(0, Math.round(toNum(rec.down, 0))),
+        avg: clamp01(toNum(rec.avg, e.base.avg)),
+        top1: clamp01(toNum(rec.top1, e.base.top1)),
+        ov: clamp01(toNum(rec.ov, 0.80))
+      };
+      if(rec.demo === true) nr.demo = true;
+      if(applyRealMetrics(nr, baseSum, task)) changed = true;
+      e.replays.push(nr);
+      evalsChanged = true;
+    });
+  });
+  if(changed) writeReplayStore(store);
+  if(evalsChanged) saveEvals();
+}
+/* 基准与搜索行为候选的赞 / 踩按「该次任务号」重算，避免与结果页显示不一致 */
+function refreshVoteCounts(){
+  var changed = false;
+  EVALS.forEach(function(e){
+    if(!e.base || !e.base.task) return;
+    var vs = votesOf(e.base.task);
+    if(vs){
+      if(e.base.up !== vs.up || e.base.down !== vs.down) changed = true;
+      e.base.up = vs.up;
+      e.base.down = vs.down;
+    }
+  });
+  SEARCHES.forEach(function(s){
+    if(!s || !s.task) return;
+    var vs = votesOf(s.task);
+    if(vs){ s.up = vs.up; s.down = vs.down; }
+  });
+  if(changed) saveEvals();
+}
+/* 新任务号：TASK + yyMMdd + 6 位大写字母数字，避开已有记录 */
+function newTaskNo(){
+  var d = new Date();
+  var date = String(d.getFullYear()).slice(-2) + pad2(d.getMonth() + 1) + pad2(d.getDate());
+  var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  var used = {};
+  EVALS.forEach(function(e){
+    (e.replays || []).forEach(function(r){ if(r && r.task) used[r.task] = 1; });
+  });
+  var no = '';
+  do{
+    no = 'TASK' + date;
+    for(var i = 0; i < 6; i++){ no += chars.charAt(Math.floor(Math.random() * chars.length)); }
+  }while(used[no]);
+  return no;
+}
+
+/* ================= 评测列表 ================= */
+function hasEval(q){
+  return !!findEval(q);
+}
+/* 最新一次重放（没有重放返回 null） */
+function lastReplay(e){
+  return e.replays.length ? e.replays[e.replays.length - 1] : null;
+}
+/* 踩变化（最新 vs 基准）：减少写 ↓N，增加写 ↑N，不变写「不变」 */
+function deltaText(baseDown, curDown){
+  var d = toNum(baseDown, 0) - toNum(curDown, 0);
+  if(d > 0) return '↓' + d;
+  if(d < 0) return '↑' + (-d);
+  return '不变';
+}
+
+/* ================= 回归劣化判定（只判断与提示，不改 cm_eval_replays 结构） ================= */
+/* 阈值：踩数上升 / 踩率 +5 个百分点 / 结果数跌破基准的 90% */
+var REG_RATE_DELTA = 0.05;
+var REG_N_RATIO = 0.9;
+/* 百分比显示：踩率 0.1234 → 12%（阻断提示只做概览，取整更易读） */
+function pctText(v){
+  return Math.round(toNum(v, 0) * 100) + '%';
+}
+/* 判定一条评测：最新一次重放 vs 基准；无重放 → 未评测 */
+function verdictOf(e){
+  var last = latestReplayOf(e);
+  if(!last) return {state: 'none', label: '未评测', reasons: []};
+  var reasons = [];
+  var bd = toNum(e.base.down, 0), ld = toNum(last.down, 0);
+  if(ld > bd) reasons.push({k: 'down', b: bd, c: ld});
+  var br = rateOf(e.base), lr = rateOf(last);
+  if(lr > br + REG_RATE_DELTA + 1e-9) reasons.push({k: 'rate', b: br, c: lr});
+  var bn = toNum(e.base.n, 0), ln = toNum(last.n, 0);
+  if(bn > 0 && ln < bn * REG_N_RATIO - 1e-9) reasons.push({k: 'n', b: bn, c: ln});
+  if(!reasons.length) return {state: 'ok', label: '正常', reasons: []};
+  return {state: 'bad', label: '已劣化', reasons: reasons};
+}
+function reasonText(r){
+  if(r.k === 'down') return '踩数 ' + r.b + ' → ' + r.c;
+  if(r.k === 'rate') return '踩率 ' + pctText(r.b) + ' → ' + pctText(r.c);
+  return '结果数 ' + r.b + ' → ' + r.c;
+}
+function verdictTip(e, vd){
+  if(vd.state === 'none') return '尚无重放，暂不判定';
+  if(vd.state === 'ok') return '最新重放未触发劣化阈值';
+  return '劣化原因：' + vd.reasons.map(reasonText).join('、');
+}
+
+var EVAL_PAGE = 1;
+var EVAL_PAGE_SIZE = 10;
+var EVAL_LIST_KW = '';
+var EVAL_VERDICT = 'all';   /* all | bad | ok | none */
+/* 只按 Query 搜索过滤（结论筛选的计数以它为基数） */
+function evalKeywordFiltered(){
+  var kw = String(EVAL_LIST_KW || '').toLowerCase();
+  var out = [];
+  EVALS.forEach(function(e, i){
+    if(!kw || String(e.q).toLowerCase().indexOf(kw) >= 0) out.push({e: e, i: i});
+  });
+  return out;
+}
+function evalListFiltered(){
+  var list = evalKeywordFiltered();
+  if(EVAL_VERDICT === 'all') return list;
+  return list.filter(function(it){ return verdictOf(it.e).state === EVAL_VERDICT; });
+}
+/* 表格上方筛选 chip：全部 / 已劣化 / 正常 / 未评测（数量随 Query 搜索联动） */
+function renderVerdictChips(list){
+  var box = $('evalVerdictChips');
+  if(!box) return;
+  var cnt = {all: list.length, bad: 0, ok: 0, none: 0};
+  list.forEach(function(it){ cnt[verdictOf(it.e).state]++; });
+  var defs = [
+    {k: 'all', label: '全部', n: cnt.all, cls: ''},
+    {k: 'bad', label: '已劣化', n: cnt.bad, cls: 'bad'},
+    {k: 'ok', label: '正常', n: cnt.ok, cls: 'ok'},
+    {k: 'none', label: '未评测', n: cnt.none, cls: 'none'}
+  ];
+  box.innerHTML = defs.map(function(d){
+    var on = EVAL_VERDICT === d.k;
+    return '<button class="v-chip ' + d.cls + (on ? ' is-on' : '') + '" type="button"' +
+      ' onclick="setVerdictFilter(\'' + d.k + '\')" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+      d.label + ' <b>' + d.n + '</b></button>';
+  }).join('');
+}
+function setVerdictFilter(k){
+  EVAL_VERDICT = (k === 'bad' || k === 'ok' || k === 'none') ? k : 'all';
+  EVAL_PAGE = 1;
+  renderEvals();
+}
+function syncBaseSummaries(){
+  var changed = false;
+  EVALS.forEach(function(e){
+    var bs = summaryOf(e.base.task);
+    if(bs && applyBaseSummary(e, bs)) changed = true;
+  });
+  if(changed) saveEvals();
+}
+function renderEvals(){
+  var body = $('evalBody');
+  if(!body) return;
+  syncBaseSummaries();
+  var kwList = evalKeywordFiltered();
+  renderVerdictChips(kwList);
+  var list = evalListFiltered();
+  var total = list.length;
+  var pages = Math.max(1, Math.ceil(total / EVAL_PAGE_SIZE));
+  if(EVAL_PAGE > pages) EVAL_PAGE = pages;
+  if(EVAL_PAGE < 1) EVAL_PAGE = 1;
+  if(!total){
+    body.innerHTML = '<tr><td colspan="6" class="ev-empty">' + (EVALS.length ? '没有匹配的评测' : '暂无评测') + '</td></tr>';
+    renderEvalPager(0);
+    return;
+  }
+  var start = (EVAL_PAGE - 1) * EVAL_PAGE_SIZE;
+  body.innerHTML = list.slice(start, start + EVAL_PAGE_SIZE).map(function(it){
+    var e = it.e, i = it.i, last = latestReplayOf(e), vd = verdictOf(e);
+    return '<tr' + (vd.state === 'bad' ? ' class="row-bad"' : '') + '>' +
+      '<td class="ev-q" title="' + esc(e.q) + '"><span>' + esc(e.q) + '</span></td>' +
+      '<td title="' + esc(e.base.time) + '">' + esc(shortTime(e.base.time)) + ' · ' + e.base.n + ' 条 · 踩 ' + e.base.down + '</td>' +
+      '<td class="num">' + e.replays.length + ' 次</td>' +
+      '<td>' + (last ? (last.n + ' 条 · 踩 ' + last.down) : '—') + '</td>' +
+      '<td class="num"><span class="v-badge ' + vd.state + '" title="' + esc(verdictTip(e, vd)) + '">' + vd.label + '</span></td>' +
+      '<td class="ev-ops"><button class="btn-ghost" type="button" onclick="replayEval(' + i + ')">重新执行</button>' +
+        '<button class="btn-ghost" type="button" onclick="openCompare(' + i + ')">查看对比</button></td>' +
+    '</tr>';
+  }).join('');
+  renderEvalPager(total);
+}
+function renderEvalPager(total){
+  var box = $('evalPager');
+  if(!box) return;
+  var pages = Math.max(1, Math.ceil(total / EVAL_PAGE_SIZE));
+  if(EVAL_PAGE > pages) EVAL_PAGE = pages;
+  if(EVAL_PAGE < 1) EVAL_PAGE = 1;
+  var html = '<span class="pager-total">共 ' + total + ' 条</span>' +
+    '<button class="pager-btn" type="button" onclick="goEvalPage(' + (EVAL_PAGE - 1) + ')"' + (EVAL_PAGE <= 1 ? ' disabled' : '') + '>上一页</button>';
+  pagerNumbers(EVAL_PAGE, pages).forEach(function(p){
+    if(p === '...'){ html += '<span class="pager-gap">…</span>'; }
+    else{
+      html += '<button class="pager-num' + (p === EVAL_PAGE ? ' is-cur' : '') + '" type="button" onclick="goEvalPage(' + p + ')"' +
+        (p === EVAL_PAGE ? ' aria-current="page"' : '') + '>' + p + '</button>';
+    }
+  });
+  html += '<button class="pager-btn" type="button" onclick="goEvalPage(' + (EVAL_PAGE + 1) + ')"' + (EVAL_PAGE >= pages ? ' disabled' : '') + '>下一页</button>';
+  box.innerHTML = html;
+}
+function goEvalPage(n){
+  var pages = Math.max(1, Math.ceil(evalListFiltered().length / EVAL_PAGE_SIZE));
+  if(n < 1) n = 1;
+  if(n > pages) n = pages;
+  EVAL_PAGE = n;
+  renderEvals();
+}
+function onEvalListSearch(v){
+  EVAL_LIST_KW = String(v || '');
+  EVAL_PAGE = 1;
+  renderEvals();
+}
+
+/* 重新执行：落一条重放记录，再带 query / 基准结果数 / 新任务号跳到结果页 */
+function replayEval(i){
+  var e = EVALS[i];
+  if(!e) return;
+  var last = lastReplay(e);
+  var task = newTaskNo();
+  var baseSum = summaryOf(e.base.task);
+  var curSum = summaryOf(task);
+  var rec;
+  if(baseSum && summaryItems(baseSum).length){
+    /* 基准有摘要：先用基准摘要生成真实口径记录；结果页落盘新任务摘要后回到本页，再按两边摘要重算重合率 */
+    var m = metricsOf(baseSum, curSum || baseSum);
+    rec = {task: task, time: nowText(), n: m.n, up: 0, down: 0, avg: m.avg, top1: m.top1, ov: m.ov};
+  }else{
+    rec = {
+      task: task,
+      time: nowText(),
+      n: Math.max(0, e.base.n - 3),
+      up: 0,
+      down: 0,
+      avg: clamp01(last ? last.avg + 0.01 : e.base.avg + 0.03),
+      top1: clamp01(last ? last.top1 + 0.01 : e.base.top1 + 0.03),
+      ov: clamp01(last ? last.ov - 0.05 : 0.80),
+      demo: true
+    };
+    rec.avg = Number(rec.avg.toFixed(2));
+    rec.top1 = Number(rec.top1.toFixed(2));
+    rec.ov = Number(rec.ov.toFixed(2));
+  }
+
+  var store = readReplayStore();
+  var arr = Array.isArray(store[e.q]) ? store[e.q] : [];
+  arr.push(rec);
+  store[e.q] = arr;
+  writeReplayStore(store);
+
+  /* 跳结果页之前先把评测列表落盘，确保新加入的评测不因跳转丢失 */
+  saveEvals();
+
+  location.href = 'P2_结果页_v5.0_20261025.html?q=' + encodeURIComponent(e.q) +
+    '&replay=1&was=' + encodeURIComponent(String(e.base.n)) +
+    '&task=' + encodeURIComponent(task) + '&back=P8';
+}
+
+/* ================= 发起评测：选一条搜索行为记录设为基准 ================= */
+function evalFiltered(){
+  var kw = String(EVAL_KW || '').toLowerCase();
+  var out = [];
+  SEARCHES.forEach(function(s, i){
+    if(!kw || String(s.q).toLowerCase().indexOf(kw) >= 0 || String(s.time).indexOf(kw) >= 0){
+      out.push({i: i, s: s});
+    }
+  });
+  return out;
+}
+
+function renderEvalPick(){
+  var box = $('evalPickList');
+  if(!box) return;
+  var head = '<div class="pick-head"><span aria-hidden="true"></span><span>时间</span><span>查询</span>' +
+    '<span class="ta-r">结果数</span><span class="ta-r">踩数</span></div>';
+  var list = evalFiltered();
+  if(!list.length){
+    box.innerHTML = head + '<div class="pick-empty">没有匹配的搜索记录</div>';
+    return;
+  }
+  box.innerHTML = head + list.map(function(it){
+    var s = it.s;
+    var checked = !!(EVAL_PICK && EVAL_PICK.q === s.q && EVAL_PICK.time === s.time);
+    var flag = hasEval(s.q) ? '<span class="pk-flag">已在评测中</span>' : '';
+    return '<label class="pick-row' + (checked ? ' is-pick' : '') + '">' +
+      '<input type="radio" name="evalPick" value="' + it.i + '" data-i="' + it.i + '"' +
+        (checked ? ' checked' : '') + ' onchange="pickEval(this)" aria-label="选择 ' + esc(s.q) + '">' +
+      '<span class="pk-time">' + esc(s.time) + '</span>' +
+      '<span class="pk-q" title="' + esc(s.q) + '">' + esc(s.q) + flag + '</span>' +
+      '<span class="pk-n">' + s.n + ' 条</span>' +
+      '<span class="pk-d">' + s.down + '</span>' +
+    '</label>';
+  }).join('');
+}
+
+function onEvalSearch(v){
+  EVAL_KW = String(v || '');
+  renderEvalPick();
+}
+
+function pickEval(radio){
+  var i = parseInt(radio.getAttribute('data-i'), 10);
+  var s = SEARCHES[i] || null;
+  if(!s) return;
+  EVAL_PICK = s;
+  var rows = document.querySelectorAll('#evalPickList .pick-row');
+  for(var k = 0; k < rows.length; k++){ rows[k].classList.remove('is-pick'); }
+  var lab = radio.closest('.pick-row');
+  if(lab) lab.classList.add('is-pick');
+  var btn = $('evalSubmit');
+  if(btn) btn.disabled = false;
+}
+
+function openAddEval(){
+  EVAL_PICK = null;
+  EVAL_KW = '';
+  openInfo('发起评测',
+    '',
+    '<div class="mb-step">搜索行为记录</div>' +
+    '<input class="hist-search" type="text" id="evalSearch" placeholder="搜索查询或时间" autocomplete="off" oninput="onEvalSearch(this.value)" aria-label="搜索查询或时间">' +
+    '<div class="pick-list" id="evalPickList"></div>',
+    '<button class="btn-ghost" type="button" onclick="closeInfo()">取消</button>' +
+    '<button class="btn-primary" type="button" id="evalSubmit" onclick="saveEvalBaseline()" disabled>设为基准</button>');
+  renderEvalPick();
+}
+
+function saveEvalBaseline(){
+  if(!EVAL_PICK){ toast('请先选择一条搜索记录', 'err'); return; }
+  if(hasEval(EVAL_PICK.q)){ toast('该搜索已在评测中', 'err'); return; }
+  EVALS.unshift({
+    q: EVAL_PICK.q,
+    base: {task: EVAL_PICK.task || '', time: EVAL_PICK.time, n: EVAL_PICK.n, up: EVAL_PICK.up, down: EVAL_PICK.down, avg: 0.82, top1: 0.91},
+    replays: []
+  });
+  saveEvals();
+  closeInfo();
+  EVAL_PAGE = 1;
+  renderEvals();
+  toast('已加入评测', 'ok');
+}
+
+/* ================= 难例样本集：数据汇总与渲染 ================= */
+var SAMPLE_ROWS = [];
+var SAMPLE_PAGE = 1;
+var SAMPLE_PAGE_SIZE = 10;
+function readJsonStore(key){
+  try{
+    var raw = sessionStorage.getItem(key);
+    if(!raw) return null;
+    return JSON.parse(raw);
+  }catch(e){ return null; }
+}
+/* 图搜 / 视频搜 / 音频搜的 input 带前缀，归并 query 时去掉 */
+function stripQueryPrefix(s){
+  return String(s == null ? '' : s).replace(/^(图片|视频|音频)：/, '');
+}
+function itemName(id, names){
+  return (names && names[id]) || ITEM_NAMES[id] || '未命名条目';
+}
+/* 真实摘要里的 id→name 映射：优先于本页演示条目表 */
+function summaryNameMap(){
+  var map = {};
+  var all = readJsonStore(SUMMARY_KEY);
+  if(!all || typeof all !== 'object' || Array.isArray(all)) return map;
+  Object.keys(all).forEach(function(k){
+    var v = all[k];
+    if(!v || !Array.isArray(v.items)) return;
+    v.items.forEach(function(it){
+      if(it && it.id && it.name) map[String(it.id)] = String(it.name);
+    });
+  });
+  return map;
+}
+/* 任务号 → query：先读结果页写入的 cm_task_meta，再用评测重放记录与搜索行为的重放记录覆盖，最后用演示任务表兜底 */
+function collectTaskMeta(){
+  var meta = {};
+  try{
+    var tm = readJsonStore('cm_task_meta');
+    if(tm && typeof tm === 'object' && !Array.isArray(tm)){
+      Object.keys(tm).forEach(function(task){
+        var v = tm[task];
+        if(!v || typeof v !== 'object' || Array.isArray(v)) return;
+        var q = stripQueryPrefix(String(v.q == null ? '' : v.q));
+        if(!q) return;
+        meta[String(task)] = {
+          q: q,
+          time: v.time ? String(v.time) : '',
+          n: Math.max(0, Math.round(toNum(v.n, 0)))
+        };
+      });
+    }
+  }catch(e){}
+  /* 结果页摘要兜底：没有 cm_task_meta 的任务号，用摘要里的 q / time / n 还原 query */
+  try{
+    var sm = readJsonStore(SUMMARY_KEY);
+    if(sm && typeof sm === 'object' && !Array.isArray(sm)){
+      Object.keys(sm).forEach(function(task){
+        if(meta[String(task)]) return;
+        var v = sm[task];
+        if(!v || typeof v !== 'object' || Array.isArray(v)) return;
+        var q = stripQueryPrefix(String(v.q == null ? '' : v.q));
+        if(!q) return;
+        meta[String(task)] = {
+          q: q,
+          time: v.time ? String(v.time) : '',
+          n: Math.max(0, Math.round(toNum(v.n, 0)))
+        };
+      });
+    }
+  }catch(e){}
+  var rs = readReplayStore();
+  Object.keys(rs).forEach(function(q){
+    var arr = rs[q];
+    if(!Array.isArray(arr)) return;
+    arr.forEach(function(r){
+      if(!r || !r.task) return;
+      meta[String(r.task)] = {q: q, time: r.time ? String(r.time) : '', n: Math.max(0, Math.round(toNum(r.n, 0)))};
+    });
+  });
+  var rr = readJsonStore('cm_replay_records');
+  if(Array.isArray(rr)){
+    rr.forEach(function(r){
+      if(!r || !r.task) return;
+      meta[String(r.task)] = {q: stripQueryPrefix(r.input), time: r.time ? String(r.time) : '', n: Math.max(0, Math.round(toNum(r.n, 0)))};
+    });
+  }
+  Object.keys(TASK_META).forEach(function(t){
+    if(!meta[t]) meta[t] = TASK_META[t];
+  });
+  return meta;
+}
+/* 难例排序：被踩条目数降序（最差在前），同数量按最近时间倒序 */
+function bySample(a, b){
+  var ca = (a.items || []).length, cb = (b.items || []).length;
+  if(ca !== cb) return cb - ca;
+  var ta = String(a.time || ''), tb = String(b.time || '');
+  if(ta !== tb) return ta < tb ? 1 : -1;
+  return (b.down || 0) - (a.down || 0);
+}
+/* 点踩聚合：任务号 → query；同一 query 的条目去重、踩数累计、最近时间取最新 */
+function aggregateVotes(){
+  var res = {rows: [], total: 0, known: 0};
+  var store = readJsonStore(VOTE_KEY);
+  if(!store || typeof store !== 'object' || Array.isArray(store)) return res;
+  var meta = collectTaskMeta();
+  var names = summaryNameMap();
+  var group = {};
+  Object.keys(store).forEach(function(task){
+    var mine = store[task];
+    if(!mine || typeof mine !== 'object' || Array.isArray(mine)) return;
+    var tm = meta[task];
+    if(!tm || !tm.q) return;
+    Object.keys(mine).forEach(function(iid){
+      var dir = mine[iid];
+      if(dir !== 'up' && dir !== 'down') return;
+      res.known++;
+      if(dir !== 'down') return;
+      var g = group[tm.q];
+      if(!g){
+        g = group[tm.q] = {q: tm.q, items: [], seen: {}, down: 0, time: '', n: 0, task: '', taskTime: '', taskDowns: {}};
+      }
+      g.down++;
+      res.total++;
+      if(!g.seen[iid]){
+        g.seen[iid] = 1;
+        g.items.push({id: iid, name: itemName(iid, names)});
+      }
+      if(tm.time && String(tm.time) > g.time) g.time = String(tm.time);
+      if(!g.n && tm.n) g.n = tm.n;
+      var taskKey = String(task);
+      g.taskDowns[taskKey] = (g.taskDowns[taskKey] || 0) + 1;
+      var tTime = tm.time ? String(tm.time) : '';
+      if(!g.task || tTime > g.taskTime){ g.task = taskKey; g.taskTime = tTime; }
+    });
+  });
+  res.rows = Object.keys(group).map(function(k){
+    var g = group[k];
+    g.taskDown = g.task ? (g.taskDowns[g.task] || 0) : 0;
+    delete g.taskDowns;
+    delete g.taskTime;
+    return g;
+  }).sort(bySample);
+  return res;
+}
+function buildSamples(){
+  var agg = aggregateVotes();
+  return {rows: agg.rows, total: agg.total};
+}
+/* 最近时间统一显示为 MM-DD HH:mm */
+function shortTime(t){
+  var s = String(t == null ? '' : t);
+  var m = s.match(/^\d{4}-(\d{2})-(\d{2})[ T](\d{2}:\d{2})/);
+  if(m) return m[1] + '-' + m[2] + ' ' + m[3];
+  return s || '—';
+}
+function renderSamples(){
+  var body = $('sampleBody');
+  if(!body) return;
+  var built = buildSamples();
+  SAMPLE_ROWS = built.rows;
+  var total = built.rows.length;
+  if(!total){
+    body.innerHTML = '<tr><td colspan="5" class="sb-empty">暂无被踩的数据</td></tr>';
+    renderSamplePager(0);
+    return;
+  }
+  var pages = Math.max(1, Math.ceil(total / SAMPLE_PAGE_SIZE));
+  if(SAMPLE_PAGE > pages) SAMPLE_PAGE = pages;
+  if(SAMPLE_PAGE < 1) SAMPLE_PAGE = 1;
+  var start = (SAMPLE_PAGE - 1) * SAMPLE_PAGE_SIZE;
+  body.innerHTML = built.rows.slice(start, start + SAMPLE_PAGE_SIZE).map(function(r, k){
+    var idx = start + k;
+    /* 悬浮看全部：title 挂完整条目列表，用「、」连接 */
+    var fullTitle = r.items.map(function(it){ return it.name; }).join('、');
+    var items = r.items.map(function(it){
+      return '<span class="sb-item">' + esc(it.name) + '</span>';
+    }).join('、');
+    var op = hasEval(r.q)
+      ? '<button class="sb-done" type="button" disabled aria-disabled="true" title="该 query 已在评测列表中">已在评测</button>'
+      : '<button class="sb-add" type="button" onclick="addSampleToEval(' + idx + ')">加入评测</button>';
+    return '<tr>' +
+      '<td class="sb-q-cell" title="' + esc(r.q) + '">' + esc(r.q) + '</td>' +
+      '<td><div class="sb-items sample-items" title="' + esc(fullTitle) + '">' + items + '</div></td>' +
+      '<td class="num" title="该 query 下被点踩的数据条数（去重）：' + r.items.length + ' 条"><span class="sb-count">' + r.items.length + ' 条</span></td>' +
+      '<td class="num"><span class="sb-time">' + esc(shortTime(r.time)) + '</span></td>' +
+      '<td class="sb-op">' + op + '</td>' +
+    '</tr>';
+  }).join('');
+  renderSamplePager(total);
+}
+/* 分页器：共 N 条 · 上一页 · 页码（当前页高亮）· 下一页；不足 1 页时首尾按钮禁用 */
+function pagerNumbers(page, pages){
+  var out = [], i;
+  if(pages <= 7){
+    for(i = 1; i <= pages; i++){ out.push(i); }
+  }else{
+    out.push(1);
+    var s = Math.max(2, page - 1), e = Math.min(pages - 1, page + 1);
+    if(s > 2){ out.push('...'); }
+    for(i = s; i <= e; i++){ out.push(i); }
+    if(e < pages - 1){ out.push('...'); }
+    out.push(pages);
+  }
+  return out;
+}
+function renderSamplePager(total){
+  var box = $('samplePager');
+  if(!box) return;
+  var pages = Math.max(1, Math.ceil(total / SAMPLE_PAGE_SIZE));
+  if(SAMPLE_PAGE > pages) SAMPLE_PAGE = pages;
+  if(SAMPLE_PAGE < 1) SAMPLE_PAGE = 1;
+  var html = '<span class="pager-total">共 ' + total + ' 条</span>' +
+    '<button class="pager-btn" type="button" onclick="goSamplePage(' + (SAMPLE_PAGE - 1) + ')"' + (SAMPLE_PAGE <= 1 ? ' disabled' : '') + '>上一页</button>';
+  pagerNumbers(SAMPLE_PAGE, pages).forEach(function(p){
+    if(p === '...'){ html += '<span class="pager-gap">…</span>'; }
+    else{
+      html += '<button class="pager-num' + (p === SAMPLE_PAGE ? ' is-cur' : '') + '" type="button" onclick="goSamplePage(' + p + ')"' +
+        (p === SAMPLE_PAGE ? ' aria-current="page"' : '') + '>' + p + '</button>';
+    }
+  });
+  html += '<button class="pager-btn" type="button" onclick="goSamplePage(' + (SAMPLE_PAGE + 1) + ')"' + (SAMPLE_PAGE >= pages ? ' disabled' : '') + '>下一页</button>';
+  box.innerHTML = html;
+}
+function goSamplePage(n){
+  var pages = Math.max(1, Math.ceil(SAMPLE_ROWS.length / SAMPLE_PAGE_SIZE));
+  if(n < 1) n = 1;
+  if(n > pages) n = pages;
+  SAMPLE_PAGE = n;
+  renderSamples();
+}
+/* 加入评测：复用「设为基准」逻辑；query 不在搜索记录里时按样本信息补一条基准 */
+function addSampleToEval(i){
+  var row = SAMPLE_ROWS[i];
+  if(!row) return;
+  if(hasEval(row.q)){ toast('该搜索已在评测中', 'err'); return; }
+  var src = searchByQuery(row.q);
+  var rowVotes = (!src && row.task) ? votesOf(row.task) : null;
+  EVAL_PICK = {
+    q: row.q,
+    task: src ? (src.task || '') : (row.task || ''),
+    time: src ? src.time : (row.time || nowText()),
+    n: src ? src.n : Math.max(0, Math.round(toNum(row.n, 0))),
+    up: src ? src.up : (rowVotes ? rowVotes.up : 0),
+    down: src ? src.down : (rowVotes ? rowVotes.down : (row.taskDown || Math.max(0, Math.round(toNum(row.down, 0)))))
+  };
+  saveEvalBaseline();
+  if(hasEval(row.q)) renderSamples();
+}
+function toggleSampleHelp(){
+  var p = $('sampleHelp'), b = $('sampleHelpBtn');
+  if(!p) return;
+  p.hidden = !p.hidden;
+  if(b) b.setAttribute('aria-expanded', p.hidden ? 'false' : 'true');
+}
+function closeSampleHelp(){
+  var p = $('sampleHelp'), b = $('sampleHelpBtn');
+  if(p && !p.hidden){
+    p.hidden = true;
+    if(b) b.setAttribute('aria-expanded', 'false');
+  }
+}
+
+/* ================= 评测数据检查（4 项只读，不改任何数据、不写任何存储） ================= */
+/* 条目级屏蔽列表（只读）：cm_blocked_items = 条目 ID 数组 */
+var BLOCKED_KEY = 'cm_blocked_items';
+/* 数据源黑名单（只读）：cm_blacklist = [{id,name,src,...}]，按 src 命中 */
+var BLACKLIST_KEY = 'cm_blacklist';
+/* 基准条目的摘要 items：cm_task_summary[任务号].items */
+function baseItemsOf(e){
+  if(!e || !e.base) return [];
+  return summaryItems(summaryOf(e.base.task));
+}
+function blockedIdSet(){
+  var set = {};
+  var arr = readJsonStore(BLOCKED_KEY);
+  if(Array.isArray(arr)){
+    arr.forEach(function(v){
+      if(v == null) return;
+      var id = String((typeof v === 'object') ? (v.id == null ? '' : v.id) : v).trim();
+      if(id) set[id] = 1;
+    });
+  }
+  return set;
+}
+function blacklistSrcSet(){
+  var set = {};
+  var arr = readJsonStore(BLACKLIST_KEY);
+  if(Array.isArray(arr)){
+    arr.forEach(function(v){
+      if(!v || typeof v !== 'object' || !v.src) return;
+      var src = String(v.src).trim();
+      if(src) set[src] = 1;
+    });
+  }
+  return set;
+}
+/* 摘要里的条目来源：id → src（本页演示条目表没有来源字段，只能从摘要取） */
+function summarySrcMap(){
+  var map = {};
+  var all = readJsonStore(SUMMARY_KEY);
+  if(!all || typeof all !== 'object' || Array.isArray(all)) return map;
+  Object.keys(all).forEach(function(k){
+    var v = all[k];
+    if(!v || !Array.isArray(v.items)) return;
+    v.items.forEach(function(it){
+      if(it && it.id && it.src) map[String(it.id)] = String(it.src);
+    });
+  });
+  return map;
+}
+/* 4 项检查：返回 [{no,label,ok,value,detail:[]}] */
+function checkDataset(){
+  var names = summaryNameMap();
+  var srcMap = summarySrcMap();
+  var out = [];
+
+  /* 1 样本够不够：评测数 + 各评测基准的 items 条数之和 */
+  var evalCount = EVALS.length, sampleCount = 0;
+  EVALS.forEach(function(e){ sampleCount += baseItemsOf(e).length; });
+  var enough = evalCount >= 1 && sampleCount >= 10;
+  out.push({
+    no: 1, label: '样本够不够', ok: enough,
+    value: evalCount + ' 个评测 · 共 ' + sampleCount + ' 条样本',
+    detail: enough ? [] : [evalCount ? '样本不足 10 条，评测结论参考价值有限' : '还没有评测，先发起一条评测再检查']
+  });
+
+  /* 2 有没有重复用：同一个 item id 出现在几个评测的基准里 */
+  var used = {};
+  EVALS.forEach(function(e){
+    var once = {};
+    baseItemsOf(e).forEach(function(it){
+      if(!it || !it.id) return;
+      var id = String(it.id);
+      if(once[id]) return;
+      once[id] = 1;
+      if(!used[id]) used[id] = {q: []};
+      used[id].q.push(e.q);
+    });
+  });
+  var dupIds = Object.keys(used).filter(function(id){ return used[id].q.length >= 2; });
+  var maxShare = 0;
+  dupIds.forEach(function(id){ if(used[id].q.length > maxShare) maxShare = used[id].q.length; });
+  out.push({
+    no: 2, label: '有没有重复用', ok: dupIds.length === 0,
+    value: dupIds.length ? dupIds.length + ' 条被 ' + maxShare + ' 个评测共用' : '没有条目被重复使用',
+    detail: dupIds.map(function(id){
+      return '「' + itemName(id, names) + '」在 ' + used[id].q.length + ' 个评测的基准里';
+    })
+  });
+
+  /* 3 样本还有效吗：条目在 cm_blocked_items 里 / 条目来源在 cm_blacklist 的 src 里 */
+  var blocked = blockedIdSet(), blSrc = blacklistSrcSet();
+  var dead = {}, deadList = [];
+  EVALS.forEach(function(e){
+    baseItemsOf(e).forEach(function(it){
+      if(!it || !it.id) return;
+      var id = String(it.id);
+      if(dead[id]) return;
+      var src = String(it.src ? it.src : (srcMap[id] || '')).trim();
+      var reason = '';
+      if(blocked[id]) reason = '已屏蔽';
+      else if(src && blSrc[src]) reason = '来源已进黑名单';
+      if(!reason) return;
+      dead[id] = 1;
+      deadList.push({id: id, name: itemName(id, names), reason: reason});
+    });
+  });
+  out.push({
+    no: 3, label: '样本还有效吗', ok: deadList.length === 0,
+    value: deadList.length ? deadList.length + ' 条已进黑名单/已下线' : '没有失效条目',
+    detail: deadList.map(function(d){ return '「' + d.name + '」' + d.reason; })
+  });
+
+  /* 4 评价矛盾吗：同一 itemId 在不同 task 下既有 up 又有 down */
+  var votes = readJsonStore(VOTE_KEY);
+  var byItem = {};
+  if(votes && typeof votes === 'object' && !Array.isArray(votes)){
+    Object.keys(votes).forEach(function(task){
+      var mine = votes[task];
+      if(!mine || typeof mine !== 'object' || Array.isArray(mine)) return;
+      Object.keys(mine).forEach(function(iid){
+        var dir = mine[iid];
+        if(dir !== 'up' && dir !== 'down') return;
+        var rec = byItem[iid] || (byItem[iid] = {up: [], down: []});
+        if(rec[dir].indexOf(task) < 0) rec[dir].push(task);
+      });
+    });
+  }
+  var clash = Object.keys(byItem).filter(function(id){ return byItem[id].up.length && byItem[id].down.length; });
+  out.push({
+    no: 4, label: '评价矛盾吗', ok: clash.length === 0,
+    value: clash.length ? clash.length + ' 条既被赞过又被踩过' : '没有条目既被赞又被踩',
+    detail: clash.map(function(id){
+      return '「' + itemName(id, names) + '」在 ' + byItem[id].up.length + ' 个任务里被赞、在 ' +
+        byItem[id].down.length + ' 个任务里被踩';
+    })
+  });
+
+  return out;
+}
+function openDataCheck(){
+  var list = checkDataset();
+  var bad = [];
+  list.forEach(function(it){ if(!it.ok) bad.push(it.no); });
+  var sum = bad.length
+    ? '<div class="chk-sum warn">⚠ 发现 ' + bad.length + ' 项问题</div>'
+    : '<div class="chk-sum ok">✓ 评测数据检查通过</div>';
+  var rows = list.map(function(it){
+    return '<div class="chk-item">' +
+      '<span class="chk-ico ' + (it.ok ? 'ok' : 'warn') + '" aria-hidden="true">' + (it.ok ? '✓' : '⚠') + '</span>' +
+      '<div class="chk-main">' +
+        '<div class="chk-t">' + it.no + '. ' + esc(it.label) + '<span class="chk-v">' + esc(it.value) + '</span></div>' +
+        (it.detail && it.detail.length
+          ? it.detail.map(function(d){ return '<div class="chk-d">' + esc(d) + '</div>'; }).join('')
+          : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
+  var adv = bad.length
+    ? '<div class="chk-adv warn">建议：第 ' + bad.join('、') + ' 项需要处理</div>'
+    : '<div class="chk-adv">评测数据可用</div>';
+  openInfo('评测数据检查', '', sum + '<div class="chk-list">' + rows + '</div>' + adv,
+    '<button class="btn-ghost" type="button" onclick="closeInfo()">关闭</button>');
+}
+
+/* ================= 对比视图（指标对比表） ================= */
+/* 对比表固定最多 4 列：基准 + 最近 3 次重放（不足 3 次有几条显示几条） */
+var CMP_MAX_REPS = 3;
+/* 按时间正序的重放序列（时间相同按原有先后）；序号即「重放 1..N」里的 N */
+function replayTimeline(e){
+  var list = [];
+  (e.replays || []).forEach(function(r, i){
+    list.push({rec: r, at: String((r && r.time) || ''), i: i});
+  });
+  list.sort(function(a, b){
+    if(a.at !== b.at) return a.at < b.at ? -1 : 1;
+    return a.i - b.i;
+  });
+  return list.map(function(x, k){ return {rec: x.rec, no: k + 1}; });
+}
+/* 最新一次重放：按时间取最新，与表里显示几列无关 */
+function latestReplayOf(e){
+  var tl = replayTimeline(e);
+  return tl.length ? tl[tl.length - 1].rec : null;
+}
+/* 要显示的重放列：超过 3 次时按时间倒序取最新 3 条，再按时间正序排 */
+function replayWindow(e){
+  var tl = replayTimeline(e);
+  var total = tl.length;
+  var shown = total > CMP_MAX_REPS ? tl.slice(total - CMP_MAX_REPS) : tl.slice();
+  return {total: total, shown: shown, latest: total ? tl[total - 1].rec : null, trimmed: total > CMP_MAX_REPS};
+}
+/* 表头上方小字：>3 次写「共 N 次重放 · 显示最近 3 次」；≤3 次只写「共 N 次重放」；0 次不显示 */
+function cmpNoteText(win){
+  if(!win.total) return '';
+  var t = '共 ' + win.total + ' 次重放';
+  if(win.trimmed) t += ' · 显示最近 ' + CMP_MAX_REPS + ' 次';
+  return t;
+}
+
+/* 结论：最新一次重放 vs 基准，须含踩数与平均相似度两项变化 */
+function conclusionOf(e){
+  var last = latestReplayOf(e);
+  if(!last){
+    return {cls: 'flat', text: '结论：尚无重放，暂无结论'};
+  }
+  var avgTxt = two(e.base.avg) + ' → ' + two(last.avg);
+  var avgUp = last.avg - e.base.avg > 0.005;
+  var avgDown = e.base.avg - last.avg > 0.005;
+  if(last.down < e.base.down){
+    return {cls: 'good', text: '结论：治理有效（踩从 ' + e.base.down + ' 降到 ' + last.down + '，平均相似度 ' + avgTxt + '）'};
+  }
+  if(last.down > e.base.down){
+    return {cls: 'bad', text: '结论：效果变差（踩从 ' + e.base.down + ' 升到 ' + last.down + '，平均相似度 ' + avgTxt + '）'};
+  }
+  if(avgUp){
+    return {cls: 'good', text: '结论：效果改善（踩仍为 ' + last.down + '，平均相似度 ' + avgTxt + '）'};
+  }
+  if(avgDown){
+    return {cls: 'bad', text: '结论：效果退步（踩仍为 ' + last.down + '，平均相似度 ' + avgTxt + '）'};
+  }
+  return {cls: 'flat', text: '结论：无明显变化（踩仍为 ' + last.down + '，平均相似度 ' + avgTxt + '）'};
+}
+
+function votesTotal(x){
+  return Math.max(0, toNum(x.up, 0)) + Math.max(0, toNum(x.down, 0));
+}
+function rateOf(x){
+  return x.n ? x.down / x.n : 0;
+}
+function rateText(x){
+  if(votesTotal(x) === 0) return '—';
+  if(!x.n) return '0%';
+  var p = rateOf(x) * 100;
+  if(p < 0.05) return '0.0%';
+  if(Math.abs(p - Math.round(p)) < 0.05) return Math.round(p) + '%';
+  return p.toFixed(1) + '%';
+}
+function ptText(v){
+  var a = Math.abs(v);
+  var t = (Math.abs(a - Math.round(a)) < 0.05) ? String(Math.round(a)) : a.toFixed(1);
+  return t + 'pt';
+}
+
+function openCompare(i){
+  var e = EVALS[i];
+  if(!e) return;
+  var win = replayWindow(e);
+  var last = win.latest;            /* 变化列按最新一次重放 vs 基准 */
+  var reps = win.shown;             /* 只渲染基准 + 最近 3 次重放 */
+  var baseSum = summaryOf(e.base.task);
+  if(baseSum && applyBaseSummary(e, baseSum)) saveEvals();
+  /* 角标按行判断：该行显示的重放记录里只要还有 demo，就标「演示」；全部真实计算则不标 */
+  var demoRow = !baseSum || reps.some(function(it){ return it.rec.demo === true; });
+
+  var head = '<tr><th scope="col">指标</th><th scope="col" class="num is-basecol">基准</th>';
+  reps.forEach(function(it){
+    var r = it.rec;
+    var tip = (r.time || '') + (r.task ? ' · ' + r.task : '');
+    head += '<th scope="col" class="num"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>重放' + it.no + '</th>';
+  });
+  head += '<th scope="col" class="num">变化<i class="th-sub">最新 vs 基准</i></th></tr>';
+
+  function colVals(fn){
+    var out = [fn(e.base, 0)];
+    reps.forEach(function(it, k){ out.push(fn(it.rec, k + 1)); });
+    return out;
+  }
+  function row(name, vals, chg, demo){
+    var tr = '<tr><td class="m-name">' + name + (demo ? '<span class="demo-badge">演示</span>' : '') + '</td>';
+    vals.forEach(function(v, k){
+      tr += '<td class="num' + (k === 0 ? ' is-basecol' : '') + '">' + v + '</td>';
+    });
+    return tr + '<td class="num chg-cell">' + chg + '</td></tr>';
+  }
+
+  var rows = '';
+
+  var nChg = '<span class="chg flat">—</span>';
+  if(last){
+    var dn = last.n - e.base.n;
+    nChg = '<span class="chg flat">' +
+      (dn === 0 ? '±0' : (dn > 0 ? '↑' + dn : '↓' + (-dn))) + '</span>';
+  }
+  rows += row('结果数', colVals(function(x){ return String(x.n); }), nChg, demoRow);
+
+  var uChg = '<span class="chg flat">—</span>';
+  if(last){
+    var du = toNum(last.up, 0) - toNum(e.base.up, 0);
+    if(du > 0){ uChg = '<span class="chg good">↑' + du + '</span>'; }
+    else if(du < 0){ uChg = '<span class="chg bad">↓' + (-du) + '</span>'; }
+    else { uChg = '<span class="chg flat">±0</span>'; }
+  }
+  rows += row('赞数', colVals(function(x){ return String(toNum(x.up, 0)); }), uChg);
+
+  var dChg = '<span class="chg flat">—</span>';
+  if(last){
+    var dd = toNum(last.down, 0) - toNum(e.base.down, 0);
+    if(dd < 0){ dChg = '<span class="chg good">↓' + (-dd) + '</span>'; }
+    else if(dd > 0){ dChg = '<span class="chg bad">↑' + dd + '</span>'; }
+    else { dChg = '<span class="chg flat">±0</span>'; }
+  }
+  rows += row('踩数', colVals(function(x){ return String(toNum(x.down, 0)); }), dChg);
+
+  var rChg = '<span class="chg flat">—</span>';
+  if(last && votesTotal(last) && votesTotal(e.base)){
+    var rd = (rateOf(last) - rateOf(e.base)) * 100;
+    if(rd < -0.05){ rChg = '<span class="chg good">↓' + ptText(rd) + '</span>'; }
+    else if(rd > 0.05){ rChg = '<span class="chg bad">↑' + ptText(rd) + '</span>'; }
+    else { rChg = '<span class="chg flat">±0pt</span>'; }
+  }
+  rows += row('踩率', colVals(function(x){ return rateText(x); }), rChg);
+
+  var aChg = '<span class="chg flat">—</span>';
+  if(last){
+    var ad = last.avg - e.base.avg;
+    if(ad > 0.005){ aChg = '<span class="chg good">↑' + two(ad) + '</span>'; }
+    else if(ad < -0.005){ aChg = '<span class="chg bad">↓' + two(-ad) + '</span>'; }
+    else { aChg = '<span class="chg flat">±0.00</span>'; }
+  }
+  rows += row('Top-20 平均相似度', colVals(function(x){ return two(x.avg); }), aChg, demoRow);
+
+  var tChg = '<span class="chg flat">—</span>';
+  if(last){
+    var td = last.top1 - e.base.top1;
+    if(td > 0.005){ tChg = '<span class="chg good">↑' + two(td) + '</span>'; }
+    else if(td < -0.005){ tChg = '<span class="chg bad">↓' + two(-td) + '</span>'; }
+    else { tChg = '<span class="chg flat">±0.00</span>'; }
+  }
+  rows += row('Top-1 分数', colVals(function(x){ return two(x.top1); }), tChg, demoRow);
+
+  rows += row('Top-20 重合率',
+    colVals(function(x, k){ return k === 0 ? '—' : Math.round(clamp01(x.ov == null ? 0 : x.ov) * 100) + '%'; }),
+    '<span class="chg flat">—</span>', demoRow);
+
+  var cj = conclusionOf(e);
+  var noteTxt = cmpNoteText(win);
+  /* 回归阻断提示：只提示、不强制拦截；未评测（无重放）不显示 */
+  var vd = verdictOf(e);
+  var regHtml = '';
+  if(vd.state === 'bad'){
+    regHtml = '<div class="regress bad" role="status">' +
+      '<div class="regress-line"><span class="rg-ico" aria-hidden="true">⚠</span>本次重放相较基准已劣化：' +
+        vd.reasons.map(reasonText).join('、') + '</div>' +
+      '<div class="regress-tip">建议：不发布当前策略，先排查召回或排序问题</div>' +
+    '</div>';
+  }else if(vd.state === 'ok'){
+    regHtml = '<div class="regress ok" role="status"><span class="rg-ico" aria-hidden="true">✓</span>本次重放未发现劣化</div>';
+  }
+  openInfo('效果对比 · ' + e.q,
+    '',
+    (noteTxt ? '<p class="cmp-note">' + noteTxt + '</p>' : '') +
+    '<div class="cmp-wrap"><table class="cmp-tbl">' +
+      '<thead>' + head + '</thead>' +
+      '<tbody>' + rows + '</tbody>' +
+    '</table></div>' +
+    '<p class="cmp-demo">部分指标为演示值（无摘要时回落演示口径）；真实实现由检索引擎按 Top-20 摘要计算</p>' +
+    regHtml +
+    '<div class="conclusion ' + cj.cls + '">' + cj.text + '</div>',
+    '<button class="btn-ghost" type="button" onclick="closeInfo()">关闭</button>');
+}
+
+/* ================= 启动 ================= */
+function initPage(){
+  mergeReplayStore();
+  refreshVoteCounts();
+  renderEvals();
+  renderSamples();
+  var mask = $('infoMask');
+  if(mask){
+    mask.addEventListener('click', function(ev){ if(ev.target === mask) closeInfo(); });
+  }
+  document.addEventListener('keydown', function(ev){
+    if(ev.key === 'Escape'){ closeInfo(); closeDev(); closeSampleHelp(); }
+  });
+  document.addEventListener('click', function(ev){
+    var p = $('sampleHelp'), b = $('sampleHelpBtn');
+    if(!p || p.hidden) return;
+    if(b && (ev.target === b || b.contains(ev.target))) return;
+    if(!p.contains(ev.target)) closeSampleHelp();
+  });
+}
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', initPage);
+}else{
+  initPage();
+}
+/* 从结果页返回（含 bfcache 恢复）时，再并一次会话记录，刷新重放次数与最新踩数 */
+window.addEventListener('pageshow', function(ev){
+  if(ev.persisted){
+    mergeReplayStore();
+    refreshVoteCounts();
+    renderEvals();
+    renderSamples();
+  }
+});
+
+/* ===== 系统门户桥接（index.html 壳用，单页直开无副作用） ===== */
+(function(){
+  try{
+    if(window.parent && window.parent !== window){
+      window.parent.postMessage({type:'sys-page', page:'P8', name:'效果评测'}, '*');
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>
