@@ -1,0 +1,42 @@
+# 跨模态检索中心 · 单机部署编排
+# 生产使用 docker compose（非 k8s）；启动时加 -p cmr-line 避免空 COMPOSE_PROJECT_NAME。
+# 镜像 tag 由 Jenkins 生成，本地不要手工编 tag。
+services:
+  cmr-server:
+    image: ${CMR_SERVER_IMAGE:-hsmty-module-cmr-start:latest}
+    container_name: cmr-server
+    restart: unless-stopped
+    environment:
+      HSMTY_VERIFY_URL: ${HSMTY_VERIFY_URL}
+      HSMTY_REDIRECT_URL: ${HSMTY_REDIRECT_URL}
+      CMR_SERVICE_URL: ${CMR_SERVICE_URL:-http://cmr-server:8080/hs-api}
+      CMR_FILE_STORE: ${CMR_FILE_STORE:-s3}
+      CMR_FILE_BUCKET: ${CMR_FILE_BUCKET}
+      CMR_FILE_ENDPOINT: ${CMR_FILE_ENDPOINT}
+      CMR_FILE_ACCESS_KEY: ${CMR_FILE_ACCESS_KEY}
+      CMR_FILE_SECRET_KEY: ${CMR_FILE_SECRET_KEY}
+      JASYPT_ENCRYPTOR_PASSWORD: ${JASYPT_ENCRYPTOR_PASSWORD}
+    ports:
+      - "${CMR_SERVER_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/hs-api/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  cmr-web:
+    image: ${CMR_WEB_IMAGE:-hsmty-cmr-web:latest}
+    container_name: cmr-web
+    restart: unless-stopped
+    depends_on:
+      - cmr-server
+    ports:
+      - "${CMR_WEB_PORT:-8081}:80"
+
+  # 检索算子容器（迁移完成后启用，单容器 6300 端口）
+  # cmr-operators:
+  #   image: ${CMR_OPERATORS_IMAGE:-cross-modal-operators:latest}
+  #   container_name: cmr-operators
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6300:6300"

@@ -1,0 +1,151 @@
+# 跨模态检索中心 · 全局配置
+# 环境相关值均可被环境变量/配置中心覆盖；敏感值使用 Jasypt ENC(...) 加密。
+server:
+  port: 8080
+  servlet:
+    context-path: /hs-api
+    encoding:
+      charset: UTF-8
+      force: true
+  tomcat:
+    max-swallow-size: -1
+
+spring:
+  application:
+    name: hsmty-module-cmr-server
+  threads:
+    virtual:
+      # 启用虚拟线程
+      enabled: true
+  servlet:
+    multipart:
+      max-file-size: 200MB
+      max-request-size: 210MB
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://192.168.1.102:13306/sd_data_engineering?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowMultiQueries=true&allowPublicKeyRetrieval=true
+    username: ai
+    password: ENC(SxiwpBUfJDRcmt+idRGJbX1RJWbioO+a)
+    hikari:
+      pool-name: HikariCP_MYSQL
+      minimum-idle: 5
+      idle-timeout: 600000
+      maximum-pool-size: 10
+      auto-commit: true
+      max-lifetime: 540000
+      keepalive-time: 300000
+      connection-timeout: 30000
+      connection-test-query: SELECT 1
+  liquibase:
+    change-log: classpath:db/changelog/changelog-master.xml
+    enabled: false
+    database-change-log-lock-table: databasechangeloglock
+    database-change-log-table: databasechangelog
+  data:
+    redis:
+      database: 3
+      password: ENC(GbNGIsdiS4E7zNYcGnSrCbYm2m9FSUph)
+      timeout: 50000
+      lettuce:
+        pool:
+          max-active: 8
+          max-wait: -1ms
+          max-idle: 8
+          min-idle: 0
+      sentinel:
+        master: mymaster
+        nodes: 192.168.1.102:26391,192.168.1.102:26392,192.168.1.102:26393
+        password: ENC(GbNGIsdiS4E7zNYcGnSrCbYm2m9FSUph)
+  cloud:
+    compatibility-verifier:
+      enabled: false
+
+# 开启 redis 监听
+redis:
+  listener:
+    enable: true
+
+---
+springdoc:
+  default-flat-param-object: true
+  swagger-ui:
+    # 生产环境建议关闭
+    enabled: true
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    # 生产环境建议关闭
+    enabled: true
+    path: /v3/api-docs
+  group-configs:
+    - group: 'cmr'
+      paths-to-match: '/**'
+      packages-to-scan: com.hsmty.cmr
+
+---
+mybatis-flex:
+  configuration:
+    map-underscore-to-camel-case: true
+    jdbc-type-for-null: null
+    auto-mapping-behavior: full
+    auto-mapping-unknown-column-behavior: none
+    cache-enabled: false
+    # 本地调试排查 SQL 时临时打开：org.apache.ibatis.logging.stdout.StdOutImpl
+    # 生产保持关闭，避免打印全量 SQL 与参数
+  global-config:
+    deleted-value-of-logic-delete: "T"
+    normal-value-of-logic-delete: "F"
+
+page-helper:
+  autoDialect: true
+  reasonable: false
+  supportMethodsArguments: true
+  params: count=countSql
+
+hsmty:
+  id:
+    worker-id: 1
+    datacenter-id: 1
+  cors:
+    allowed-origins: "*"
+  # UAP 校验与重定向地址，生产由环境变量覆盖
+  verify: '${HSMTY_VERIFY_URL:https://obu-ai-cloud.corp.huxishenghuo.com/hs-api/permissions/verify}'
+  redirect: '${HSMTY_REDIRECT_URL:https://obu-ai-cloud.corp.huxishenghuo.com/sdom-main-web/home}'
+  api-prefix:
+    modules:
+      cmr:
+        enabled: true
+        prefix: /cmr
+
+# 加密配置
+---
+jasypt:
+  encryptor:
+    algorithm: PBEWithMD5AndDES
+    password: ${JASYPT_ENCRYPTOR_PASSWORD:datasource}
+
+# 接口白名单：文档与容器健康检查；开放接口必须在此登记并注明原因
+router:
+  whitelist:
+    - "/v3/api-docs/**"
+    - "/swagger-ui/**"
+    - "/swagger-ui.html"
+    # 容器 healthcheck 使用，不暴露业务数据
+    - "/actuator/health"
+    - "/actuator/health/**"
+
+# 跨服务调用地址（含 context-path），禁止写死 IP 于代码
+cmr:
+  service:
+    url: '${CMR_SERVICE_URL:http://127.0.0.1:8080/hs-api}'
+  # 文件存储：local 仅本地开发；生产切 s3 并注入 OSS 地址/桶/凭据
+  file:
+    store: '${CMR_FILE_STORE:local}'
+    local-root: '${CMR_FILE_LOCAL_ROOT:./data/files}'
+    bucket: '${CMR_FILE_BUCKET:}'
+    endpoint: '${CMR_FILE_ENDPOINT:}'
+    region: '${CMR_FILE_REGION:us-east-1}'
+    access-key: '${CMR_FILE_ACCESS_KEY:}'
+    secret-key: '${CMR_FILE_SECRET_KEY:}'
+    path-style: true

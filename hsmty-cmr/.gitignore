@@ -1,0 +1,15 @@
+# 依赖与构建产物（根 .gitignore 只覆盖了老工程目录）
+node_modules/
+dist/
+target/
+# flatten-maven-plugin 生成的临时 POM，禁止入库
+.flattened-pom.xml
+
+# 本地环境变量；示例文件需要入库
+.env
+.env.local
+.env.*.local
+!deploy/.env.example
+
+# Maven 本地设置含 Nexus 凭据，只保留脱敏示例
+settings.xml

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 公司统一父工程：管理 Spring Boot 4 / MyBatis-Flex / springdoc / AWS SDK 等版本 -->
+    <parent>
+        <groupId>com.hsmty</groupId>
+        <artifactId>hsmty-module-starter</artifactId>
+        <version>2.0.1</version>
+        <relativePath/>
+    </parent>
+
+    <artifactId>hsmty-module-cmr-server</artifactId>
+    <version>${revision}</version>
+    <packaging>pom</packaging>
+    <name>hsmty-module-cmr-server</name>
+    <description>跨模态检索中心（client-core-start 架构）</description>
+
+    <properties>
+        <!-- 与公司父工程版本保持一致：父 POM 内 ${project.version} 会按子工程版本插值 -->
+        <revision>2.0.1</revision>
+    </properties>
+
+    <modules>
+        <module>hsmty-module-cmr-client</module>
+        <module>hsmty-module-cmr-core</module>
+        <module>hsmty-module-cmr-start</module>
+    </modules>
+</project>

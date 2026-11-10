@@ -1,0 +1,41 @@
+spring:
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:cmr;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/changelog-master.xml
+  data:
+    redis:
+      # 覆盖主配置中的 ENC(...)，测试环境不触发解密与真实连接
+      password: ""
+      sentinel:
+        master: mymaster
+        nodes: 127.0.0.1:1
+        password: ""
+
+# 测试环境不连真实 Redis
+redis:
+  listener:
+    enable: false
+
+hsmty:
+  verify: 'http://127.0.0.1:1/permissions/verify'
+  redirect: 'http://127.0.0.1:1/home'
+
+# 测试环境放行全部路径，权限仍由 @PreAuthorize + @WithMockUser 校验
+router:
+  whitelist:
+    - "/**"
+
+cmr:
+  file:
+    store: local
+    local-root: ./target/test-files
+
+logging:
+  level:
+    com.hsmty.cmr: warn
+    liquibase: warn
