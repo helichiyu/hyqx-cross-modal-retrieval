@@ -39,7 +39,7 @@
                 <div class="q mono">{{ row.bizNo }}</div>
                 <div class="c">{{ row.name }}</div>
                 <div class="c">{{ sceneLabel(row.scene) }}</div>
-                <div class="num">v{{ row.currentVersion ?? 0 }}</div>
+                <div class="num">{{ row.currentVersion ? `v${row.currentVersion}` : '—' }}</div>
                 <span class="badge" :class="row.status === 'active' ? 'ok' : 'pend'">{{ statusLabel(row.status) }}</span>
                 <div class="c">{{ row.updateTime || row.createTime || '—' }}</div>
                 <div class="act-wrap"><button class="mini-btn primary" type="button" @click.stop="openEditStrategy(row)">编辑</button></div>
