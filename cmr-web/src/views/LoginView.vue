@@ -27,7 +27,7 @@
         </el-button>
       </el-form>
       <div class="login-hint text-secondary">
-        初始账号：admin / operator / user，密码见交付说明
+        测试账号：admin / operator / user，密码均为 123456
       </div>
     </el-card>
   </div>
