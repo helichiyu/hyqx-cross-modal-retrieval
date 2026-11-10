@@ -1,21 +1,29 @@
 # 跨模态检索中心 · REST API 契约（P1–P9）
 
-> Base：`/hs-api/cmr`。统一信封 `{"code":0,"msg":"success","data":...}`；`code=1` 业务失败（msg 带原因）。
-> 认证：除 `POST /auth/login` 外均需 `Authorization: Bearer <jwt>`；权限码标注于各接口（角色映射见 04）。
-> 分页：请求 `pageNum/pageSize`，响应 `data: {records:[], total, pageNum, pageSize}`。
+> 口径（D-009，2026-11-10 确认）：**按 HSMTY 平台口径**，不再沿用旧后端契约。
+> Base：`/hs-api/cmr`。统一信封 `ApiResult`：`{code, message, data, param}`，成功 `code="0000"`；
+> 业务失败 `code` 为 `C` 前缀（如 `C100` 参数校验、`C108` 权限不足、`C1003` 文件不存在），`message` 带原因。
+> 认证：除白名单外均需 HSMTY **UAP 会话（Cookie/SSO）**，由平台 `AuthenticationTokenFilter` 校验；
+> 登录/登出在 UAP 门户完成，业务服务不提供 `/auth/login`、不保存 JWT。
+> 分页：请求 `page`/`limit`（`PageQuery`），响应 `data` 为 `PageResult{current,limit,totalPage,total,rows}`。
 > 编号字段（bizNo/resultSetId 等）前端一律 monospace 展示 + 一键复制（ID 规范）。
+> 标注「已实现」的接口与当前代码一致，其余为规划；生产环境文档入口关闭（D-007）。
 
 ## 〇、认证与公共
 
-| 方法 | 路径 | 权限码 | 说明 |
-| --- | --- | --- | --- |
-| POST | /auth/login | 公开 | {username,password} → {token, user}；12h |
-| GET | /auth/me | 登录即可 | 当前用户+角色+权限码列表 |
-| POST | /auth/logout | 登录即可 | token 加黑名单 |
-| GET | /file?path=runtime/... | cmr:file:read | 共享卷文件（白名单+防穿越）；支持 Range；媒体预览/材料下载统一入口 |
-| POST | /file/upload | cmr:search:create | 查询文件上传（以图/音/视搜检索）→ {path:"dataset/query/xxx"} |
-| POST | /file/package | cmr:file:read | 批量打包共享卷文件：{paths:[...]} → ZIP（单次 ≤200） |
-| GET | /dict/{type} | 登录即可 | 字典项（场景/状态/类型枚举统一来源） |
+| 方法 | 路径 | 权限码 | 状态 | 说明 |
+| --- | --- | --- | --- | --- |
+| GET | /auth/me | 登录即可 | 平台提供 | 当前用户+角色+权限码列表，由 HSMTY 统一身份服务提供，本服务不实现 |
+| GET | /file?path=runtime/... | cmr:file:read | 规划 | 共享卷文件（白名单+防穿越）；支持 Range；媒体预览/材料下载统一入口 |
+| POST | /file/upload | cmr:search:create | 规划 | 查询文件上传至共享卷（以图/音/视搜检索）→ `{path:"dataset/query/xxx"}`，作为 `queryFile` 传算子 |
+| POST | /file/package | cmr:file:read | 规划 | 批量打包共享卷文件：`{paths:[...]}` → ZIP（单次 ≤200） |
+| GET | /dict/{type} | 登录即可 | 平台提供 | 字典项（`cmr_*` 类型，来源 3100），统一来源 |
+| POST | /files | cmr:file:upload | 已实现 | 文件对象上传（multipart：`file`、`bizType`）→ `FileObjectVO` |
+| GET | /files | cmr:file:page | 已实现 | 文件对象分页：`keyword`/`status`/`page`/`limit` |
+| GET | /files/{id} | cmr:file:detail | 已实现 | 文件对象详情 |
+| GET | /files/{id}/content | cmr:file:read | 已实现 | 文件下载（`Content-Disposition` 带原始文件名） |
+| DELETE | /files | cmr:file:remove | 已实现 | 批量逻辑删除：`{ids:[...]}` |
+| POST | /files/by-ids | cmr:file:read | 已实现 | Feign 批量查询 `Collection<Long>` → `List<FileObjectVO>` |
 
 ## 一、库管理域（P4）
 
@@ -40,14 +48,14 @@
 | GET | /indexes?datasetId= | cmr:dataset:detail | 索引历史（candidate/active/retired + 406 结果） |
 | POST | /indexes/{id}/activate | cmr:dataset:confirm | 回滚激活（旧 retired 索引重新激活） |
 
-状态机约束在后端强制（02 文档）；非法迁移返回 code=1"不允许的状态流转"。
+状态机约束在后端强制（02 文档）；非法迁移返回 `code` 非 `"0000"`（`C` 前缀），`message` 为“不允许的状态流转”。
 
 ## 二、检索域（P1 检索台 / P2 结果页 / P9 检索历史）
 
 | 方法 | 路径 | 权限码 | 说明 |
 | --- | --- | --- | --- |
 | GET | /search/suggest?scene=&prefix= | 登录即可 | 推荐词联想（enabled 词按 sort） |
-| POST | /search/understand | cmr:search:create | 407 代理：{query} 或 {queryFile} → {needClarify, clarifyOptions[], queryModality, hint} |
+| POST | /search/understand | cmr:search:create | 407 代理（已实现）：{query} 或 {queryFile} → QueryUnderstandVO {needClarify, clarifyOptions[], queryModality, hint, ambiguousTerm, normalizedQuery}；算子不可用返回 `C9999` |
 | POST | /search | cmr:search:create | 执行检索：{query/queryFile, scene, targetModalities?, clarified?, clarifiedQuery?, weights?, rerank?, topK?, strategyId?, threshold?} → 结果集（条目：itemId/rank/score/modality/source/alignScore/qualityGrade/vote/favorited；qualityGrade 继承 P4 数据集 402 评定分 A≥0.90/B≥0.80/C≥0.70/其余 D；+策略快照+resultSetId+taskId+srhNo）；strategyId 不传用场景生效策略，threshold 不传用策略版本阈值；文本 query 少于 4 字且 clarified≠true 时返回「请先完成澄清」，queryFile 检索跳过澄清；屏蔽条目与数据源黑名单来源不下发，itemCount 为实际下发条数 |
 | GET | /search/results/{resultSetId} | cmr:search:page | 结果集快照回看（P2）；条目名称按 ID 实时回查，条目已删显示「已删除」占位；被屏蔽条目不返回 |
 | POST | /search/results/{resultSetId}/rerun | cmr:search:create | P2 错误态重跑：原参数重放，生成新 SRH/RST |
@@ -157,7 +165,7 @@ v5 口径：**一条 query 一条评测**，以历史检索为基准，重放后
 
 | 路由 | 页面 | 菜单 |
 | --- | --- | --- |
-| /login | 登录 | — |
+| /login | 登录 | —（UAP 门户负责，子应用不实现） |
 | / | 门户（九宫格） | — |
 | /search | P1 检索台 | 检索中心/检索台 |
 | /search/results/:resultSetId | P2 结果页 | （检索跳转，不挂菜单） |

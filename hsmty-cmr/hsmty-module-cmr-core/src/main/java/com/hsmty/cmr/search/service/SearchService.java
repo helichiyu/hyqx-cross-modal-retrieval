@@ -6,6 +6,7 @@ import com.hsmty.cmr.pojo.vo.OperatorResult;
 import com.hsmty.cmr.pojo.vo.QueryUnderstandVO;
 import com.hsmty.core.common.enums.CommonResponseEnum;
 import com.hsmty.core.common.exception.common.BusinessException;
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -41,7 +42,15 @@ public class SearchService {
             dto.setUniqueId(UUID.randomUUID().toString());
         }
 
-        OperatorResult<QueryUnderstandVO> result = operatorFeignClient.queryUnderstand(dto);
+        OperatorResult<QueryUnderstandVO> result;
+        try {
+            result = operatorFeignClient.queryUnderstand(dto);
+        } catch (FeignException e) {
+            // 未启用 Spring Cloud CircuitBreaker 时 fallbackFactory 不生效，连接失败会抛 FeignException，
+            // 这里统一翻译为业务错误，避免把熔断骨架的异常形态透给前端。
+            log.error("检索算子调用失败: uniqueId={}, status={}", dto.getUniqueId(), e.status(), e);
+            throw new BusinessException(CommonResponseEnum.UNKNOWN, new Object[0], "检索算子服务不可用");
+        }
         if (result == null || result.getCode() == null || result.getCode() != OperatorResult.SUCCESS_CODE) {
             String reason = result == null || !StringUtils.hasText(result.getMsg())
                     ? "算子未返回有效响应" : result.getMsg();

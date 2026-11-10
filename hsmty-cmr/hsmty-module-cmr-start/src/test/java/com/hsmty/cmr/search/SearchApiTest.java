@@ -4,6 +4,7 @@ import com.hsmty.cmr.feign.CmrOperatorFeignClient;
 import com.hsmty.cmr.pojo.dto.QueryUnderstandDTO;
 import com.hsmty.cmr.pojo.vo.OperatorResult;
 import com.hsmty.cmr.pojo.vo.QueryUnderstandVO;
+import feign.FeignException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -21,6 +22,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -76,6 +78,19 @@ class SearchApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"query\":\"apple\"}"), List.of("cmr:search:create"))
                 .andExpect(jsonPath("$.code").value("C9999"));
+    }
+
+    @Test
+    void understandTranslatesFeignException() throws Exception {
+        FeignException cause = mock(FeignException.class);
+        when(operatorFeignClient.queryUnderstand(any(QueryUnderstandDTO.class))).thenThrow(cause);
+
+        performAsUser(post("/cmr/search/understand")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"query\":\"apple\"}"), List.of("cmr:search:create"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("C9999"))
+                .andExpect(jsonPath("$.message").value("检索算子服务不可用"));
     }
 
     @Test

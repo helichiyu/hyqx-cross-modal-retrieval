@@ -26,4 +26,10 @@ public class QueryUnderstandVO {
 
     @Schema(description = "补充提示（如查询过短）")
     private String hint;
+
+    @Schema(description = "命中的歧义词，未命中为空")
+    private String ambiguousTerm;
+
+    @Schema(description = "归一化后的查询文本")
+    private String normalizedQuery;
 }

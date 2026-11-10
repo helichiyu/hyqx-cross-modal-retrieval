@@ -97,7 +97,7 @@ java -jar hsmty-module-cmr-start/target/hsmty-module-cmr-start.jar --spring.liqu
 | 在线链超时 | `connect 2s / read 15s` | 同左，按需覆盖 |
 | 批量链超时 | 预留 `1800000ms`，接入 401–406/409 时启用 | 同左 |
 
-目前已接入 407 查询理解（`/hs-api/cmr/search/understand`）；408 检索需要结果集、任务与策略落库，随检索域迁移接入。
+目前已接入 407 查询理解（`/hs-api/cmr/search/understand`），并用本地 6300 真实算子验证了歧义命中、过短提示、正常查询三类响应；算子不可用时返回 `C9999` 与明确文案。408 检索需要数据集/索引/结果集落库，随检索域迁移接入。
 
 ## 5. 数据库
 
@@ -128,7 +128,8 @@ corepack pnpm@10.17.1 dev
 - 类型检查 + 构建：`corepack pnpm@10.17.1 build`
 - 测试：`corepack pnpm@10.17.1 test`（vitest）
 - 静态检查：`corepack pnpm@10.17.1 lint`
-- 检索页为占位：算子接口未迁移，不在前端伪造检索结果
+- 检索页已接 407 查询理解：展示澄清选项、过短提示与查询模态；408 检索执行与结果页待索引域迁移后接入
+- 本地开发需先通过 UAP 门户建立会话（子应用不提供登录页），否则业务接口返回 401
 
 ## 8. 部署
 
@@ -143,9 +144,10 @@ docker compose -p cmr-line --env-file deploy/.env -f deploy/docker-compose.yml u
 
 | 范围 | 命令 | 结果 |
 | --- | --- | --- |
-| 后端测试 | `mvn -s settings.xml -DskipTests=false -pl hsmty-module-cmr-start -am test` | 12/12 通过（core 2、start 10） |
+| 后端测试 | `mvn -s settings.xml -DskipTests=false -pl hsmty-module-cmr-start -am test` | 13/13 通过（core 2、start 11） |
+| 407 真实算子联调 | `POST http://127.0.0.1:6300/407m_query_understand/predict` | 歧义命中/过短提示/正常查询三类响应已核对 |
 | 前端类型检查 + 构建 | `corepack pnpm@10.17.1 build` | 通过 |
-| 前端测试 | `corepack pnpm@10.17.1 test` | 2/2 通过 |
+| 前端测试 | `corepack pnpm@10.17.1 test` | 4/4 通过 |
 | 前端静态检查 | `corepack pnpm@10.17.1 lint` | 0 error |
 
 测试用 H2 + 白名单 `/**`，不依赖真实数据库与 Redis；生产启动需按 `docs/待提供清单.md` 注入配置。
