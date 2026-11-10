@@ -1,6 +1,6 @@
 """M2 端到端验证：建库全链 401→402→403→404→405→406，并验证幂等与版本防护。
 
-前提：服务已启动（python -m uvicorn router.main:app --port 6300），样本已生成。
+前提：服务已启动（python -m uvicorn operators.router.main:app --port 6300），样本已生成。
 用法：python scripts/e2e_m2.py
 """
 

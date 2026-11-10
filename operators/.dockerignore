@@ -1,0 +1,12 @@
+# 构建上下文只保留算子服务源码，排除运行产物与本地依赖
+Dockerfile
+docker-compose.yml
+.dockerignore
+weight/
+runtime/
+dist/
+.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.log

@@ -1,9 +1,10 @@
-"""生成交付包：只含 Docker 构建/运行所需内容。
+"""生成交付包：只含算子服务的 Docker 构建/运行内容。
 
-产物 dist/cmr-operators.zip，包含：
-  Dockerfile、docker-compose.yml、requirements.txt、config.yaml、map.json、
-  router/、operators/（剔除 __pycache__）、README.md（包内说明）。
-不含 runtime/、dataset/、docs/、scripts/、tests/（文档与测试数据另行交付）。
+交付根目录为 operators/（含 Dockerfile、docker-compose.yml、config.yaml、map.json、
+requirements.txt、router/、common/ 与 9 个算子目录），压缩包内保持同样的顶层结构。
+
+产物 dist/cmr-operators.zip；不含 weight/、runtime/、dataset/、docs/、scripts/、tests/
+（模型权重、运行产物、文档与测试数据另行交付）。
 
 用法：python scripts/make_package.py
 """
@@ -13,12 +14,19 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+SERVICE_ROOT = ROOT / "operators"
 OUT = ROOT / "dist" / "cmr-operators.zip"
 
-FILES = ["Dockerfile", "docker-compose.yml", "requirements.txt", "config.yaml", "map.json"]
-DIRS = ["router", "operators"]
+# 不进交付包的目录/文件（运行产物、本地环境、权重）
+EXCLUDE_PARTS = {
+    "__pycache__", "weight", "runtime", "dist",
+    ".venv", "venv", "env", ".pytest_cache", ".mypy_cache", ".ruff_cache",
+}
+EXCLUDE_SUFFIXES = {".pyc", ".pyo", ".log"}
 
 PKG_README = """# 跨模态检索中心 · 算子服务交付包
+
+本包即算子服务交付根目录（原仓库 operators/），构建上下文就是当前目录。
 
 构建并启动（先按《部署说明》第二节把三个模型权重放到 ./weight 下）：
 
@@ -34,6 +42,10 @@ PKG_README = """# 跨模态检索中心 · 算子服务交付包
 """
 
 
+def _excluded(rel: Path) -> bool:
+    return any(part in EXCLUDE_PARTS for part in rel.parts) or rel.suffix in EXCLUDE_SUFFIXES
+
+
 def main() -> None:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     if OUT.exists():
@@ -41,14 +53,14 @@ def main() -> None:
     n = 0
     with zipfile.ZipFile(OUT, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("README.md", PKG_README)
-        for name in FILES:
-            zf.write(ROOT / name, name)
+        for p in sorted(SERVICE_ROOT.rglob("*")):
+            if not p.is_file():
+                continue
+            rel = p.relative_to(SERVICE_ROOT)
+            if _excluded(rel):
+                continue
+            zf.write(p, rel.as_posix())
             n += 1
-        for d in DIRS:
-            for p in sorted((ROOT / d).rglob("*")):
-                if p.is_file() and "__pycache__" not in p.parts:
-                    zf.write(p, p.relative_to(ROOT))
-                    n += 1
     size_mb = OUT.stat().st_size / 1024 / 1024
     print(f"交付包已生成: {OUT}（{n} 个文件，{size_mb:.1f} MB）")
     with zipfile.ZipFile(OUT) as zf:

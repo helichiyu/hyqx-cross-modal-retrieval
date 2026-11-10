@@ -1,7 +1,7 @@
 """M1 端到端验证：启动服务 → 上传样本(zip) → 403 解析 → 404 向量化 → 抽查向量。
 
 用法：先启动服务（见下），再运行 python scripts/e2e_m1.py
-启动：python -m uvicorn router.main:app --host 127.0.0.1 --port 6300
+启动：python -m uvicorn operators.router.main:app --host 127.0.0.1 --port 6300
 """
 
 import io

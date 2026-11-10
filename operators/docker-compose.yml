@@ -1,10 +1,10 @@
-# 跨模态检索中心 · 算子服务
-# 用法：权重放到 ./weight（三个模型子目录，见 docs/部署说明.md 第二节），然后
+# 跨模态检索中心 · 算子服务（唯一打包/部署单元）
+# 用法：在本目录（operators/）执行，权重放到 ./weight（三个模型子目录，见 docs/部署说明.md 第二节）
 #   docker compose up -d --build
 # 验证：curl http://127.0.0.1:6300/healthz
 services:
   cmr-operators:
-    build: .
+    build: .                       # 构建上下文只含算子服务（router + common + 9 算子）
     image: cmr-operators:1.0
     container_name: cmr-operators
     ports:

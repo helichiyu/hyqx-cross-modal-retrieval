@@ -2,7 +2,7 @@
 #
 # 用法（在本目录执行）：
 #   cp .env.example .env      # 改密码/密钥/端口
-#   把三个模型目录放到仓库根 weight/ 下（见 docs/部署与运维手册.md）
+#   把三个模型目录放到 operators/weight/ 下（见 docs/部署与运维手册.md）
 #   docker compose up -d --build
 # 访问：http://<宿主机>:${CMR_WEB_PORT:-8080}
 #
@@ -48,7 +48,7 @@ services:
   # 算子服务：仅内部网络可达，不发布 6300
   operators:
     build:
-      context: ..
+      context: ../operators        # 算子服务交付根，构建上下文只含算子服务
       dockerfile: Dockerfile
     image: cmr-operators:1.0
     container_name: cmr-operators
@@ -57,7 +57,7 @@ services:
       TZ: Asia/Shanghai
     volumes:
       # 模型权重：宿主机目录（三个模型子目录），不进镜像
-      - ${CMR_WEIGHT_DIR:-../weight}:/weight:ro
+      - ${CMR_WEIGHT_DIR:-../operators/weight}:/weight:ro
       # 与后端共享同一份数据集/运行目录，逻辑路径 dataset/...、runtime/... 两侧一致
       - ../dataset:/app/dataset:ro
       - ../runtime:/app/runtime

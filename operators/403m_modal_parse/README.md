@@ -53,6 +53,6 @@
 
 ```bash
 python scripts/make_samples.py
-python -m uvicorn router.main:app --host 127.0.0.1 --port 6300
+python -m uvicorn operators.router.main:app --host 127.0.0.1 --port 6300
 python scripts/e2e_m1.py
 ```

@@ -10,7 +10,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-CFG = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
+CFG = yaml.safe_load((ROOT / "operators" / "config.yaml").read_text(encoding="utf-8"))
 MODEL_ROOT = Path(CFG["paths"]["model_root"])
 
 MODELS = [

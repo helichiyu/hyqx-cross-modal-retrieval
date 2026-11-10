@@ -1,6 +1,6 @@
 """统一路由层入口：单容器单端口，按 /{operatorId}/ 分发到各算子。
 
-启动：uvicorn router.main:app --host 0.0.0.0 --port 6300
+启动（在仓库根目录）：uvicorn operators.router.main:app --host 0.0.0.0 --port 6300
 """
 
 from __future__ import annotations
@@ -14,15 +14,18 @@ import yaml
 from fastapi import FastAPI
 
 from operators.common.loading import load_operator
-from router.operator_router import build_operator_router
+from operators.router.operator_router import build_operator_router
 
 logger = logging.getLogger("router")
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# PACKAGE_ROOT = operators/（算子服务交付根，含 config.yaml、router/ 与 9 个算子目录）
+# PROJECT_ROOT = PACKAGE_ROOT 的上一级（runtime/、dataset/ 等运行目录的基准）
+PACKAGE_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = PACKAGE_ROOT.parent
 
 
 def load_config() -> dict:
-    with open(PROJECT_ROOT / "config.yaml", encoding="utf-8") as f:
+    with open(PACKAGE_ROOT / "config.yaml", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
     # 路径统一解析为绝对路径；容器部署可用环境变量 CMR_MODEL_ROOT 等覆盖，免改配置文件
     for key in ("runtime_root", "dataset_root", "model_root"):
@@ -48,7 +51,7 @@ def create_app() -> FastAPI:
     for entry in cfg["operators"]:
         if not entry.get("enabled", True):
             continue
-        op = load_operator(PROJECT_ROOT / "operators" / entry["id"], entry["id"], cfg)
+        op = load_operator(PACKAGE_ROOT / entry["id"], entry["id"], cfg)
         app.state.operators[entry["id"]] = op
         app.include_router(build_operator_router(op), prefix=f"/{entry['id']}")
         # 算子可提供四协议之外的自有路由（如 408 的 /search），挂在同一前缀下

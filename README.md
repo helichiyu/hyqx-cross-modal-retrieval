@@ -1,6 +1,6 @@
 # 跨模态检索中心
 
-当前交付范围：**算法算子包**（9 个算子，单容器单端口统一路由）+ **前后端应用**（`cmr-backend`、`cmr-web`）与**一体化部署**（`deploy/`）。
+当前交付范围：**算法算子包**（9 个算子，单容器单端口统一路由）——`operators/` 自包含，是唯一的打包与 Docker 部署单元；仓库另含前后端应用（`cmr-backend`、`cmr-web`）与一体化部署编排（`deploy/`），两者均不参与算子打包。
 
 ## 文档导航
 
@@ -35,12 +35,17 @@
 ## 目录结构
 
 ```text
-├── Dockerfile              # 单容器打包，对外仅 6300 端口
-├── config.yaml             # 统一配置（甲方只改这里）
-├── map.json                # 算子映射表
-├── requirements.txt
-├── router/                 # 统一路由层：/{operatorId}/healthz|uploadFile|predict|removeFile
-├── operators/              # 9 个算子目录 + common（基类、协议、路径安全、索引存储）
+├── operators/              # 算子服务（唯一打包/部署单元，自包含）
+│   ├── Dockerfile          # 单容器打包，对外仅 6300 端口
+│   ├── docker-compose.yml  # 算子服务编排（在本目录执行）
+│   ├── config.yaml         # 统一配置（甲方只改这里）
+│   ├── map.json            # 算子映射表
+│   ├── requirements.txt
+│   ├── router/             # 统一路由层：/{operatorId}/healthz|uploadFile|predict|removeFile
+│   └── 401m_.../ common/   # 9 个算子目录 + common（基类、协议、路径安全、索引存储）
+├── cmr-backend/            # 后端工程（独立构建/部署）
+├── cmr-web/                # 前端工程（独立构建/部署）
+├── deploy/                 # 前后端一体化部署编排（可选，不参与算子打包）
 ├── dataset/                # demo 样本与数据格式说明
 ├── docs/                   # 部署说明、接口调用示例、9 份算子说明书
 ├── scripts/                # 造样本、下模型、端到端验证、耗时实测
@@ -51,11 +56,11 @@
 ## 本地快速验证
 
 ```bash
-python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt
+python -m venv .venv && .venv/Scripts/python -m pip install -r operators/requirements.txt
 .venv/Scripts/python scripts/make_samples.py
 .venv/Scripts/python scripts/build_cmr_testset.py   # 可选：重建四模态回归测试集（需 pyarrow）
 .venv/Scripts/python scripts/download_models.py
-.venv/Scripts/python -m uvicorn router.main:app --host 127.0.0.1 --port 6300
+.venv/Scripts/python -m uvicorn operators.router.main:app --host 127.0.0.1 --port 6300
 .venv/Scripts/python scripts/e2e_m1.py
 .venv/Scripts/python scripts/e2e_m2.py
 .venv/Scripts/python scripts/e2e_m3.py
@@ -64,11 +69,14 @@ python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt
 
 ## 部署
 
+算子服务是自包含的部署单元，`operators/` 即构建上下文：
+
 ```bash
+cd operators
 docker compose up -d --build
 ```
 
-权重放 `./weight`（三个模型子目录，见部署说明第二节）；容器经 `CMR_MODEL_ROOT=/weight` 覆盖配置，无需改 config.yaml。算子服务仅允许后端内网访问。
+权重放 `operators/weight`（三个模型子目录，见部署说明第二节）；容器经 `CMR_MODEL_ROOT=/weight` 覆盖配置，无需改 config.yaml。算子服务仅允许后端内网访问。
 
 ## 交付包
 
@@ -76,4 +84,4 @@ docker compose up -d --build
 .venv/Scripts/python scripts/make_package.py
 ```
 
-生成 `dist/cmr-operators.zip`，只含 Docker 构建/运行所需内容（Dockerfile、compose、requirements、config、map.json、router/、operators/）。
+生成 `dist/cmr-operators.zip`，内容即 `operators/` 目录（Dockerfile、compose、requirements、config、map.json、router/、9 个算子与 common/），解压后直接 `docker compose up -d --build`。
