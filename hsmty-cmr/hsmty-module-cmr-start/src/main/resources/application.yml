@@ -59,6 +59,13 @@ spring:
   cloud:
     compatibility-verifier:
       enabled: false
+    openfeign:
+      client:
+        config:
+          # 在线链（407 查询理解 / 408 检索）走短超时，批量链单独配置
+          CmrOperatorFeignClient:
+            connect-timeout: 2000
+            read-timeout: 15000
 
 # 开启 redis 监听
 redis:
@@ -139,6 +146,12 @@ router:
 cmr:
   service:
     url: '${CMR_SERVICE_URL:http://127.0.0.1:8080/hs-api}'
+  # 检索算子独立容器；本地/测试用 127.0.0.1，生产用 compose 内服务名或实际地址
+  operator:
+    base-url: '${CMR_OPERATOR_BASE_URL:http://127.0.0.1:6300}'
+    timeout:
+      search-ms: 15000
+      batch-ms: 1800000
   # 文件存储：local 仅本地开发；生产切 s3 并注入 OSS 地址/桶/凭据
   file:
     store: '${CMR_FILE_STORE:local}'
@@ -149,3 +162,15 @@ cmr:
     access-key: '${CMR_FILE_ACCESS_KEY:}'
     secret-key: '${CMR_FILE_SECRET_KEY:}'
     path-style: true
+
+---
+# 生产 profile：关闭接口文档入口（决策 D-007），测试环境保留
+spring:
+  config:
+    activate:
+      on-profile: prod
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false

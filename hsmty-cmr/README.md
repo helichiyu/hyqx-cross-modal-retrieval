@@ -82,9 +82,22 @@ java -jar hsmty-module-cmr-start/target/hsmty-module-cmr-start.jar --spring.liqu
 | `/hs-api/cmr/files/{id}/content` | GET（下载） | `cmr:file:read` |
 | `/hs-api/cmr/files` | DELETE（批量删除） | `cmr:file:remove` |
 | `/hs-api/cmr/files/by-ids` | POST（Feign 批量查） | `cmr:file:read` |
+| `/hs-api/cmr/search/understand` | POST（407 查询理解代理） | `cmr:search:create` |
 
 返回结构为平台 `ApiResult`：成功 `code=0000`，业务失败码带前缀（如 `C1003` 文件不存在、
 `C108` 权限不足），分页为 `current/limit/total/totalPage/rows`。
+
+### 检索算子
+
+算子保持独立容器（决策 D-006），后端通过 Feign 调用，地址只来自配置：
+
+| 配置 | 本地/测试默认 | 生产 |
+| --- | --- | --- |
+| `cmr.operator.base-url` | `http://127.0.0.1:6300` | 环境变量 `CMR_OPERATOR_BASE_URL`（compose 内 `http://cmr-operators:6300`） |
+| 在线链超时 | `connect 2s / read 15s` | 同左，按需覆盖 |
+| 批量链超时 | 预留 `1800000ms`，接入 401–406/409 时启用 | 同左 |
+
+目前已接入 407 查询理解（`/hs-api/cmr/search/understand`）；408 检索需要结果集、任务与策略落库，随检索域迁移接入。
 
 ## 5. 数据库
 
@@ -130,7 +143,7 @@ docker compose -p cmr-line --env-file deploy/.env -f deploy/docker-compose.yml u
 
 | 范围 | 命令 | 结果 |
 | --- | --- | --- |
-| 后端测试 | `mvn -s settings.xml -DskipTests=false -pl hsmty-module-cmr-start -am test` | 8/8 通过（core 2、start 6） |
+| 后端测试 | `mvn -s settings.xml -DskipTests=false -pl hsmty-module-cmr-start -am test` | 12/12 通过（core 2、start 10） |
 | 前端类型检查 + 构建 | `corepack pnpm@10.17.1 build` | 通过 |
 | 前端测试 | `corepack pnpm@10.17.1 test` | 2/2 通过 |
 | 前端静态检查 | `corepack pnpm@10.17.1 lint` | 0 error |

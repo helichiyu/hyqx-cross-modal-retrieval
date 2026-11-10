@@ -32,7 +32,8 @@ public class CmrApiPrefixConfiguration {
 
             @Override
             public String[] basePackages() {
-                return new String[]{"com.hsmty.cmr.file.controller"};
+                // 用模块根包，新增 controller 子包（file/search/...）时无需再改这里
+                return new String[]{"com.hsmty.cmr"};
             }
         };
     }

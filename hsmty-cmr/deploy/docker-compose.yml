@@ -10,6 +10,8 @@ services:
       HSMTY_VERIFY_URL: ${HSMTY_VERIFY_URL}
       HSMTY_REDIRECT_URL: ${HSMTY_REDIRECT_URL}
       CMR_SERVICE_URL: ${CMR_SERVICE_URL:-http://cmr-server:8080/hs-api}
+      # 算子独立容器；未启用算子服务时保持默认端口，不影响后端启动
+      CMR_OPERATOR_BASE_URL: ${CMR_OPERATOR_BASE_URL:-http://cmr-operators:6300}
       CMR_FILE_STORE: ${CMR_FILE_STORE:-s3}
       CMR_FILE_BUCKET: ${CMR_FILE_BUCKET}
       CMR_FILE_ENDPOINT: ${CMR_FILE_ENDPOINT}
