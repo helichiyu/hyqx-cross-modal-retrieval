@@ -32,7 +32,8 @@
 | POST | /datasources/{id}/test | cmr:dataset:create | 测试连接：返回 connected/statusCode/latencyMs/message，并持久化最近结果 |
 | GET | /datasources/contract | cmr:dataset:page | 上游对接契约（只读）：数据集/条目接口、必填字段、模态规则、推送方式说明 |
 | GET | /datasources/{id}/datasets | cmr:dataset:page | 拉取上游数据集列表：GET {base}/datasets；dataset_id/name/item_count 必填，modal_types 可选 |
-| POST | /datasources/{id}/sync | cmr:dataset:update | 同步上游数据集：写入 connect_status/required_ok/upstream_dataset_id/total_count/last_sync_time |
+| POST | /datasources/{id}/sync | cmr:dataset:update | 同步元数据（只发现，不建库）：要求数据源已连接；黑名单命中的来源/数据集跳过并返回 skippedBlacklisted；写入 required_ok/upstream_dataset_id/total_count/last_sync_time |
+| POST | /datasources/{id}/ingest | cmr:dataset:create | 接入上游数据集：{datasetId, name?, version?, scene?} → 拉取条目内容落共享卷 `dataset/ds/{数据源号}/{datasetId}`，登记本地数据集并触发 401→406；要求已连接且 4 项必填通过；黑名单数据集不可接入 |
 | GET | /datasource-blacklist | cmr:dataset:page | 数据源黑名单列表 |
 | POST | /datasource-blacklist | cmr:dataset:create | 拉黑数据源 {sourceName, reason} |
 | DELETE | /datasource-blacklist/{id} | cmr:dataset:update | 解除拉黑 |
@@ -47,7 +48,7 @@
 | --- | --- | --- | --- |
 | GET | /search/suggest?scene=&prefix= | 登录即可 | 推荐词联想（enabled 词按 sort） |
 | POST | /search/understand | cmr:search:create | 407 代理：{query} 或 {queryFile} → {needClarify, clarifyOptions[], queryModality, hint} |
-| POST | /search | cmr:search:create | 执行检索：{query/queryFile, scene, targetModalities?, clarifiedQuery?, weights?, rerank?, topK?, strategyId?, threshold?} → 结果集（条目：itemId/rank/score/modality/source/alignScore/vote/favorited；+策略快照+resultSetId+taskId+srhNo）；strategyId 不传用场景生效策略，threshold 不传用策略版本阈值 |
+| POST | /search | cmr:search:create | 执行检索：{query/queryFile, scene, targetModalities?, clarified?, clarifiedQuery?, weights?, rerank?, topK?, strategyId?, threshold?} → 结果集（条目：itemId/rank/score/modality/source/alignScore/vote/favorited；+策略快照+resultSetId+taskId+srhNo）；strategyId 不传用场景生效策略，threshold 不传用策略版本阈值；文本 query 少于 4 字且 clarified≠true 时返回「请先完成澄清」，queryFile 检索跳过澄清；屏蔽条目与数据源黑名单来源不下发，itemCount 为实际下发条数 |
 | GET | /search/results/{resultSetId} | cmr:search:page | 结果集快照回看（P2）；条目名称按 ID 实时回查，条目已删显示「已删除」占位；被屏蔽条目不返回 |
 | POST | /search/results/{resultSetId}/rerun | cmr:search:create | P2 错误态重跑：原参数重放，生成新 SRH/RST |
 | POST | /search/results/{resultSetId}/adopt | cmr:search:adopt | 未采用→已采用 |

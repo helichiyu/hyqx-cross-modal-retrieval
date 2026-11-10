@@ -31,8 +31,13 @@ class SearchLogCleanupJobTest {
         jdbc.update("INSERT INTO cmr_search_history(id,create_time) VALUES(2,?)", expired);
         jdbc.update("INSERT INTO cmr_search_history(id,create_time) VALUES(3,?)", expired);
         jdbc.update("INSERT INTO cmr_search_history(id,create_time) VALUES(4,?)", recent);
+        // 5 被赞踩引用、6 被收藏引用：即使过期也不得删除（运营台账永久保留）
+        jdbc.update("INSERT INTO cmr_search_history(id,biz_no,create_time) VALUES(5,'SRH-5',?)", expired);
+        jdbc.update("INSERT INTO cmr_search_history(id,biz_no,create_time) VALUES(6,'SRH-6',?)", expired);
         jdbc.update("INSERT INTO cmr_feedback(search_id) VALUES(2)");
         jdbc.update("INSERT INTO cmr_eval_item(search_id) VALUES(3)");
+        jdbc.update("INSERT INTO cmr_item_vote(search_id) VALUES(5)");
+        jdbc.update("INSERT INTO cmr_favorite(task_no) VALUES('SRH-6')");
         jdbc.update("INSERT INTO cmr_result_item(search_id,result_rank) VALUES(1,1),(2,1)");
         jdbc.update("INSERT INTO cmr_click_event(search_id,result_rank) VALUES(1,1),(2,1)");
         jdbc.update("INSERT INTO cmr_task(id,type,ref_id) VALUES(101,'search',1),(102,'search',2),(103,'build',1)");
@@ -44,7 +49,7 @@ class SearchLogCleanupJobTest {
         new SearchLogCleanupJob(new NamedParameterJdbcTemplate(dataSource), properties).cleanup();
 
         assertThat(jdbc.queryForList("SELECT id FROM cmr_search_history ORDER BY id", Long.class))
-                .containsExactly(2L, 3L, 4L);
+                .containsExactly(2L, 3L, 4L, 5L, 6L);
         assertThat(jdbc.queryForList("SELECT search_id FROM cmr_result_item ORDER BY search_id", Long.class))
                 .containsExactly(2L);
         assertThat(jdbc.queryForList("SELECT search_id FROM cmr_click_event ORDER BY search_id", Long.class))
@@ -56,9 +61,11 @@ class SearchLogCleanupJobTest {
     }
 
     private void createSchema(JdbcTemplate jdbc) {
-        jdbc.execute("CREATE TABLE cmr_search_history(id INTEGER PRIMARY KEY, create_time TIMESTAMP)");
+        jdbc.execute("CREATE TABLE cmr_search_history(id INTEGER PRIMARY KEY, biz_no TEXT, create_time TIMESTAMP)");
         jdbc.execute("CREATE TABLE cmr_feedback(search_id INTEGER)");
         jdbc.execute("CREATE TABLE cmr_eval_item(search_id INTEGER)");
+        jdbc.execute("CREATE TABLE cmr_item_vote(id INTEGER PRIMARY KEY, search_id INTEGER)");
+        jdbc.execute("CREATE TABLE cmr_favorite(id INTEGER PRIMARY KEY, task_no TEXT)");
         jdbc.execute("CREATE TABLE cmr_result_item(search_id INTEGER, result_rank INTEGER)");
         jdbc.execute("CREATE TABLE cmr_click_event(search_id INTEGER, result_rank INTEGER)");
         jdbc.execute("CREATE TABLE cmr_task(id INTEGER PRIMARY KEY, type TEXT, ref_id INTEGER)");
