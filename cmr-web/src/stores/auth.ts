@@ -8,7 +8,6 @@ const BYPASS_PERMISSIONS = [
   'cmr:dataset:page', 'cmr:dataset:detail', 'cmr:dataset:create', 'cmr:dataset:update',
   'cmr:dataset:adjudicate', 'cmr:dataset:confirm',
   'cmr:search:create', 'cmr:search:page', 'cmr:search:update', 'cmr:search:adopt',
-  'cmr:operation:update',
   'cmr:task:page', 'cmr:task:detail',
   'cmr:strategy:page', 'cmr:strategy:detail', 'cmr:strategy:create', 'cmr:strategy:update', 'cmr:strategy:publish',
   'cmr:eval:page', 'cmr:eval:detail', 'cmr:eval:create', 'cmr:eval:update', 'cmr:eval:run',

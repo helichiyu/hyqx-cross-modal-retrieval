@@ -67,8 +67,8 @@
               <div class="range-scale"><span>D</span><span>C</span><span>B</span><span>A</span></div>
             </div>
             <div class="filter-block">
-              <label>相似度阈值 <span class="fb-val">≥ {{ similarityThreshold.toFixed(2) }}</span></label>
-              <div class="sim-range"><input v-model.number="similarityThreshold" type="range" min="0.5" max="0.99" step="0.01" aria-label="相似度阈值"></div>
+              <label>相似度阈值 <span class="fb-val">{{ similarityThreshold > 0 ? `≥ ${similarityThreshold.toFixed(2)}` : '不限' }}</span></label>
+              <div class="sim-range"><input v-model.number="similarityThreshold" type="range" min="0" max="0.99" step="0.01" aria-label="相似度阈值"></div>
             </div>
             <div class="filter-block">
               <label>来源</label>
@@ -118,7 +118,7 @@
                       <div class="rc-line1"><b>{{ item.name || item.itemId }}</b><span v-if="item.deleted" class="badge deleted-badge">已删除</span><span v-else class="badge" :class="`q${qualityLevel(item.score)}`">质量 {{ qualityText(item.score) }}</span></div>
                       <div class="rc-src">来源：{{ itemSource(item) }} · {{ itemExtra(item) }}</div>
                       <div v-if="heatMap" class="rc-align">
-                        对齐分 <i class="al-chip" :style="{ background: heatColor(item.score) }">语 {{ item.score.toFixed(2) }}</i>
+                        对齐分 <i class="al-chip" :style="{ background: heatColor(alignScoreOf(item)) }">{{ alignLabelOf(item) }}</i>
                       </div>
                       <div v-if="expandedId === item.id && !item.deleted" class="rc-media">
                         <MediaPreview :path="item.sourceFile" />
@@ -318,7 +318,7 @@ const filterOpen = ref(true)
 const activeGroup = ref('all')
 const qualityMin = ref(0)
 const qualityMax = ref(3)
-const similarityThreshold = ref(0.5)
+const similarityThreshold = ref(0)
 const sourceFilter = ref('全部来源')
 const selectedIds = ref(new Set<Id>())
 const clickedIds = ref(new Set<Id>())
@@ -468,6 +468,16 @@ function heatColor(value: number) {
   return `rgb(${r},${g},${b})`
 }
 
+/** 对齐分缺失的历史数据回退到融合分 */
+function alignScoreOf(item: ResultItemVO) {
+  return item.alignScore ?? item.score
+}
+
+/** 对齐分芯片：模态简称 + 两位小数 */
+function alignLabelOf(item: ResultItemVO) {
+  return `${shortModalityLabel(item.modality).slice(0, 1)} ${alignScoreOf(item).toFixed(2)}`
+}
+
 function normalizeQualityRange() {
   if (qualityMin.value > qualityMax.value) {
     const temp = qualityMin.value
@@ -479,7 +489,7 @@ function normalizeQualityRange() {
 function resetFilters() {
   qualityMin.value = 0
   qualityMax.value = 3
-  similarityThreshold.value = 0.5
+  similarityThreshold.value = 0
   sourceFilter.value = '全部来源'
   activeGroup.value = 'all'
 }
