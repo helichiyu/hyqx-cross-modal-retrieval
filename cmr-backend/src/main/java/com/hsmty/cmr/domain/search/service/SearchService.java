@@ -11,6 +11,7 @@ import com.hsmty.cmr.common.util.JsonUtils;
 import com.hsmty.cmr.domain.dataset.entity.CmrDataset;
 import com.hsmty.cmr.domain.dataset.entity.CmrIndex;
 import com.hsmty.cmr.domain.dataset.mapper.DatasetMapper;
+import com.hsmty.cmr.domain.dataset.mapper.DatasourceBlacklistMapper;
 import com.hsmty.cmr.domain.dataset.mapper.IndexMapper;
 import com.hsmty.cmr.domain.search.dto.SearchExecuteDTO;
 import com.hsmty.cmr.domain.search.dto.UnderstandDTO;
@@ -44,6 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +74,9 @@ public class SearchService {
     /** 摘要保留 30 天（数据流 4.x 检索日志口径） */
     private static final int SUMMARY_KEEP_DAYS = 30;
 
+    /** 文本查询少于该字数且未澄清时拒绝检索（P1 澄清规则） */
+    private static final int CLARIFY_MIN_CHARS = 4;
+
     private final SearchHistoryMapper historyMapper;
     private final ResultItemMapper resultItemMapper;
     private final ClickEventMapper clickEventMapper;
@@ -80,6 +85,7 @@ public class SearchService {
     private final BlockedItemMapper blockedItemMapper;
     private final IndexMapper indexMapper;
     private final DatasetMapper datasetMapper;
+    private final DatasourceBlacklistMapper blacklistMapper;
     private final StrategyService strategyService;
     private final OperatorClient operatorClient;
     private final TaskService taskService;
@@ -103,7 +109,7 @@ public class SearchService {
         }
         JsonNode data = operatorClient.understand(payload);
         List<String> options = new ArrayList<>();
-        data.path("clarifyOptions").forEach(o -> options.add(o.asText()));
+        data.path("clarifyOptions").forEach(o -> options.add(clarifyOptionText(o)));
         return UnderstandVO.builder()
                 .needClarify(data.path("needClarify").asBoolean(false))
                 .clarifyOptions(options)
@@ -119,6 +125,13 @@ public class SearchService {
                 "query 与 queryFile 必须二选一");
         if (!blank(dto.getQueryFile())) {
             fileService.resolve(dto.getQueryFile());
+        }
+        // P1 澄清规则：文本查询少于 4 字且未澄清 → 拒绝；文件查询不走澄清
+        if (blank(dto.getQueryFile()) && !Boolean.TRUE.equals(dto.getClarified())) {
+            String effectiveQuery = blank(dto.getClarifiedQuery()) ? dto.getQuery() : dto.getClarifiedQuery();
+            int length = effectiveQuery == null ? 0 : effectiveQuery.trim().length();
+            BizException.assertTrue(length < CLARIFY_MIN_CHARS,
+                    "搜索词少于 " + CLARIFY_MIN_CHARS + " 个字，请先完成澄清后再检索");
         }
         List<String> targetModalities = normalizedTargetModalities(dto.getTargetModalities());
         String targetModality = targetModalities == null ? null : targetModalities.get(0);
@@ -443,7 +456,8 @@ public class SearchService {
                 .taskBizNo(taskService.bizNoOf(history.getTaskId()))
                 .queryModality(history.getQueryModality())
                 .targetModality(history.getTargetModality())
-                .itemCount(history.getItemCount())
+                // 命中条数以屏蔽过滤后的实际下发条数为准（库表设计：结果条数）
+                .itemCount(items.size())
                 .elapsedMs(history.getElapsedMs())
                 .strategy(strategy)
                 .items(items)
@@ -458,16 +472,32 @@ public class SearchService {
                 .map(CmrResultItem::getItemId)
                 .filter(id -> id != null && !id.isBlank())
                 .toList();
-        // 屏蔽条目不再下发给检索端（屏蔽列表只影响展示，不影响历史快照）
+        // 屏蔽条目与黑名单来源不再下发给检索端（屏蔽列表只影响展示，不影响历史快照）
         Set<String> blocked = blockedItemIds(itemIds);
+        Set<String> blacklistedSources = blacklistedSources();
         Map<String, ItemMetaService.ItemMeta> metas = itemMetaService.lookup(history.getIndexId(), itemIds);
         Map<String, String> votes = votesOf(history.getBizNo());
         Set<String> favorites = favoriteItemIds();
         return entities.stream()
                 .filter(item -> item.getItemId() == null || !blocked.contains(item.getItemId()))
+                .filter(item -> !blacklistedSources.contains(item.getSource()))
                 .map(item -> toItemVO(item, metas.get(item.getItemId()),
                         votes.get(item.getItemId()), favorites.contains(item.getItemId())))
                 .toList();
+    }
+
+    /** 黑名单：来源名 + 数据集 ID 两路匹配，命中即整源排除 */
+    private Set<String> blacklistedSources() {
+        Set<String> names = new HashSet<>();
+        blacklistMapper.selectListByQuery(QueryWrapper.create()).forEach(b -> {
+            if (!blank(b.getSourceName())) {
+                names.add(b.getSourceName());
+            }
+            if (!blank(b.getDatasetId())) {
+                names.add(b.getDatasetId());
+            }
+        });
+        return names;
     }
 
     private Set<String> blockedItemIds(List<String> itemIds) {
@@ -635,7 +665,8 @@ public class SearchService {
     /** 搜索结果摘要（P3）：Top-20 条目 + 赞/踩，30 天后过期 */
     public Map<String, Object> summary(String taskNo) {
         CmrSearchHistory history = requireHistoryByBizNo(taskNo);
-        List<ResultItemVO> items = itemsOf(history).stream().limit(20).toList();
+        List<ResultItemVO> delivered = itemsOf(history);
+        List<ResultItemVO> items = delivered.stream().limit(20).toList();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("taskNo", history.getBizNo());
         result.put("searchId", history.getId());
@@ -647,7 +678,8 @@ public class SearchService {
         result.put("strategyNo", history.getStrategyNo());
         result.put("strategyVersion", history.getStrategyVersion());
         result.put("threshold", history.getThreshold());
-        result.put("itemCount", history.getItemCount());
+        // 命中条数以屏蔽过滤后的实际下发条数为准
+        result.put("itemCount", delivered.size());
         result.put("sealed", "T".equals(history.getSealed()));
         result.put("createTime", history.getCreateTime());
         result.put("expireTime", history.getSummaryExpireTime());
@@ -800,6 +832,14 @@ public class SearchService {
             return "video";
         }
         return "text";
+    }
+
+    /** 澄清选项：407 返回对象时序列化成 JSON 字符串（前端解析后取 query/intent），纯文本保持原样 */
+    private String clarifyOptionText(JsonNode option) {
+        if (option == null || option.isNull()) {
+            return "";
+        }
+        return option.isObject() ? JsonUtils.writeQuietly(option) : option.asText("");
     }
 
     private String textOrNull(String s) {

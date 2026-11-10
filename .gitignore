@@ -39,5 +39,9 @@ dist/
 # 建库管线自动合成的默认评测集（运行时生成，勿提交）
 dataset/eval/
 
+# 本地联调数据：数据源接入落盘目录 / v5 样例副本（与 dataset/sample 相同，不入库）
+dataset/ds/
+dataset/v5_sample/
+
 # 本地数据库/密钥配置
 cmr-backend/src/main/resources/application-local.yml

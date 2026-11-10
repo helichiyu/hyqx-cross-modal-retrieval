@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 检索日志保留清理：30 天外物理删除，反馈/评测引用永久保留。
+ * 检索日志保留清理：30 天外物理删除，反馈/评测/赞踩/收藏引用的记录永久保留。
  *
  * @author cmr
  * @since 2026-11-09
@@ -30,6 +30,8 @@ public class SearchLogCleanupJob {
             WHERE h.create_time < :cutoff
               AND NOT EXISTS (SELECT 1 FROM cmr_feedback f WHERE f.search_id = h.id)
               AND NOT EXISTS (SELECT 1 FROM cmr_eval_item e WHERE e.search_id = h.id)
+              AND NOT EXISTS (SELECT 1 FROM cmr_item_vote v WHERE v.search_id = h.id)
+              AND NOT EXISTS (SELECT 1 FROM cmr_favorite fav WHERE fav.task_no = h.biz_no)
             ORDER BY h.id
             LIMIT :limit
             """;

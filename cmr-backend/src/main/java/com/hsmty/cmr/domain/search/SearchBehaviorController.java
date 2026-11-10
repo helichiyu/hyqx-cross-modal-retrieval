@@ -55,7 +55,7 @@ public class SearchBehaviorController {
     }
 
     @Operation(summary = "解除屏蔽")
-    @PreAuthorize("hasAnyAuthority('cmr:operation:update')")
+    @PreAuthorize("hasAnyAuthority('cmr:feedback:update')")
     @PostMapping("blocked-items/{id}/unblock")
     public ApiResult<Void> unblock(@org.springframework.web.bind.annotation.PathVariable Long id) {
         searchService.unblock(id);

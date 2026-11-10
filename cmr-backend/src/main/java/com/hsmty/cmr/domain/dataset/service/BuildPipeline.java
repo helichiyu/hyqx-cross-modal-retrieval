@@ -158,7 +158,11 @@ public class BuildPipeline {
                     "投产校验通过，索引已激活，数据集可检索");
         } else {
             dataset.setStatus(CmrDataset.STATUS_STUCK);
-            dataset.setStuckReason("召回率校验未达标（recall=" + r406.path("recall").asText() + "），待人工确认投产");
+            // 406 输出键为 recall@10（旧版算子为 recall），两者兼容
+            JsonNode recallNode = r406.has("recall@10") ? r406.get("recall@10") : r406.path("recall");
+            String recallText = recallNode.isMissingNode() || recallNode.isNull() ? "-"
+                    : recallNode.isNumber() ? String.format("%.2f", recallNode.asDouble()) : recallNode.asText();
+            dataset.setStuckReason("召回率校验未达标（recall@10=" + recallText + "），待人工确认投产");
             datasetMapper.update(dataset);
             taskService.log(task.getId(), "406", CmrTaskLog.STATUS_OK, r406, "召回率未达标，等待人工确认投产");
         }

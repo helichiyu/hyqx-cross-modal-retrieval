@@ -194,6 +194,7 @@
         </div>
         <div class="modal-body">
           <div class="mb-tip">「<b>{{ clarifyRaw }}</b>」较短或存在歧义，你是不是想找：</div>
+          <div v-if="!clarifyOptions.length" class="mb-tip">{{ clarifyHint || '请补充更具体的描述（对象、场景、动作）' }}</div>
           <button v-for="item in clarifyOptions" :key="item" class="clarify-item" type="button" @click="pickClarify(item)"><span class="ci-q">{{ item }}</span></button>
           <div class="mb-tip" style="margin-top:12px">场景建议：</div>
           <div class="clarify-scenes">
@@ -302,6 +303,7 @@ const modeNudge = ref(false)
 
 const clarifyVisible = ref(false)
 const clarifyRaw = ref('')
+const clarifyHint = ref('')
 const clarifyOptions = ref<string[]>([])
 const clarifiedQueries = ref(new Set<string>())
 
@@ -563,6 +565,7 @@ async function submitSearch() {
       const result = await understand(buildUnderstandBody())
       if (result.needClarify) {
         clarifyRaw.value = text
+        clarifyHint.value = result.hint || ''
         clarifyOptions.value = normalizeClarifyOptions(result.clarifyOptions)
         clarifyVisible.value = true
         return
@@ -602,7 +605,7 @@ async function runSearch(clarifiedQuery?: string) {
 }
 
 function normalizeClarifyOptions(options: string[]) {
-  const normalized = options.map(option => {
+  const normalized = (options ?? []).map(option => {
     try {
       const value = JSON.parse(option) as { query?: string; intent?: string }
       return value.query || value.intent || option
@@ -610,7 +613,7 @@ function normalizeClarifyOptions(options: string[]) {
       return option
     }
   }).filter(Boolean)
-  return normalized.length ? normalized.slice(0, 3) : ['含发票代码的扫描件', '发票代码 高清扫描', '增值税发票代码位置示意']
+  return normalized.slice(0, 3)
 }
 
 function closeClarify() {

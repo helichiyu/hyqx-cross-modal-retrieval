@@ -17,7 +17,8 @@ public final class Permissions {
 
     /** 全量权限码（admin 拥有） */
     public static final List<String> ALL = List.of(
-            "cmr:dataset:page", "cmr:dataset:detail", "cmr:dataset:create", "cmr:dataset:adjudicate", "cmr:dataset:confirm",
+            "cmr:dataset:page", "cmr:dataset:detail", "cmr:dataset:create", "cmr:dataset:update",
+            "cmr:dataset:adjudicate", "cmr:dataset:confirm",
             "cmr:search:create", "cmr:search:page", "cmr:search:adopt",
             "cmr:task:page", "cmr:task:detail",
             "cmr:strategy:page", "cmr:strategy:detail", "cmr:strategy:create", "cmr:strategy:update", "cmr:strategy:publish",

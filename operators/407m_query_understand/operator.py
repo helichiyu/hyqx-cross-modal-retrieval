@@ -4,7 +4,7 @@
 1. 模态识别：query 文本 → text；queryFile → 按魔数/扩展名识别文件模态
 2. 歧义检测（初版规则，不接 LLM）：
    - 命中 configs/ambiguity.json 歧义词表 → 生成意图选项
-   - 文本过短（< 3 字）且不在词表 → 提示补充描述
+   - 文本过短（< 4 字）且不在词表 → 提示补充描述（与后端检索前的澄清拦截阈值一致）
 3. 输出 normalizedQuery 与澄清选项；needClarify=false 时调用方直接发起检索
 
 词表是业务配置，运营可加词，不需要改代码。后续可升级 LLM 澄清（协议不变）。
@@ -81,7 +81,7 @@ class Operator(OperatorBase):
                 }
 
         # 过短查询提示补充（规则兜底）
-        if len(query) < 3:
+        if len(query) < 4:
             return {
                 "queryModality": "text",
                 "needClarify": True,

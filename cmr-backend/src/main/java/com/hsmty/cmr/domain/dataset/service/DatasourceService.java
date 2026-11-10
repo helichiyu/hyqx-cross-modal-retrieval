@@ -6,13 +6,19 @@ import com.hsmty.cmr.common.id.SnowflakeIdWorker;
 import com.hsmty.cmr.common.util.AesUtils;
 import com.hsmty.cmr.config.CmrProperties;
 import com.hsmty.cmr.domain.dataset.dto.DatasourceCreateDTO;
+import com.hsmty.cmr.domain.dataset.dto.DatasourceIngestDTO;
+import com.hsmty.cmr.domain.dataset.entity.CmrDataset;
 import com.hsmty.cmr.domain.dataset.entity.CmrDatasource;
+import com.hsmty.cmr.domain.dataset.mapper.DatasourceBlacklistMapper;
 import com.hsmty.cmr.domain.dataset.mapper.DatasourceMapper;
 import com.hsmty.cmr.domain.dataset.mapper.DatasetMapper;
+import com.hsmty.cmr.domain.dataset.vo.DatasetVO;
 import com.hsmty.cmr.domain.dataset.vo.DatasourceTestVO;
 import com.hsmty.cmr.domain.dataset.vo.DatasourceVO;
+import com.hsmty.cmr.file.FileService;
 import com.mybatisflex.core.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -20,10 +26,16 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static com.hsmty.cmr.domain.dataset.entity.table.CmrDatasetTableDef.CMR_DATASET;
@@ -35,6 +47,7 @@ import static com.hsmty.cmr.domain.dataset.entity.table.CmrDatasourceTableDef.CM
  * @author cmr
  * @since 2026-11-03
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DatasourceService {
@@ -48,6 +61,9 @@ public class DatasourceService {
 
     private final DatasourceMapper datasourceMapper;
     private final DatasetMapper datasetMapper;
+    private final DatasourceBlacklistMapper blacklistMapper;
+    private final DatasetService datasetService;
+    private final FileService fileService;
     private final SnowflakeIdWorker idWorker;
     private final BizNoGenerator bizNoGenerator;
     private final CmrProperties properties;
@@ -77,45 +93,207 @@ public class DatasourceService {
         return fetchDatasets(datasource);
     }
 
-    /** 同步：拉元数据并回写连接状态、必填校验、数据集总数 */
+    /**
+     * 同步（只做元数据发现，不触发建库链）：已连接数据源才允许，黑名单来源整源跳过。
+     *
+     * <p>连接状态只由测试连接驱动，同步不再改写，避免「字段不全仍转已连接」。
+     */
     public java.util.Map<String, Object> sync(Long id) {
-        CmrDatasource datasource = datasourceMapper.selectOneById(id);
-        BizException.assertNull(datasource, "数据源不存在");
+        CmrDatasource datasource = requireDatasource(id);
+        BizException.assertTrue(!"connected".equals(datasource.getConnectStatus()),
+                "数据源未连接，请先测试连接");
         java.util.Map<String, Object> result;
         try {
             result = fetchDatasets(datasource);
         } catch (BizException e) {
-            datasource.setConnectStatus("failed");
             datasource.setRequiredOk(false);
-            datasource.setLastTestConnected(false);
             datasource.setLastTestMessage(e.getMessage());
             datasource.setLastTestTime(LocalDateTime.now());
             datasourceMapper.update(datasource, false);
             throw e;
         }
-        datasource.setConnectStatus("connected");
         datasource.setRequiredOk(Boolean.TRUE.equals(result.get("requiredOk")));
         datasource.setUpstreamDatasetId((String) result.get("firstDatasetId"));
         datasource.setTotalCount((Integer) result.get("totalItems"));
         datasource.setLastSyncTime(LocalDateTime.now());
-        datasource.setLastTestConnected(true);
-        datasource.setLastTestMessage("同步成功，数据集 " + result.get("datasetCount") + " 个");
+        datasource.setLastTestMessage("同步成功，数据集 " + result.get("datasetCount") + " 个"
+                + (intOf(result.get("skippedBlacklisted")) > 0
+                ? "（黑名单跳过 " + result.get("skippedBlacklisted") + " 个）" : ""));
         datasource.setLastTestTime(LocalDateTime.now());
         datasourceMapper.update(datasource, false);
         return result;
     }
 
+    /**
+     * 接入（P4）：拉取上游数据集条目内容落到共享卷，登记本地数据集并触发 401→406 建库链。
+     *
+     * <p>与同步的分工：同步只发现元数据；接入才真正下载内容并建索引。
+     */
+    public DatasetVO ingest(Long id, DatasourceIngestDTO dto) {
+        CmrDatasource datasource = requireDatasource(id);
+        BizException.assertNull(datasource.getEndpoint(), "数据源未配置接口地址");
+        BizException.assertTrue(!"connected".equals(datasource.getConnectStatus()),
+                "数据源未连接，请先测试连接");
+        BizException.assertTrue(!Boolean.TRUE.equals(datasource.getRequiredOk()), "4 项必填校验未通过，不可接入");
+
+        String base = trimBase(datasource.getEndpoint());
+        String datasetId = dto.getDatasetId();
+        java.util.Map<String, Object> probe = fetchDatasets(datasource);
+        java.util.Map<String, Object> upstream = ((List<?>) probe.get("datasets")).stream()
+                .filter(node -> node instanceof java.util.Map<?, ?> m && datasetId.equals(m.get("datasetId")))
+                .map(node -> (java.util.Map<String, Object>) node)
+                .findFirst()
+                .orElseThrow(() -> new BizException("上游数据集不存在或已被黑名单排除: " + datasetId));
+
+        Path dir = fileService.datasetRoot().resolve("ds").resolve(datasource.getBizNo()).resolve(safeName(datasetId));
+        int fetched = pullItems(datasource, base, datasetId, dir);
+        BizException.assertTrue(fetched <= 0, "上游数据集无可用条目: " + datasetId);
+
+        String logicalRoot = "dataset/ds/" + datasource.getBizNo() + "/" + safeName(datasetId);
+        String name = dto.getName() != null && !dto.getName().isBlank()
+                ? dto.getName() : String.valueOf(upstream.get("name"));
+        DatasetVO dataset = datasetService.registerUpstream(datasource.getId(), name,
+                dto.getVersion(), dto.getScene(), logicalRoot);
+        log.info("数据源接入: source={} datasetId={} files={} dataset={}",
+                datasource.getBizNo(), datasetId, fetched, dataset.getBizNo());
+        return dataset;
+    }
+
+    /** 逐条目下载模态内容到本地目录，返回落盘文件数 */
+    private int pullItems(CmrDatasource datasource, String base, String datasetId, Path dir) {
+        BizException.assertTrue(!dirBelongs(dir), "接入目录非法");
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new BizException("接入目录创建失败: " + e.getMessage(), e);
+        }
+        int fetched = 0;
+        for (int page = 1; page <= 50; page++) {
+            String body = getJson(datasource, base + "/datasets/" + datasetId + "/items?page=" + page + "&size=100");
+            List<java.util.Map<String, Object>> items = unwrapList(body, "items");
+            if (items.isEmpty()) {
+                break;
+            }
+            for (java.util.Map<String, Object> item : items) {
+                fetched += saveItem(dir, item);
+            }
+            if (items.size() < 100) {
+                break;
+            }
+        }
+        return fetched;
+    }
+
+    private int saveItem(Path dir, java.util.Map<String, Object> item) {
+        String itemId = safeName(str(item.get("item_id")));
+        if (itemId.isBlank() || !(item.get("modals") instanceof List<?> modals)) {
+            return 0;
+        }
+        int saved = 0;
+        for (Object modal : modals) {
+            if (!(modal instanceof java.util.Map<?, ?> m)) {
+                continue;
+            }
+            String type = str(m.get("type"));
+            if (type == null) {
+                continue;
+            }
+            Object content = m.get("content");
+            Object url = m.get("url");
+            Path target = dir.resolve(itemId + "_" + type + (content != null ? ".txt" : extOf(str(url))));
+            try {
+                if (content != null) {
+                    Files.writeString(target, String.valueOf(content), StandardCharsets.UTF_8);
+                    saved++;
+                } else if (url != null) {
+                    download(str(url), target);
+                    saved++;
+                }
+            } catch (IOException | InterruptedException e) {
+                if (e instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
+                log.warn("条目模态下载失败 item={} type={}: {}", itemId, type, e.getMessage());
+            }
+        }
+        return saved;
+    }
+
+    private void download(String url, Path target) throws IOException, InterruptedException {
+        HttpResponse<Path> response = HTTP_CLIENT.send(
+                HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(30)).GET().build(),
+                HttpResponse.BodyHandlers.ofFile(target));
+        BizException.assertTrue(response.statusCode() < 200 || response.statusCode() >= 300,
+                "条目内容下载失败 HTTP " + response.statusCode());
+    }
+
+    private String extOf(String url) {
+        if (url == null) {
+            return ".bin";
+        }
+        int slash = url.lastIndexOf('/');
+        String name = slash >= 0 ? url.substring(slash + 1) : url;
+        int query = name.indexOf('?');
+        if (query >= 0) {
+            name = name.substring(0, query);
+        }
+        int dot = name.lastIndexOf('.');
+        return dot >= 0 ? name.substring(dot) : ".bin";
+    }
+
+    private String safeName(String value) {
+        return value == null ? "" : value.replaceAll("[^A-Za-z0-9._-]", "_");
+    }
+
+    /** 接入目录必须落在 dataset/ds 下，防止越界写 */
+    private boolean dirBelongs(Path dir) {
+        return dir.toAbsolutePath().normalize().startsWith(fileService.datasetRoot().resolve("ds"));
+    }
+
+    private CmrDatasource requireDatasource(Long id) {
+        CmrDatasource datasource = datasourceMapper.selectOneById(id);
+        BizException.assertNull(datasource, "数据源不存在");
+        return datasource;
+    }
+
     private java.util.Map<String, Object> fetchDatasets(CmrDatasource datasource) {
         String base = trimBase(datasource.getEndpoint());
         String body = getJson(datasource, base + "/datasets");
-        java.util.List<java.util.Map<String, Object>> datasets = unwrapList(body);
+        java.util.List<java.util.Map<String, Object>> datasets = unwrapList(body, "datasets");
         BizException.assertTrue(datasets.isEmpty(), "上游未返回任何数据集");
+
+        // 黑名单：来源名命中整源排除；dataset_id 命中单个数据集排除
+        Set<String> blackSourceNames = new HashSet<>();
+        Set<String> blackDatasetIds = new HashSet<>();
+        blacklistMapper.selectListByQuery(QueryWrapper.create()).forEach(b -> {
+            if (b.getSourceName() != null && !b.getSourceName().isBlank()) {
+                blackSourceNames.add(b.getSourceName());
+            }
+            if (b.getDatasetId() != null && !b.getDatasetId().isBlank()) {
+                blackDatasetIds.add(b.getDatasetId());
+            }
+        });
+        boolean wholeSourceBlacklisted = blackSourceNames.contains(datasource.getName());
+        java.util.List<java.util.Map<String, Object>> allowed = new java.util.ArrayList<>();
+        int skippedBlacklisted = 0;
+        for (java.util.Map<String, Object> ds : datasets) {
+            String datasetId = str(ds.get("dataset_id"));
+            String name = str(ds.get("name"));
+            boolean black = wholeSourceBlacklisted || (datasetId != null && blackDatasetIds.contains(datasetId))
+                    || (name != null && blackSourceNames.contains(name));
+            if (black) {
+                skippedBlacklisted++;
+            } else {
+                allowed.add(ds);
+            }
+        }
+        BizException.assertTrue(allowed.isEmpty(), "上游数据集全部在数据源黑名单中");
 
         java.util.List<java.util.Map<String, Object>> briefs = new java.util.ArrayList<>();
         boolean requiredOk = true;
         Integer totalItems = 0;
         String firstDatasetId = null;
-        for (java.util.Map<String, Object> ds : datasets) {
+        for (java.util.Map<String, Object> ds : allowed) {
             String datasetId = str(ds.get("dataset_id"));
             String name = str(ds.get("name"));
             Integer itemCount = intOf(ds.get("item_count"));
@@ -142,6 +320,7 @@ public class DatasourceService {
         result.put("firstDatasetId", firstDatasetId);
         result.put("totalItems", totalItems);
         result.put("itemIssue", itemIssue);
+        result.put("skippedBlacklisted", skippedBlacklisted);
         return result;
     }
 
@@ -151,7 +330,7 @@ public class DatasourceService {
         }
         try {
             String body = getJson(datasource, base + "/datasets/" + datasetId + "/items?page=1&size=1");
-            java.util.List<java.util.Map<String, Object>> items = unwrapList(body);
+            java.util.List<java.util.Map<String, Object>> items = unwrapList(body, "items");
             if (items.isEmpty()) {
                 return null;
             }
@@ -199,11 +378,16 @@ public class DatasourceService {
     }
 
     @SuppressWarnings("unchecked")
-    private java.util.List<java.util.Map<String, Object>> unwrapList(String body) {
+    private java.util.List<java.util.Map<String, Object>> unwrapList(String body, String listKey) {
         Object parsed = com.hsmty.cmr.common.util.JsonUtils.read(body, Object.class);
         Object listNode = parsed;
         if (parsed instanceof java.util.Map<?, ?> map) {
-            listNode = map.get("data") != null ? map.get("data") : map.get("datasets");
+            for (String key : List.of("data", listKey)) {
+                if (map.get(key) instanceof List<?>) {
+                    listNode = map.get(key);
+                    break;
+                }
+            }
         }
         BizException.assertTrue(!(listNode instanceof java.util.List<?>), "上游响应不是数据集列表");
         java.util.List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
@@ -250,9 +434,14 @@ public class DatasourceService {
                         QueryWrapper.create().orderBy(CMR_DATASOURCE.ID.desc()))
                 .stream().map(DatasourceVO::from).toList();
         for (DatasourceVO source : sources) {
-            Long count = datasetMapper.selectCountByQuery(QueryWrapper.create()
+            List<CmrDataset> datasets = datasetMapper.selectListByQuery(QueryWrapper.create()
                     .where(CMR_DATASET.DATASOURCE_ID.eq(source.getId())));
-            source.setDatasetCount(count == null ? 0 : count);
+            source.setDatasetCount((long) datasets.size());
+            // 向量化完成数 = 该数据源下已可检索数据集的实际条目数
+            source.setVectorizedCount(datasets.stream()
+                    .filter(ds -> CmrDataset.STATUS_SEARCHABLE.equals(ds.getStatus()))
+                    .mapToInt(ds -> ds.getItemCount() == null ? 0 : ds.getItemCount())
+                    .sum());
         }
         return sources;
     }
@@ -287,8 +476,7 @@ public class DatasourceService {
     }
 
     public DatasourceTestVO test(Long id) {
-        CmrDatasource datasource = datasourceMapper.selectOneById(id);
-        BizException.assertNull(datasource, "数据源不存在");
+        CmrDatasource datasource = requireDatasource(id);
         DatasourceTestVO result;
         if (isPushProtocol(datasource.getProtocol())) {
             result = DatasourceTestVO.builder()
@@ -306,8 +494,30 @@ public class DatasourceService {
                     .build();
         } else {
             result = testEndpoint(datasource);
+            if (Boolean.TRUE.equals(result.getConnected())) {
+                result = checkRequiredFields(datasource, result);
+            }
         }
         return saveTestResult(datasource, result);
+    }
+
+    /** 测试连接第二步：逐字段检测 4 项必填（dataset_id/name/item_count/modals），缺任一项判接入失败 */
+    private DatasourceTestVO checkRequiredFields(CmrDatasource datasource, DatasourceTestVO result) {
+        try {
+            java.util.Map<String, Object> probe = fetchDatasets(datasource);
+            boolean ok = Boolean.TRUE.equals(probe.get("requiredOk"));
+            result.setConnected(ok);
+            if (ok) {
+                result.setMessage("连接成功，4 项必填齐全");
+            } else {
+                Object issue = probe.get("itemIssue");
+                result.setMessage("4 项必填缺失：" + (issue == null ? "上游数据集字段不全" : issue));
+            }
+        } catch (BizException e) {
+            result.setConnected(false);
+            result.setMessage(e.getMessage());
+        }
+        return result;
     }
 
     private DatasourceTestVO saveTestResult(CmrDatasource datasource, DatasourceTestVO result) {
@@ -318,6 +528,10 @@ public class DatasourceService {
         datasource.setLastTestLatencyMs(result.getLatencyMs());
         datasource.setLastTestMessage(result.getMessage());
         datasource.setLastTestTime(testedAt);
+        // 状态表：测试通过 → 已连接；测试未通过 → 状态保持原样
+        if (Boolean.TRUE.equals(result.getConnected())) {
+            datasource.setConnectStatus("connected");
+        }
         datasourceMapper.update(datasource, false);
         return result;
     }

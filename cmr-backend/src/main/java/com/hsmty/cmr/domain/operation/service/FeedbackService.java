@@ -57,6 +57,20 @@ public class FeedbackService {
         BizException.assertTrue(CmrFeedback.ENTRY_MISMATCH.equals(dto.getEntryType()) && history == null,
                 "标记不匹配必须指定有效的来源任务");
 
+        // 同一任务重复标记不匹配：返回已有待处理反馈单，避免运营重复处置
+        if (CmrFeedback.ENTRY_MISMATCH.equals(dto.getEntryType())) {
+            CmrFeedback pending = feedbackMapper.selectOneByQuery(QueryWrapper.create()
+                    .where(CMR_FEEDBACK.SOURCE_TASK_NO.eq(dto.getSourceTaskNo())
+                            .and(CMR_FEEDBACK.ENTRY_TYPE.eq(CmrFeedback.ENTRY_MISMATCH))
+                            .and(CMR_FEEDBACK.STATUS.eq(CmrFeedback.STATUS_PENDING)))
+                    .orderBy(CMR_FEEDBACK.ID.desc())
+                    .limit(1));
+            if (pending != null) {
+                log.info("反馈重复提交，返回待处理单: {} task={}", pending.getBizNo(), dto.getSourceTaskNo());
+                return FeedbackVO.from(pending);
+            }
+        }
+
         CmrFeedback feedback = new CmrFeedback();
         feedback.setId(idWorker.next());
         feedback.setBizNo(bizNoGenerator.next(BizNoGenerator.PREFIX_FEEDBACK));

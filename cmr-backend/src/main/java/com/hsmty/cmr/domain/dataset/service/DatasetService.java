@@ -86,14 +86,34 @@ public class DatasetService {
         } else {
             fileRoot = fileService.requireDir(dto.getDatasetPath());
         }
+        return register(dto.getDatasourceId(), dto.getName(), dto.getVersion(), dto.getScene(), fileRoot, bizNo);
+    }
 
+    /**
+     * 数据源接入：上游内容已落到共享卷时登记数据集并提交建库任务（401→406）
+     *
+     * @param datasourceId 来源数据源
+     * @param name         数据集名称
+     * @param version      版本号
+     * @param scene        业务场景
+     * @param fileRoot     已落盘的逻辑目录（dataset/...）
+     * @return 新数据集
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public DatasetVO registerUpstream(Long datasourceId, String name, String version, String scene, String fileRoot) {
+        return register(datasourceId, name, version, scene, fileRoot,
+                bizNoGenerator.next(BizNoGenerator.PREFIX_DATASET));
+    }
+
+    private DatasetVO register(Long datasourceId, String name, String version, String scene,
+                               String fileRoot, String bizNo) {
         CmrDataset dataset = new CmrDataset();
         dataset.setId(idWorker.next());
         dataset.setBizNo(bizNo);
-        dataset.setDatasourceId(dto.getDatasourceId());
-        dataset.setName(dto.getName());
-        dataset.setVersion(dto.getVersion());
-        dataset.setScene(dto.getScene());
+        dataset.setDatasourceId(datasourceId);
+        dataset.setName(name);
+        dataset.setVersion(version);
+        dataset.setScene(scene == null || scene.isBlank() ? "general" : scene);
         dataset.setStatus(CmrDataset.STATUS_INGEST);
         dataset.setFileRoot(fileRoot);
         dataset.setItemCount(0);

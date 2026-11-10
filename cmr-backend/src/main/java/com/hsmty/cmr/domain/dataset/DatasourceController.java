@@ -2,6 +2,7 @@ package com.hsmty.cmr.domain.dataset;
 
 import com.hsmty.cmr.common.api.ApiResult;
 import com.hsmty.cmr.domain.dataset.dto.DatasourceCreateDTO;
+import com.hsmty.cmr.domain.dataset.dto.DatasourceIngestDTO;
 import com.hsmty.cmr.domain.dataset.service.DatasourceService;
 import com.hsmty.cmr.domain.dataset.vo.DatasourceTestVO;
 import com.hsmty.cmr.domain.dataset.vo.DatasourceVO;
@@ -61,11 +62,19 @@ public class DatasourceController {
         return ApiResult.success(datasourceService.remoteDatasets(id));
     }
 
-    @Operation(summary = "同步元数据（回写连接状态/必填校验/条目总数）")
-    @PreAuthorize("hasAnyAuthority('cmr:dataset:create')")
+    @Operation(summary = "同步元数据（只发现，不建库；黑名单来源整源跳过）")
+    @PreAuthorize("hasAnyAuthority('cmr:dataset:update')")
     @PostMapping("{id}/sync")
     public ApiResult<java.util.Map<String, Object>> sync(@PathVariable Long id) {
         return ApiResult.success(datasourceService.sync(id));
+    }
+
+    @Operation(summary = "接入上游数据集（拉内容落共享卷并触发 401→406 建库链）")
+    @PreAuthorize("hasAnyAuthority('cmr:dataset:create')")
+    @PostMapping("{id}/ingest")
+    public ApiResult<com.hsmty.cmr.domain.dataset.vo.DatasetVO> ingest(@PathVariable Long id,
+                                                                      @Valid @RequestBody DatasourceIngestDTO dto) {
+        return ApiResult.success(datasourceService.ingest(id, dto));
     }
 
     @Operation(summary = "数据源接入契约（只读面板）")
