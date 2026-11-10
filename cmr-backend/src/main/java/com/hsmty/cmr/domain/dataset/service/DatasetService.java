@@ -150,7 +150,8 @@ public class DatasetService {
         if (pass) {
             dataset.setStatus(CmrDataset.STATUS_STORED);
             dataset.setStuckReason(null);
-            datasetMapper.update(dataset);
+            // ignoreNulls=false：Flex 默认跳过 null 字段，否则卡住原因清不掉
+            datasetMapper.update(dataset, false);
             submitBuild(dataset);
             log.info("裁决通过，续跑建库: dataset={} note={}", dataset.getBizNo(), note);
         } else {
@@ -184,7 +185,8 @@ public class DatasetService {
                 "已剔除的数据集不可重建");
         dataset.setStatus(CmrDataset.STATUS_INGEST);
         dataset.setStuckReason(null);
-        datasetMapper.update(dataset);
+        // ignoreNulls=false：Flex 默认跳过 null 字段，否则卡住原因清不掉
+        datasetMapper.update(dataset, false);
         return toTaskVO(submitBuild(dataset));
     }
 

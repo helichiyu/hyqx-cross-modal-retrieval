@@ -10,7 +10,10 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 实体基类：雪花主键 + 审计字段 + 逻辑删除（值由 {@link com.hsmty.cmr.config.AuditListener} 填充，业务代码不手写）
+ * 实体基类：雪花主键 + 审计字段 + 逻辑删除。
+ *
+ * <p>审计字段与逻辑删除初值由 {@link com.hsmty.cmr.config.AuditListener} 填充；
+ * {@code id} 需业务代码在插入前显式赋值（{@code setId(idWorker.next())}）。
  *
  * @author cmr
  * @since 2026-11-03

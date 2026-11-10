@@ -12,10 +12,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
-import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -30,6 +30,25 @@ SEG_CHARS = 500
 SEG_OVERLAP = 50
 AUDIO_SLICE_SEC = 30
 VIDEO_FPS = 1
+
+
+def _stable_id(item: dict) -> str:
+    """条目 ID = 模态 + 源文件 + 文件内位置的稳定哈希。
+
+    不用随机 uuid：重建会重跑整链，itemId 一变，历史检索结果、评测标注
+    与自动合成的默认评测集（query→itemId 自评）全部失配，406 必然判失败。
+    位置取切片/抽帧产物文件名（slice_0000.wav、frame_0001.jpg）或文本段序号，
+    与任务号无关，故重复解析结果一致。
+    """
+    locator = item.get("locator") or {}
+    if locator.get("path"):
+        position = Path(locator["path"]).name
+    elif "segment" in locator:
+        position = f"segment-{locator['segment']}"
+    else:
+        position = json.dumps(locator, sort_keys=True, ensure_ascii=False)
+    key = f"{item.get('modality')}|{item.get('sourceFile')}|{position}"
+    return hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
 
 
 def _ffmpeg() -> str:
@@ -160,11 +179,11 @@ class Operator(OperatorBase):
                     items = _parse_video(f, task_out)
                 count[modality] += len(items)
                 for it in items:
-                    it["itemId"] = uuid.uuid4().hex[:16]
                     it["sourceFile"] = self.relpath(f)
                     # 音频切片/视频帧产物同样输出逻辑路径，供后端直接挂载还原
                     if "path" in it.get("locator", {}):
                         it["locator"]["path"] = self.relpath(it["locator"]["path"])
+                    it["itemId"] = _stable_id(it)
                     fi.write(json.dumps(it, ensure_ascii=False) + "\n")
                 fl.write(json.dumps({
                     "uniqueId": unique_id,

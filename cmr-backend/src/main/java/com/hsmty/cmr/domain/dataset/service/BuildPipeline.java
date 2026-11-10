@@ -2,6 +2,7 @@ package com.hsmty.cmr.domain.dataset.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.hsmty.cmr.common.exception.BizException;
+import com.hsmty.cmr.common.id.SnowflakeIdWorker;
 import com.hsmty.cmr.common.util.JsonUtils;
 import com.hsmty.cmr.config.CmrProperties;
 import com.hsmty.cmr.domain.dataset.entity.CmrDataset;
@@ -19,6 +20,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -50,6 +54,7 @@ public class BuildPipeline {
     private final IndexMapper indexMapper;
     private final FileService fileService;
     private final CmrProperties properties;
+    private final SnowflakeIdWorker idWorker;
 
     /** 执行建库链（由 TaskExecutor 调度，异常上抛交由重试/隔离处置） */
     public void run(CmrTask task, Long datasetId) {
@@ -92,7 +97,8 @@ public class BuildPipeline {
             default -> {
                 dataset.setStatus(CmrDataset.STATUS_STORED);
                 dataset.setStuckReason(null);
-                datasetMapper.update(dataset);
+                // 置空卡住原因：Flex 的 update(entity) 忽略 null 字段，需 ignoreNulls=false 才会真正清空
+                datasetMapper.update(dataset, false);
             }
         }
 
@@ -100,9 +106,11 @@ public class BuildPipeline {
         taskService.updateStep(task, "403");
         JsonNode r403 = step(task, "403", () -> operatorClient.predict(OpIds.PARSE,
                 Map.of("uniqueId", uniqueId, "inputFile", dataset.getFileRoot())));
-        int itemCount = sumCounts(r403.path("counts"));
+        // 403 输出为 byModality（各模态条目数）与 itemCount，兼容旧版 counts 键
+        JsonNode modalityCounts = r403.has("byModality") ? r403.path("byModality") : r403.path("counts");
+        int itemCount = r403.path("itemCount").asInt(sumCounts(modalityCounts));
         dataset.setItemCount(itemCount);
-        dataset.setModalityJson(JsonUtils.writeQuietly(r403.path("counts")));
+        dataset.setModalityJson(JsonUtils.writeQuietly(modalityCounts));
         dataset.setStatus(CmrDataset.STATUS_INDEXING);
         datasetMapper.update(dataset);
 
@@ -128,11 +136,12 @@ public class BuildPipeline {
             return operatorClient.predict(OpIds.INDEX, payload);
         });
         CmrIndex index = new CmrIndex();
+        index.setId(idWorker.next());
         index.setDatasetId(dataset.getId());
         index.setIndexDir(r405.path("indexDir").asText(indexDir));
         index.setModelVersion(modelVersion);
         index.setStatus(CmrIndex.STATUS_CANDIDATE);
-        index.setCountsJson(JsonUtils.writeQuietly(r403.path("counts")));
+        index.setCountsJson(JsonUtils.writeQuietly(modalityCounts));
         indexMapper.insert(index, true);
 
         // 406 投产召回率校验
@@ -175,7 +184,8 @@ public class BuildPipeline {
         dataset.setStatus(CmrDataset.STATUS_SEARCHABLE);
         dataset.setCurrentIndexId(index.getId());
         dataset.setStuckReason(null);
-        datasetMapper.update(dataset);
+        // 同上：ignoreNulls=false 用于把 stuckReason 清成 null
+        datasetMapper.update(dataset, false);
     }
 
     /** 步骤统一包裹：start 日志在调用方、ok/fail 日志与异常上抛在此 */
@@ -198,8 +208,9 @@ public class BuildPipeline {
         }
         List<String> lines;
         try {
-            lines = fileService.readLines(itemsFile);
-        } catch (BizException e) {
+            lines = readItemsLines(itemsFile);
+        } catch (BizException | IOException e) {
+            log.warn("读取解析条目失败，跳过默认评测集合成: {} ({})", itemsFile, e.getMessage());
             lines = List.of();
         }
         List<String> evalLines = new ArrayList<>();
@@ -219,6 +230,24 @@ public class BuildPipeline {
         fileService.writeDatasetText(defaultFile.substring("dataset/".length()), String.join("\n", evalLines) + "\n");
         log.info("已自动合成默认评测文件: {}（{} 条）", defaultFile, evalLines.size());
         return defaultFile;
+    }
+
+    /**
+     * 读取算子输出的条目文件。
+     *
+     * <p>算子侧返回的是其项目根相对路径（如 runtime/...）或绝对路径，后者无法走
+     * {@link FileService#resolve(String)} 的逻辑路径校验，故此处单独放行，
+     * 仅允许落在 dataset/runtime 两个挂载根之内。
+     */
+    private List<String> readItemsLines(String itemsFile) throws IOException {
+        Path path = Path.of(itemsFile);
+        if (!path.isAbsolute()) {
+            path = fileService.resolve(itemsFile).absolute();
+        }
+        Path absolute = path.toAbsolutePath().normalize();
+        BizException.assertTrue(!absolute.startsWith(fileService.datasetRoot())
+                && !absolute.startsWith(fileService.runtimeRoot()), "读取路径越界: " + itemsFile);
+        return Files.readAllLines(absolute).stream().filter(l -> !l.isBlank()).toList();
     }
 
     private int sumCounts(JsonNode counts) {
