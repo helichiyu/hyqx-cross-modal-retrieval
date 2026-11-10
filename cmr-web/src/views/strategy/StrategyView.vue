@@ -31,13 +31,13 @@
               </select>
               <button class="mini-btn" type="button" @click="reloadStrategies">刷新</button>
             </div>
-            <div class="mini-table" style="--tc:118px minmax(0,1.15fr) 140px 56px 128px 118px 196px">
+            <div class="mini-table" style="--tc:118px minmax(150px,1.15fr) 140px 56px 110px 118px 196px">
               <div class="mt-row head"><div>策略ID</div><div>名称</div><div>适用场景</div><div>版本</div><div>状态</div><div>更新时间</div><div>操作</div></div>
               <div v-if="strategyLoading" class="mt-row"><div class="table-empty">加载中…</div></div>
               <div v-else-if="!strategies.length" class="mt-row"><div class="table-empty">暂无策略</div></div>
               <div v-for="row in strategies" v-else :key="row.id" class="mt-row clickable" @click="openEditStrategy(row)">
                 <div class="q mono">{{ row.bizNo }}</div>
-                <div class="c">{{ row.name }}</div>
+                <div class="c name" :title="row.name">{{ row.name }}</div>
                 <div class="c">{{ sceneLabel(row.scene) }}</div>
                 <div class="num">{{ row.currentVersion ? `v${row.currentVersion}` : '—' }}</div>
                 <span class="badge" :class="row.status === 'active' ? 'ok' : 'pend'">{{ statusLabel(row.status) }}</span>
@@ -154,10 +154,10 @@
           <section class="ed-sec">
             <div class="ed-sec-head"><span class="p-title">融合参数</span></div>
             <div class="fuse-wrap">
-              <div class="fslider"><span>文本</span><input v-model.number="editor.weights.text" type="range" min="0" max="100" step="1"><b>{{ editor.weights.text }}%</b></div>
-              <div class="fslider"><span>图像</span><input v-model.number="editor.weights.image" type="range" min="0" max="100" step="1"><b>{{ editor.weights.image }}%</b></div>
-              <div class="fslider"><span>视频</span><input v-model.number="editor.weights.video" type="range" min="0" max="100" step="1"><b>{{ editor.weights.video }}%</b></div>
-              <div class="fslider"><span>音频</span><input v-model.number="editor.weights.audio" type="range" min="0" max="100" step="1"><b>{{ editor.weights.audio }}%</b></div>
+              <div class="fslider"><span>文本</span><input v-model.number="editor.weights.text" type="range" min="0" max="100" step="1"><span class="wval"><input v-model.number="editor.weights.text" class="wnum" type="number" min="0" max="100" step="1" aria-label="文本权重百分比" @change="normalizeWeight('text')" @blur="normalizeWeight('text')">%</span></div>
+              <div class="fslider"><span>图像</span><input v-model.number="editor.weights.image" type="range" min="0" max="100" step="1"><span class="wval"><input v-model.number="editor.weights.image" class="wnum" type="number" min="0" max="100" step="1" aria-label="图像权重百分比" @change="normalizeWeight('image')" @blur="normalizeWeight('image')">%</span></div>
+              <div class="fslider"><span>视频</span><input v-model.number="editor.weights.video" type="range" min="0" max="100" step="1"><span class="wval"><input v-model.number="editor.weights.video" class="wnum" type="number" min="0" max="100" step="1" aria-label="视频权重百分比" @change="normalizeWeight('video')" @blur="normalizeWeight('video')">%</span></div>
+              <div class="fslider"><span>音频</span><input v-model.number="editor.weights.audio" type="range" min="0" max="100" step="1"><span class="wval"><input v-model.number="editor.weights.audio" class="wnum" type="number" min="0" max="100" step="1" aria-label="音频权重百分比" @change="normalizeWeight('audio')" @blur="normalizeWeight('audio')">%</span></div>
             </div>
             <div class="sum-line" :class="{ invalid: editorWeightSum !== 100 }">权重合计 <b>{{ editorWeightSum }}%</b> {{ editorWeightSum === 100 ? '✓' : '✕ 必须为 100%' }}</div>
           </section>
@@ -297,6 +297,12 @@ const mainTabs = [
 ] as const
 
 const editorWeightSum = computed(() => editor.weights.text + editor.weights.image + editor.weights.audio + editor.weights.video)
+
+/** 手输权重：限制在 0~100 的整数（滑块与数字框双向联动） */
+function normalizeWeight(key: 'text' | 'image' | 'audio' | 'video') {
+  const value = Number(editor.weights[key])
+  editor.weights[key] = Number.isFinite(value) ? Math.min(100, Math.max(0, Math.round(value))) : 0
+}
 const editorVersion = computed(() => {
   if (!editingId.value) return 'v1（待创建）'
   const current = editorDetail.value?.current?.versionNo ?? 0
@@ -669,7 +675,16 @@ function closeDev() { devOpen.value = false }
 <style scoped>
 .p5-root { min-height: 100%; }
 .p5-filter { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
-.p5-filter select { height:30px; border:1px solid #d9e7f8; border-radius:6px; padding:0 9px; background:#fff; color:#344054; }
+.p5-filter select {
+  height:32px; border:1px solid #d9e7f8; border-radius:8px; padding:0 28px 0 10px;
+  background-color:#fff; color:#344054; font-size:12.5px; cursor:pointer; outline:none;
+  appearance:none; -webkit-appearance:none; -moz-appearance:none;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237f90ad' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 8px center; background-size:13px 13px;
+  transition:border-color .15s, box-shadow .15s;
+}
+.p5-filter select:hover { border-color:#bcd2f6; }
+.p5-filter select:focus { border-color:#8fa3ff; box-shadow:0 0 0 3px rgba(65,105,246,.10); }
 .ops-sub { color:#1f5fd4; font-weight:600; }
 .p5-small-title { font-size:13px; }
 .scene-alias { margin-left:8px; color:#98a2b3; font-size:11px; }
@@ -844,7 +859,7 @@ a.nav-item{text-decoration:none;color:#344054}
 .eval-act .mini-btn{height:32px;padding:0 14px;font-size:12.5px}
 
 /* 迷你表格 */
-.mini-table{border:1px solid #eef2f8;border-radius:8px;overflow:hidden}
+.mini-table{border:1px solid #eef2f8;border-radius:8px;overflow-x:auto;overflow-y:hidden}
 .mt-row{
   min-height:38px;padding:9px 12px;border-top:1px solid #eef2f8;
   display:grid;grid-template-columns:var(--tc,minmax(0,1fr) 100px);gap:8px;align-items:center;
@@ -855,6 +870,7 @@ a.nav-item{text-decoration:none;color:#344054}
 .mt-row:not(.head):hover{background:#f8fbff}
 .mt-row .q{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#273244}
 .mt-row .c{color:var(--muted);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mt-row .c.name{color:#1f2a44;font-weight:600;font-size:12px;min-width:0}
 
 /* ================= 分页组件（表格下方 · 右对齐） ================= */
 .pager-bar{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:#667085}
@@ -911,8 +927,12 @@ a.nav-item{text-decoration:none;color:#344054}
 .ed-op{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ed-pick{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:#5b6472}
 .ed-select{
-  height:32px;min-width:260px;border:1px solid #cfd8e8;border-radius:6px;background:#fff;
-  padding:0 10px;font-size:13px;color:var(--text-primary);outline:none;
+  height:32px;min-width:260px;border:1px solid #d9e7f8;border-radius:8px;background-color:#fff;
+  padding:0 28px 0 10px;font-size:13px;color:var(--text-primary);outline:none;cursor:pointer;
+  appearance:none;-webkit-appearance:none;-moz-appearance:none;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237f90ad' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;background-size:13px 13px;
+  transition:border-color .15s,box-shadow .15s;
 }
 .ed-select:focus{border-color:#8fa3ff;box-shadow:0 0 0 2px rgba(65,105,246,.12)}
 .ed-select:disabled{background:#f5f7fb;color:#3f4a5c;cursor:default;opacity:1}
@@ -928,9 +948,14 @@ a.nav-item{text-decoration:none;color:#344054}
 
 /* 融合权重滑块（唯一可调参数，极简实现） */
 .fuse-wrap{display:flex;flex-direction:column;gap:7px;max-width:720px}
-.fslider{display:grid;grid-template-columns:44px minmax(0,1fr) 48px;gap:10px;align-items:center;font-size:12.5px;color:#5b6472}
+.fslider{display:grid;grid-template-columns:44px minmax(0,1fr) 78px;gap:10px;align-items:center;font-size:12.5px;color:#5b6472}
 .fslider input[type=range]{width:100%;accent-color:var(--system-blue)}
 .fslider b{text-align:right;font-variant-numeric:tabular-nums;color:#1f2a44;font-size:12px;font-weight:600}
+.fslider .wval{display:inline-flex;align-items:center;justify-content:flex-end;gap:2px;color:#1f2a44;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.wnum{width:52px;height:26px;border:1px solid #d9e7f8;border-radius:6px;padding:0 6px;text-align:right;font:inherit;font-size:12px;color:#1f2a44;background:#fff;outline:none;font-variant-numeric:tabular-nums}
+.wnum:focus{border-color:#8fa3ff;box-shadow:0 0 0 2px rgba(65,105,246,.12)}
+.wnum::-webkit-outer-spin-button,.wnum::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.wnum{-moz-appearance:textfield;appearance:textfield}
 .sum-line{font-size:12px;color:var(--muted)}
 .sum-line b{color:var(--success);font-variant-numeric:tabular-nums}
 .sum-line.over b{color:var(--error)}
@@ -1008,7 +1033,14 @@ a.nav-item{text-decoration:none;color:#344054}
 .modal-box.wide{width:660px}
 .modal-box.wide .modal-body{max-height:58vh;overflow:auto}
 .fld{display:block;font-size:12px;color:#475467;margin:10px 0 4px}
-.fld input,.fld select{width:100%;height:32px;border:1px solid #cfd8e8;border-radius:6px;padding:0 10px;font-size:13px;background:#fff;outline:none;color:var(--text-primary)}
+.fld input,.fld select{width:100%;height:32px;border:1px solid #d9e7f8;border-radius:8px;padding:0 10px;font-size:13px;background:#fff;outline:none;color:var(--text-primary)}
+.fld select{
+  padding-right:28px;cursor:pointer;
+  appearance:none;-webkit-appearance:none;-moz-appearance:none;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237f90ad' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;background-size:13px 13px;
+}
+.fld select:focus{border-color:#8fa3ff;box-shadow:0 0 0 2px rgba(65,105,246,.12)}
 
 /* 权限遮罩 */
 .placeholder-mask{

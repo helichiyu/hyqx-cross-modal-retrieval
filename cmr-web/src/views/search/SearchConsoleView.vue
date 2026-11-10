@@ -17,12 +17,15 @@
             @dragover.prevent="searchboxDragging = true"
             @dragleave="searchboxDragging = false"
             @drop.prevent="onSearchboxDrop"
+            @click="onSearchboxClick"
           >
             <span class="search-ico" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.2"/><path d="M15.2 15.2L20 20"/></svg>
             </span>
             <div class="search-field">
               <input
+                id="queryInput"
+                ref="queryInputRef"
                 v-model="query"
                 type="text"
                 maxlength="512"
@@ -276,6 +279,7 @@ const matrix = [
 ]
 
 const query = ref('')
+const queryInputRef = ref<HTMLInputElement | null>(null)
 const queryFile = ref('')
 const queryFileName = ref('')
 const queryMode = ref<Target | null>(null)
@@ -427,6 +431,13 @@ function onQueryInput() {
     }
     suggestVisible.value = Boolean(historySuggestions.value.length || hotSuggestions.value.length)
   }, 180)
+}
+
+/** 整个大搜索框都是输入热区：点空白处（图标、框内留白）也聚焦输入框 */
+function onSearchboxClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  if (target?.closest('button, a, select, .suggest-pop')) return
+  queryInputRef.value?.focus()
 }
 
 function onQueryFocus() {
@@ -1169,9 +1180,17 @@ input,select,textarea{font-family:inherit}
 }
 .scene-pick .sp-label{font-size:12px;font-weight:600;color:#8b9ab2;letter-spacing:.04em;white-space:nowrap}
 .scene-select{
-  height:36px;border:0;outline:none;background:transparent;
-  font-size:13px;color:#26374f;padding:0 6px;min-width:268px;max-width:100%;
+  height:34px;border:1px solid transparent;border-radius:9px;outline:none;
+  background-color:transparent;font-size:13px;color:#26374f;
+  padding:0 26px 0 8px;min-width:268px;max-width:100%;cursor:pointer;
+  appearance:none;-webkit-appearance:none;-moz-appearance:none;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237f90ad' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 6px center;background-size:13px 13px;
+  transition:background-color .15s,border-color .15s;
 }
+.scene-select:hover{background-color:#f6f9ff;border-color:#e2eaf7}
+.scene-select:focus{border-color:#bcd2f6;background-color:#fff;box-shadow:0 0 0 3px rgba(31,95,212,.08)}
+.scene-select option{color:#26374f;background:#fff}
 .scene-cfg{
   display:inline-flex;align-items:center;gap:3px;font-size:11.5px;color:#7f90ad;
   text-decoration:none;padding:0 8px 0 8px;border-left:1px solid #eef2f9;margin-left:2px;white-space:nowrap;
