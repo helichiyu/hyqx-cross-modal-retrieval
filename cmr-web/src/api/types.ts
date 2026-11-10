@@ -75,6 +75,8 @@ export interface ResultItemVO {
   source: string | null
   /** 对齐分 */
   alignScore: number | null
+  /** 质量等级（继承 P4 评定：A/B/C/D；历史数据为空） */
+  qualityGrade: string | null
   /** 当前用户赞踩：up/down/null */
   vote: 'up' | 'down' | null
   /** 当前用户是否收藏 */

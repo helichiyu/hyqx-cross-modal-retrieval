@@ -14,4 +14,6 @@
     <include file="db/changelog/009_cmr_evaluation.xml"/>
     <include file="db/changelog/010_cmr_dict_v5.xml"/>
     <include file="db/changelog/011_cmr_dict_feedback_status_cleanup.xml"/>
+    <include file="db/changelog/012_cmr_result_item_quality_grade.xml"/>
+    <include file="db/changelog/013_cmr_reset_initial_password.xml"/>
 </databaseChangeLog>

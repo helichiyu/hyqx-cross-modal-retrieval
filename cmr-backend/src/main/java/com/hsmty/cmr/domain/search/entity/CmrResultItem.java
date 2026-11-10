@@ -43,6 +43,9 @@ public class CmrResultItem extends BaseEntity {
     /** 对齐分（算子返回时） */
     private BigDecimal alignScore;
 
+    /** 质量等级（继承自 P4 数据集评定分：A/B/C/D） */
+    private String qualityGrade;
+
     /** 冗余：是否被点击（维护自事件表） */
     private Boolean clicked;
 }

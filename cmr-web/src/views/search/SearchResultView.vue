@@ -115,7 +115,7 @@
                   >
                     <input type="checkbox" :checked="selectedIds.has(item.id)" :disabled="item.deleted" aria-label="选择{{ item.name || item.itemId }}" @click.stop @change="toggleSelect(item, $event)">
                     <div class="rc-info">
-                      <div class="rc-line1"><b>{{ item.name || item.itemId }}</b><span v-if="item.deleted" class="badge deleted-badge">已删除</span><span v-else class="badge" :class="`q${qualityLevel(item.score)}`">质量 {{ qualityText(item.score) }}</span></div>
+                      <div class="rc-line1"><b>{{ item.name || item.itemId }}</b><span v-if="item.deleted" class="badge deleted-badge">已删除</span><span v-else class="badge" :class="`q${qualityLevel(item)}`">质量 {{ qualityText(item) }}</span></div>
                       <div class="rc-src">来源：{{ itemSource(item) }} · {{ itemExtra(item) }}</div>
                       <div v-if="heatMap" class="rc-align">
                         对齐分 <i class="al-chip" :style="{ background: heatColor(alignScoreOf(item)) }">{{ alignLabelOf(item) }}</i>
@@ -380,7 +380,7 @@ const similarQueries = computed(() => [`${contextQuery.value} 高清`, `${contex
 const filteredItems = computed(() => items.value
   .filter(item => activeGroup.value === 'all' || item.modality === activeGroup.value)
   .filter(item => {
-    const quality = qualityLevel(item.score)
+    const quality = qualityLevel(item)
     return quality >= qualityMin.value && quality <= qualityMax.value
   })
   .filter(item => item.score >= similarityThreshold.value)
@@ -440,15 +440,22 @@ function shortModalityLabel(modality: string) {
   return ({ text: '文', image: '图', audio: '音', video: '视频' } as Record<string, string>)[modality] || modality
 }
 
-function qualityLevel(score: number) {
-  if (score >= 0.9) return 3
-  if (score >= 0.8) return 2
-  if (score >= 0.7) return 1
+/** 质量等级继承 P4 接入评定；历史条目没有等级时回退到融合分估算 */
+function qualityLevel(item: ResultItemVO) {
+  const grade = item.qualityGrade?.toUpperCase()
+  const byGrade = { A: 3, B: 2, C: 1, D: 0 }[grade as 'A' | 'B' | 'C' | 'D']
+  if (byGrade !== undefined) {
+    return byGrade
+  }
+  if (item.score >= 0.9) return 3
+  if (item.score >= 0.8) return 2
+  if (item.score >= 0.7) return 1
   return 0
 }
 
-function qualityText(score: number) {
-  return ['D', 'C', 'B', 'A'][qualityLevel(score)]
+function qualityText(item: ResultItemVO) {
+  const grade = item.qualityGrade?.toUpperCase()
+  return ['A', 'B', 'C', 'D'].includes(grade ?? '') ? grade : ['D', 'C', 'B', 'A'][qualityLevel(item)]
 }
 
 function itemSource(item: ResultItemVO) {

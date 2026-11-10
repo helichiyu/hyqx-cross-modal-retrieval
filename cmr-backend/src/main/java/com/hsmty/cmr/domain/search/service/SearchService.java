@@ -233,6 +233,8 @@ public class SearchService {
 
             history.setResultSetId(data.path("resultSetId").asText("RST-" + history.getBizNo()));
             history.setElapsedMs(elapsed);
+            // 质量等级继承 P4 接入评定：同一索引属于同一数据集，本次检索统一取值
+            String qualityGrade = datasetGrade(index.getDatasetId());
             List<CmrResultItem> items = new ArrayList<>();
             for (JsonNode node : data.path("items")) {
                 CmrResultItem item = new CmrResultItem();
@@ -247,6 +249,7 @@ public class SearchService {
                 item.setScore(node.path("score").isNumber() ? node.path("score").decimalValue() : BigDecimal.ZERO);
                 item.setAlignScore(node.path("alignScore").isNumber()
                         ? node.path("alignScore").decimalValue() : null);
+                item.setQualityGrade(qualityGrade);
                 item.setClicked(false);
                 item.setDelFlag("F");
                 item.setCreateTime(LocalDateTime.now());
@@ -546,6 +549,7 @@ public class SearchService {
                 .name(name)
                 .source(e.getSource() != null ? e.getSource() : (deleted ? null : meta.sourceFile()))
                 .modality(e.getModality()).score(e.getScore()).alignScore(e.getAlignScore())
+                .qualityGrade(e.getQualityGrade())
                 .vote(vote).favorited(favorited)
                 .sourceFile(deleted ? null : meta.sourceFile())
                 .locatorJson(deleted ? null : meta.locatorJson())
@@ -554,7 +558,32 @@ public class SearchService {
                 .build();
     }
 
-    /** 赞/踩：同一用户对同一任务同一条目只保留一条，重复同向即取消 */
+    /** 质量等级继承 P4 402 评定分：≥0.90 A / ≥0.80 B / ≥0.70 C / 其余 D；无评定分返回 null */
+static String qualityGradeOf(BigDecimal score) {
+    if (score == null) {
+        return null;
+    }
+    if (score.compareTo(new BigDecimal("0.90")) >= 0) {
+        return "A";
+    }
+    if (score.compareTo(new BigDecimal("0.80")) >= 0) {
+        return "B";
+    }
+    if (score.compareTo(new BigDecimal("0.70")) >= 0) {
+        return "C";
+    }
+    return "D";
+}
+
+private String datasetGrade(Long datasetId) {
+    if (datasetId == null) {
+        return null;
+    }
+    CmrDataset dataset = datasetMapper.selectOneById(datasetId);
+    return dataset == null ? null : qualityGradeOf(dataset.getScore());
+}
+
+/** 赞/踩：同一用户对同一任务同一条目只保留一条，重复同向即取消 */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> vote(String taskNo, String itemId, String vote) {
         BizException.assertTrue(blank(taskNo) || blank(itemId), "任务号与条目不能为空");

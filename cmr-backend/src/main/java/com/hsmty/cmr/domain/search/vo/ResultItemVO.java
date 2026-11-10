@@ -34,6 +34,9 @@ public class ResultItemVO {
     /** 对齐分 */
     private BigDecimal alignScore;
 
+    /** 质量等级（继承自 P4 数据集评定分：A/B/C/D；历史数据为 null） */
+    private String qualityGrade;
+
     /** 当前用户赞踩：up/down/null */
     private String vote;
 

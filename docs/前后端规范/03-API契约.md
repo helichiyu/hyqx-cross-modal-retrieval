@@ -48,7 +48,7 @@
 | --- | --- | --- | --- |
 | GET | /search/suggest?scene=&prefix= | 登录即可 | 推荐词联想（enabled 词按 sort） |
 | POST | /search/understand | cmr:search:create | 407 代理：{query} 或 {queryFile} → {needClarify, clarifyOptions[], queryModality, hint} |
-| POST | /search | cmr:search:create | 执行检索：{query/queryFile, scene, targetModalities?, clarified?, clarifiedQuery?, weights?, rerank?, topK?, strategyId?, threshold?} → 结果集（条目：itemId/rank/score/modality/source/alignScore/vote/favorited；+策略快照+resultSetId+taskId+srhNo）；strategyId 不传用场景生效策略，threshold 不传用策略版本阈值；文本 query 少于 4 字且 clarified≠true 时返回「请先完成澄清」，queryFile 检索跳过澄清；屏蔽条目与数据源黑名单来源不下发，itemCount 为实际下发条数 |
+| POST | /search | cmr:search:create | 执行检索：{query/queryFile, scene, targetModalities?, clarified?, clarifiedQuery?, weights?, rerank?, topK?, strategyId?, threshold?} → 结果集（条目：itemId/rank/score/modality/source/alignScore/qualityGrade/vote/favorited；qualityGrade 继承 P4 数据集 402 评定分 A≥0.90/B≥0.80/C≥0.70/其余 D；+策略快照+resultSetId+taskId+srhNo）；strategyId 不传用场景生效策略，threshold 不传用策略版本阈值；文本 query 少于 4 字且 clarified≠true 时返回「请先完成澄清」，queryFile 检索跳过澄清；屏蔽条目与数据源黑名单来源不下发，itemCount 为实际下发条数 |
 | GET | /search/results/{resultSetId} | cmr:search:page | 结果集快照回看（P2）；条目名称按 ID 实时回查，条目已删显示「已删除」占位；被屏蔽条目不返回 |
 | POST | /search/results/{resultSetId}/rerun | cmr:search:create | P2 错误态重跑：原参数重放，生成新 SRH/RST |
 | POST | /search/results/{resultSetId}/adopt | cmr:search:adopt | 未采用→已采用 |
