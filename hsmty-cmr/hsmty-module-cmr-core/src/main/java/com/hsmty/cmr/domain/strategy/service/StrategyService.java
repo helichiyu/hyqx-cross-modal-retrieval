@@ -51,7 +51,7 @@ public class StrategyService {
     /** 版本历史只保留最近 10 个已发布版本 */
     private static final int VERSION_KEEP = 10;
 
-    private static final java.math.BigDecimal DEFAULT_THRESHOLD = new java.math.BigDecimal("0.60");
+
 
     private static final BigDecimal THRESHOLD_MIN = new BigDecimal("0.30");
 
@@ -275,7 +275,7 @@ public class StrategyService {
         saveDraft(strategy, weights,
                 dto.getRerank() == null ? Boolean.TRUE : dto.getRerank(),
                 dto.getTopK(),
-                dto.getThreshold() == null ? DEFAULT_THRESHOLD : dto.getThreshold());
+                dto.getThreshold() == null ? properties.getSearch().getThreshold() : dto.getThreshold());
         return toVO(strategy);
     }
 
@@ -307,7 +307,7 @@ public class StrategyService {
         if (threshold == null) {
             threshold = draft != null && draft.getThreshold() != null ? draft.getThreshold()
                     : current != null && current.getThreshold() != null ? current.getThreshold()
-                    : DEFAULT_THRESHOLD;
+                    : properties.getSearch().getThreshold();
         }
         validateThreshold(threshold);
 
@@ -334,19 +334,26 @@ public class StrategyService {
         saveDraft(strategy, weights, rerank, topK, threshold);
     }
 
-    /** 放弃草稿（回到生效版本态） */
+    /**
+     * 放弃草稿：只丢弃待发布参数，不改策略当前状态。
+     *
+     * <p>数据流 3.5：已下线策略放弃草稿后仍是已下线，需上线才回检索台；从未发布过的草稿策略
+     * 放弃后整条移除，避免留下空策略。
+     *
+     * @param id 策略主键
+     * @author cmr
+     * @since 2026-11-11
+     */
     @Transactional(rollbackFor = Exception.class)
     public void discardDraft(Long id) {
         CmrStrategy strategy = requireStrategy(id);
         CmrStrategyVersion draft = draftOf(strategy.getId());
         BizException.assertNull(draft, "没有待发布的草稿");
         versionMapper.deleteById(draft.getId());
-        if (strategy.getCurrentVersion() != null && strategy.getCurrentVersion() > 0) {
-            strategy.setStatus(CmrStrategy.STATUS_ACTIVE);
-        } else {
-            strategy.setStatus(CmrStrategy.STATUS_DRAFT);
+        if (strategy.getCurrentVersion() == null || strategy.getCurrentVersion() <= 0) {
+            // 从未发布过的草稿策略：放弃草稿即整条删除
+            strategyMapper.deleteById(id);
         }
-        strategyMapper.update(strategy);
     }
 
     /**
@@ -380,18 +387,15 @@ public class StrategyService {
         draft.setPublishedTime(LocalDateTime.now());
         versionMapper.update(draft);
 
-        strategy.setStatus(CmrStrategy.STATUS_ACTIVE);
+        boolean staysOffline = CmrStrategy.STATUS_OFFLINE.equals(strategy.getStatus());
         strategy.setCurrentVersion(nextVersion);
-        strategyMapper.update(strategy);
-
-        // 同场景同时只有一条生效策略
-        List<CmrStrategy> sameScene = strategyMapper.selectListByQuery(QueryWrapper.create()
-                .where(CMR_STRATEGY.SCENE.eq(strategy.getScene()).and(CMR_STRATEGY.ID.ne(id))
-                        .and(CMR_STRATEGY.STATUS.eq(CmrStrategy.STATUS_ACTIVE))));
-        for (CmrStrategy other : sameScene) {
-            other.setStatus(CmrStrategy.STATUS_DRAFT);
-            strategyMapper.update(other);
+        if (!staysOffline) {
+            strategy.setStatus(CmrStrategy.STATUS_ACTIVE);
+            clearOfflineTrace(strategy);
         }
+        // 全字段更新：由已下线转生效时需清空下线原因/备注/时间
+        strategyMapper.update(strategy, false);
+        demoteSameSceneOthers(strategy);
         pruneVersions(id);
         log.info("策略发布生效: {} v{} scene={}", strategy.getBizNo(), nextVersion, strategy.getScene());
         return toVersionVO(versionMapper.selectOneById(draft.getId()));
@@ -448,11 +452,10 @@ public class StrategyService {
         BizException.assertTrue(strategy.getCurrentVersion() == null || strategy.getCurrentVersion() <= 0,
                 "策略尚无生效版本，请编辑并发布后再上线");
         strategy.setStatus(CmrStrategy.STATUS_ACTIVE);
-        strategy.setOfflineReason(null);
-        strategy.setOfflineRemark(null);
-        strategy.setOfflineTime(null);
+        clearOfflineTrace(strategy);
         // 全字段更新：上线时需真正清空下线原因/备注/时间
         strategyMapper.update(strategy, false);
+        demoteSameSceneOthers(strategy);
         log.info("策略重新上线（直接生效）: {} v{}", strategy.getBizNo(), strategy.getCurrentVersion());
     }
 
@@ -493,9 +496,10 @@ public class StrategyService {
             item.put("scene", s.getScene());
             item.put("preset", Boolean.TRUE.equals(s.getPreset()));
             item.put("versionNo", s.getCurrentVersion());
-            item.put("threshold", v == null || v.getThreshold() == null ? DEFAULT_THRESHOLD : v.getThreshold());
+            item.put("threshold", v == null || v.getThreshold() == null
+                    ? properties.getSearch().getThreshold() : v.getThreshold());
             item.put("rerank", v != null && Boolean.TRUE.equals(v.getRerank()));
-            item.put("topK", v == null || v.getTopK() == null ? 20 : v.getTopK());
+            item.put("topK", v == null || v.getTopK() == null ? properties.getSearch().getTopK() : v.getTopK());
             item.put("paramSummary", paramSummary(v));
             return item;
         }).toList();
@@ -543,17 +547,15 @@ public class StrategyService {
             versionMapper.deleteById(draft.getId());
         }
 
-        strategy.setStatus(CmrStrategy.STATUS_ACTIVE);
+        boolean staysOffline = CmrStrategy.STATUS_OFFLINE.equals(strategy.getStatus());
         strategy.setCurrentVersion(nextVersion);
-        strategyMapper.update(strategy);
-
-        List<CmrStrategy> sameScene = strategyMapper.selectListByQuery(QueryWrapper.create()
-                .where(CMR_STRATEGY.SCENE.eq(strategy.getScene()).and(CMR_STRATEGY.ID.ne(id))
-                        .and(CMR_STRATEGY.STATUS.eq(CmrStrategy.STATUS_ACTIVE))));
-        for (CmrStrategy other : sameScene) {
-            other.setStatus(CmrStrategy.STATUS_DRAFT);
-            strategyMapper.update(other);
+        if (!staysOffline) {
+            strategy.setStatus(CmrStrategy.STATUS_ACTIVE);
+            clearOfflineTrace(strategy);
         }
+        // 全字段更新：回滚到生效态时需清空下线原因/备注/时间
+        strategyMapper.update(strategy, false);
+        demoteSameSceneOthers(strategy);
         pruneVersions(id);
         log.info("策略回滚: {} v{} -> v{}", strategy.getBizNo(), targetVersionNo, nextVersion);
         return toVersionVO(rollbackVersion);
@@ -673,11 +675,13 @@ public class StrategyService {
         if (notBlank(scene)) {
             match = strategyMapper.selectOneByQuery(QueryWrapper.create()
                     .where(CMR_STRATEGY.SCENE.eq(scene).and(CMR_STRATEGY.STATUS.eq(CmrStrategy.STATUS_ACTIVE)))
+                    .orderBy(CMR_STRATEGY.ID.asc())
                     .limit(1));
         }
         if (match == null) {
             match = strategyMapper.selectOneByQuery(QueryWrapper.create()
                     .where(CMR_STRATEGY.SCENE.eq("all").and(CMR_STRATEGY.STATUS.eq(CmrStrategy.STATUS_ACTIVE)))
+                    .orderBy(CMR_STRATEGY.ID.asc())
                     .limit(1));
         }
         return effectiveOfEntity(match);
@@ -691,18 +695,48 @@ public class StrategyService {
         return effectiveOfEntity(strategy);
     }
 
+    /** 把策略置为生效前的公共动作：清空下线原因/备注/时间三件套 */
+    private void clearOfflineTrace(CmrStrategy strategy) {
+        strategy.setOfflineReason(null);
+        strategy.setOfflineRemark(null);
+        strategy.setOfflineTime(null);
+    }
+
+    /**
+     * 同场景同时只能有一条生效策略：把同场景其它生效策略降为草稿。
+     *
+     * <p>仅在当前策略确实处于生效态时执行；已下线/草稿策略不影响其它策略。
+     *
+     * @param strategy 当前策略
+     */
+    private void demoteSameSceneOthers(CmrStrategy strategy) {
+        if (!CmrStrategy.STATUS_ACTIVE.equals(strategy.getStatus())
+                || strategy.getScene() == null || strategy.getScene().isBlank()) {
+            return;
+        }
+        List<CmrStrategy> sameScene = strategyMapper.selectListByQuery(QueryWrapper.create()
+                .where(CMR_STRATEGY.SCENE.eq(strategy.getScene())
+                        .and(CMR_STRATEGY.ID.ne(strategy.getId()))
+                        .and(CMR_STRATEGY.STATUS.eq(CmrStrategy.STATUS_ACTIVE))));
+        for (CmrStrategy other : sameScene) {
+            other.setStatus(CmrStrategy.STATUS_DRAFT);
+            strategyMapper.update(other);
+        }
+    }
+
     private EffectiveStrategy effectiveOfEntity(CmrStrategy match) {
         if (match == null || match.getCurrentVersion() == null || match.getCurrentVersion() <= 0) {
-            return new EffectiveStrategy(null, null, null, null, defaultWeights(), false, 20, DEFAULT_THRESHOLD);
+            return new EffectiveStrategy(null, null, null, null, defaultWeights(), false,
+                    properties.getSearch().getTopK(), properties.getSearch().getThreshold());
         }
         CmrStrategyVersion v = currentOf(match);
         if (v == null) {
             return new EffectiveStrategy(match.getId(), null, match.getBizNo(), match.getCurrentVersion(),
-                    defaultWeights(), false, 20, DEFAULT_THRESHOLD);
+                    defaultWeights(), false, properties.getSearch().getTopK(), properties.getSearch().getThreshold());
         }
         return new EffectiveStrategy(match.getId(), v.getId(), match.getBizNo(), match.getCurrentVersion(),
                 readWeights(v), Boolean.TRUE.equals(v.getRerank()),
-                v.getTopK() == null ? 20 : v.getTopK(), thresholdOf(v));
+                v.getTopK() == null ? properties.getSearch().getTopK() : v.getTopK(), thresholdOf(v));
     }
 
     /** 生效策略参数（weights/rerank/topK/threshold + 策略编号与版本引用） */
@@ -742,7 +776,7 @@ public class StrategyService {
         draft.setWeightsJson(JsonUtils.write(weights));
         draft.setRerank(Boolean.TRUE.equals(rerank));
         draft.setTopK(topK == null ? 20 : topK);
-        draft.setThreshold(threshold == null ? DEFAULT_THRESHOLD : threshold);
+        draft.setThreshold(threshold == null ? properties.getSearch().getThreshold() : threshold);
         if (isNew) {
             draft.setSource("new");
             versionMapper.insert(draft, true);
@@ -812,7 +846,7 @@ public class StrategyService {
     }
 
     private java.math.BigDecimal thresholdOf(CmrStrategyVersion v) {
-        return v == null || v.getThreshold() == null ? DEFAULT_THRESHOLD : v.getThreshold();
+        return v == null || v.getThreshold() == null ? properties.getSearch().getThreshold() : v.getThreshold();
     }
 
     private String paramSummary(CmrStrategyVersion v) {
@@ -875,8 +909,13 @@ public class StrategyService {
         return weights;
     }
 
+    /** 兜底策略的默认四模态权重（cmr.search.weights，缺省四模态各 25） */
     private Map<String, Integer> defaultWeights() {
-        return new LinkedHashMap<>(Map.of("text", 25, "image", 25, "audio", 25, "video", 25));
+        Map<String, Integer> weights = new LinkedHashMap<>(properties.getSearch().getWeights());
+        for (String key : List.of("text", "image", "audio", "video")) {
+            weights.putIfAbsent(key, 25);
+        }
+        return weights;
     }
 
     /** 新建策略的默认四模态权重 50/30/10/10（契约第 4 节） */

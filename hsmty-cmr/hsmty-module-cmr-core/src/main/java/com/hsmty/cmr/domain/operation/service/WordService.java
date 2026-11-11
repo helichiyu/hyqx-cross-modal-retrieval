@@ -98,7 +98,12 @@ public class WordService {
 
     @Transactional(rollbackFor = Exception.class)
     public void remove(Long id) {
-        BizException.assertNull(requireWord(id), "推荐词不存在");
+        CmrRecommendWord word = requireWord(id);
+        BizException.assertNull(word, "推荐词不存在");
+        // uk_word 不区分逻辑删除：先改成唯一墓碑值释放原词，再逻辑删除，
+        // 否则删除同名推荐词后再新增会撞唯一键
+        word.setWord("__deleted_" + word.getId());
+        wordMapper.update(word);
         wordMapper.deleteById(id);
     }
 

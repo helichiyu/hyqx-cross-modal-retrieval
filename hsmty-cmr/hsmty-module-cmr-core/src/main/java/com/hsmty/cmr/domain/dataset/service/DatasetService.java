@@ -101,16 +101,57 @@ public class DatasetService {
      */
     @Transactional(rollbackFor = Exception.class)
     public DatasetVO registerUpstream(Long datasourceId, String name, String version, String scene, String fileRoot) {
-        return register(datasourceId, name, version, scene, fileRoot,
+        return registerUpstream(datasourceId, null, name, version, scene, fileRoot);
+    }
+
+    /**
+     * 数据源接入登记（带上游数据集 ID）：登记前按 数据源 + 上游数据集 去重，重复接入直接拒绝。
+     *
+     * @param datasourceId      来源数据源
+     * @param upstreamDatasetId 上游数据集 ID（接入去重锚点）
+     * @param name              数据集名称
+     * @param version           版本号
+     * @param scene             业务场景
+     * @param fileRoot          已落盘的逻辑目录（dataset/...）
+     * @return 新数据集
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public DatasetVO registerUpstream(Long datasourceId, String upstreamDatasetId, String name,
+                                      String version, String scene, String fileRoot) {
+        BizException.assertTrue(existsUpstream(datasourceId, upstreamDatasetId), "该上游数据集已接入");
+        return register(datasourceId, upstreamDatasetId, name, version, scene, fileRoot,
                 bizNoGenerator.next(BizNoGenerator.PREFIX_DATASET));
+    }
+
+    /**
+     * 同一数据源的同一上游数据集是否已接入（逻辑未删除口径）。
+     *
+     * @param datasourceId      来源数据源
+     * @param upstreamDatasetId 上游数据集 ID
+     * @return 已接入返回 true
+     */
+    public boolean existsUpstream(Long datasourceId, String upstreamDatasetId) {
+        if (datasourceId == null || upstreamDatasetId == null || upstreamDatasetId.isBlank()) {
+            return false;
+        }
+        Long count = datasetMapper.selectCountByQuery(QueryWrapper.create()
+                .where(CMR_DATASET.DATASOURCE_ID.eq(datasourceId)
+                        .and(CMR_DATASET.UPSTREAM_DATASET_ID.eq(upstreamDatasetId))));
+        return count != null && count > 0;
     }
 
     private DatasetVO register(Long datasourceId, String name, String version, String scene,
                                String fileRoot, String bizNo) {
+        return register(datasourceId, null, name, version, scene, fileRoot, bizNo);
+    }
+
+    private DatasetVO register(Long datasourceId, String upstreamDatasetId, String name, String version,
+                               String scene, String fileRoot, String bizNo) {
         CmrDataset dataset = new CmrDataset();
         dataset.setId(idWorker.next());
         dataset.setBizNo(bizNo);
         dataset.setDatasourceId(datasourceId);
+        dataset.setUpstreamDatasetId(upstreamDatasetId);
         dataset.setName(name);
         dataset.setVersion(version);
         dataset.setScene(scene == null || scene.isBlank() ? "general" : scene);

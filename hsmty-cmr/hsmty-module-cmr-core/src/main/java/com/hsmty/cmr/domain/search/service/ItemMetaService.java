@@ -44,7 +44,24 @@ public class ItemMetaService {
         if (index == null) {
             return Collections.emptyMap();
         }
-        Path metaDb = resolveMetaDb(index.getIndexDir());
+        return query(resolveMetaDb(index.getIndexDir()), itemIds);
+    }
+
+    /**
+     * 兜底索引（cmr.search.index-dir，无 cmr_index 记录）按目录直查 meta.db。
+     *
+     * @param indexDir 索引目录
+     * @param itemIds  条目 ID 列表
+     * @return 条目元数据
+     */
+    public Map<String, ItemMeta> lookupByDir(String indexDir, List<String> itemIds) {
+        if (indexDir == null || indexDir.isBlank() || itemIds == null || itemIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return query(resolveMetaDb(indexDir), itemIds);
+    }
+
+    private Map<String, ItemMeta> query(Path metaDb, List<String> itemIds) {
         if (metaDb == null || !Files.isRegularFile(metaDb)) {
             return Collections.emptyMap();
         }

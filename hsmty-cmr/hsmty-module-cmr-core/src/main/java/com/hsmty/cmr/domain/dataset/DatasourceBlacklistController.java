@@ -1,9 +1,9 @@
 package com.hsmty.cmr.domain.dataset;
 
 import com.hsmty.core.common.entity.ApiResult;
-import com.hsmty.cmr.domain.dataset.entity.CmrDatasourceBlacklist;
 import com.hsmty.cmr.domain.dataset.service.DatasourceBlacklistService;
 import com.hsmty.cmr.domain.dataset.vo.DatasourceBlacklistSummaryVO;
+import com.hsmty.cmr.domain.dataset.vo.DatasourceBlacklistVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,8 +39,8 @@ public class DatasourceBlacklistController {
     @Operation(summary = "黑名单列表")
     @PreAuthorize("hasAnyAuthority('cmr:dataset:page')")
     @GetMapping
-    public ApiResult<List<CmrDatasourceBlacklist>> list() {
-        return ApiResult.success(blacklistService.list());
+    public ApiResult<List<DatasourceBlacklistVO>> list() {
+        return ApiResult.success(blacklistService.list().stream().map(DatasourceBlacklistVO::from).toList());
     }
 
     /**
@@ -58,9 +58,9 @@ public class DatasourceBlacklistController {
     @Operation(summary = "加入黑名单（按 datasetId 去重，检索按来源名整源排除）")
     @PreAuthorize("hasAnyAuthority('cmr:dataset:update')")
     @PostMapping
-    public ApiResult<CmrDatasourceBlacklist> add(@Valid @RequestBody BlacklistDTO dto) {
-        return ApiResult.success(blacklistService.add(
-                dto.getDatasetId(), dto.getName(), dto.getSourceName(), dto.getEndpoint()));
+    public ApiResult<DatasourceBlacklistVO> add(@Valid @RequestBody BlacklistDTO dto) {
+        return ApiResult.success(DatasourceBlacklistVO.from(blacklistService.add(
+                dto.getDatasetId(), dto.getName(), dto.getSourceName(), dto.getEndpoint())));
     }
 
     @Operation(summary = "移出黑名单")

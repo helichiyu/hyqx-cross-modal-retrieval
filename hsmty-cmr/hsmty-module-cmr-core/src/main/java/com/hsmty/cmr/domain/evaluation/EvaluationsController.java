@@ -6,9 +6,9 @@ import com.hsmty.cmr.common.api.PageQuery;
 import com.hsmty.cmr.common.api.PageResult;
 import com.hsmty.cmr.domain.evaluation.dto.EvaluationCreateDTO;
 import com.hsmty.cmr.domain.evaluation.dto.EvaluationReplayDTO;
-import com.hsmty.cmr.domain.evaluation.entity.CmrEvaluation;
 import com.hsmty.cmr.domain.evaluation.service.EvaluationService;
 import com.hsmty.cmr.domain.evaluation.vo.EvaluationDetailVO;
+import com.hsmty.cmr.domain.evaluation.vo.EvaluationVO;
 import com.hsmty.cmr.domain.evaluation.vo.HardCaseVO;
 import com.hsmty.cmr.domain.search.vo.SearchResultVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,8 +51,8 @@ public class EvaluationsController {
     @Operation(summary = "以历史检索为基准登记评测")
     @PreAuthorize("hasAnyAuthority('cmr:eval:create')")
     @PostMapping
-    public ApiResult<CmrEvaluation> create(@Valid @RequestBody EvaluationCreateDTO dto) {
-        return ApiResult.success(evaluationService.create(dto.getBaseTaskNo()));
+    public ApiResult<EvaluationVO> create(@Valid @RequestBody EvaluationCreateDTO dto) {
+        return ApiResult.success(EvaluationVO.from(evaluationService.create(dto.getBaseTaskNo())));
     }
 
     /**
@@ -78,6 +78,13 @@ public class EvaluationsController {
      * @author cmr
      * @since 2026-11-11
      */
+    @Operation(summary = "检查评测数据（4 项只读检查：样本够不够 / 重复用 / 有效性 / 评价矛盾）")
+    @PreAuthorize("hasAnyAuthority('cmr:eval:page')")
+    @GetMapping("check-data")
+    public ApiResult<Map<String, Object>> checkData() {
+        return ApiResult.success(Map.of("checks", evaluationService.checkData()));
+    }
+
     @Operation(summary = "评测详情（基准 vs 重放 + 退化原因 + 数据检查）")
     @PreAuthorize("hasAnyAuthority('cmr:eval:page')")
     @GetMapping("{id}")

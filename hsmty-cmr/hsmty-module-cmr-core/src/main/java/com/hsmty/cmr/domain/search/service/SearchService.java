@@ -8,11 +8,14 @@ import com.hsmty.cmr.common.exception.BizException;
 import com.hsmty.cmr.common.id.BizNoGenerator;
 import com.hsmty.cmr.common.id.SnowflakeIdWorker;
 import com.hsmty.cmr.common.util.JsonUtils;
+import com.hsmty.cmr.config.CmrProperties;
 import com.hsmty.cmr.domain.dataset.entity.CmrDataset;
 import com.hsmty.cmr.domain.dataset.entity.CmrIndex;
 import com.hsmty.cmr.domain.dataset.mapper.DatasetMapper;
 import com.hsmty.cmr.domain.dataset.mapper.DatasourceBlacklistMapper;
 import com.hsmty.cmr.domain.dataset.mapper.IndexMapper;
+import com.hsmty.cmr.domain.evaluation.entity.CmrEvaluation;
+import com.hsmty.cmr.domain.evaluation.mapper.EvaluationMapper;
 import com.hsmty.cmr.domain.search.dto.SearchExecuteDTO;
 import com.hsmty.cmr.domain.search.dto.UnderstandDTO;
 import com.hsmty.cmr.domain.search.entity.CmrClickEvent;
@@ -37,8 +40,10 @@ import com.hsmty.cmr.domain.task.TaskService;
 import com.hsmty.cmr.domain.task.entity.CmrTask;
 import com.hsmty.cmr.file.FileService;
 import com.hsmty.cmr.operator.OperatorClient;
+import com.mybatisflex.core.logicdelete.LogicDeleteManager;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.core.update.UpdateChain;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -55,6 +60,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static com.hsmty.cmr.domain.dataset.entity.table.CmrIndexTableDef.CMR_INDEX;
+import static com.hsmty.cmr.domain.evaluation.entity.table.CmrEvaluationTableDef.CMR_EVALUATION;
 import static com.hsmty.cmr.domain.operation.entity.table.CmrBlockedItemTableDef.CMR_BLOCKED_ITEM;
 import static com.hsmty.cmr.domain.search.entity.table.CmrFavoriteTableDef.CMR_FAVORITE;
 import static com.hsmty.cmr.domain.search.entity.table.CmrItemVoteTableDef.CMR_ITEM_VOTE;
@@ -72,9 +78,6 @@ import static com.hsmty.cmr.domain.search.entity.table.CmrSearchHistoryTableDef.
 @Service
 @RequiredArgsConstructor
 public class SearchService {
-
-    /** 摘要保留 30 天（数据流 4.x 检索日志口径） */
-    private static final int SUMMARY_KEEP_DAYS = 30;
 
     /** 文本查询少于该字数且未澄清时拒绝检索（P1 澄清规则） */
     private static final int CLARIFY_MIN_CHARS = 4;
@@ -94,12 +97,14 @@ public class SearchService {
     private final IndexMapper indexMapper;
     private final DatasetMapper datasetMapper;
     private final DatasourceBlacklistMapper blacklistMapper;
+    private final EvaluationMapper evaluationMapper;
     private final StrategyService strategyService;
     private final OperatorClient operatorClient;
     private final TaskService taskService;
     private final TaskExecutor taskExecutor;
     private final FileService fileService;
     private final ItemMetaService itemMetaService;
+    private final CmrProperties properties;
     private final SnowflakeIdWorker idWorker;
     private final BizNoGenerator bizNoGenerator;
 
@@ -159,16 +164,24 @@ public class SearchService {
         BigDecimal threshold = dto.getThreshold() != null ? dto.getThreshold() : effective.threshold();
         BizException.assertTrue(threshold == null, "阈值不能为空");
 
-        // 索引：场景匹配的 active 索引，兜底最新 active
+        // 索引：场景匹配的 active 索引，兜底最新 active；均无激活索引时回落配置的兜底索引目录
         CmrIndex index = activeIndexOf(dto.getScene());
-        BizException.assertNull(index, "暂无可检索索引，请先完成建库并投产");
+        if (index == null) {
+            String fallbackDir = properties.getSearch().getIndexDir();
+            BizException.assertTrue(fallbackDir == null || fallbackDir.isBlank(),
+                    "暂无可检索索引，请先完成建库并投产");
+            CmrIndex fallback = new CmrIndex();
+            fallback.setIndexDir(fallbackDir);
+            index = fallback;
+        }
+        final CmrIndex resolvedIndex = index;
 
         // 先落检索历史（SRH）与任务记录，再执行（每次检索必有记录，失败也留痕）
         String queryModality = !blank(dto.getQueryFile()) ? modalityOf(dto.getQueryFile()) : "text";
         CmrSearchHistory history = new CmrSearchHistory();
         history.setId(idWorker.next());
         history.setBizNo(bizNoGenerator.next(BizNoGenerator.PREFIX_SEARCH));
-        history.setIndexId(index.getId());
+        history.setIndexId(resolvedIndex.getId());
         history.setResultSetId("PENDING-" + history.getBizNo());
         history.setQueryText(!blank(dto.getClarifiedQuery()) ? dto.getClarifiedQuery() : dto.getQuery());
         history.setQueryFile(dto.getQueryFile());
@@ -186,12 +199,14 @@ public class SearchService {
         snapshot.put("threshold", threshold);
         snapshot.put("strategyNo", effective.strategyNo());
         snapshot.put("strategyVersion", effective.versionNo());
+        // 兜底索引无 cmr_index 记录，回看时按快照里的目录直查 meta.db
+        snapshot.put("indexDir", resolvedIndex.getIndexDir());
         history.setStrategySnapshotJson(JsonUtils.write(snapshot));
         history.setThreshold(threshold);
         history.setItemCount(0);
         history.setAdoptStatus(CmrSearchHistory.ADOPT_UNADOPTED);
         history.setSealed("F");
-        history.setSummaryExpireTime(LocalDateTime.now().plusDays(SUMMARY_KEEP_DAYS));
+        history.setSummaryExpireTime(LocalDateTime.now().plusDays(properties.getSearch().getSummaryDays()));
         history.setUserId(AuthContext.userId());
         history.setOperatorId(AuthContext.userId());
         history.setOperatorName(currentOperatorName());
@@ -201,11 +216,12 @@ public class SearchService {
 
         CmrTask task = taskService.create(CmrTask.TYPE_SEARCH, history.getId(),
                 Map.of("query", history.getQueryText() == null ? "" : history.getQueryText(),
-                        "indexDir", index.getIndexDir()));
+                        "indexDir", resolvedIndex.getIndexDir()));
         history.setTaskId(task.getId());
         historyMapper.update(history);
 
-        taskExecutor.runSyncWithRetry(task, t -> doSearch(t, history, index, targetModalities, weights, rerank, topK, threshold));
+        taskExecutor.runSyncWithRetry(task,
+                t -> doSearch(t, history, resolvedIndex, targetModalities, weights, rerank, topK, threshold));
         // 任务已按失败处置落库；检索历史保留零结果记录，向用户返回原因
         CmrTask done = taskService.requireTask(task.getId());
         if (!CmrTask.STATUS_DONE.equals(done.getStatus())) {
@@ -241,8 +257,8 @@ public class SearchService {
 
             history.setResultSetId(data.path("resultSetId").asText("RST-" + history.getBizNo()));
             history.setElapsedMs(elapsed);
-            // 质量等级继承 P4 接入评定：同一索引属于同一数据集，本次检索统一取值
-            String qualityGrade = datasetGrade(index.getDatasetId());
+            // 质量等级继承 P4 接入评定：同一索引属于同一数据集，本次检索统一取值；兜底索引无归属数据集
+            String qualityGrade = index.getDatasetId() == null ? null : datasetGrade(index.getDatasetId());
             List<CmrResultItem> items = new ArrayList<>();
             for (JsonNode node : data.path("items")) {
                 CmrResultItem item = new CmrResultItem();
@@ -353,7 +369,8 @@ public class SearchService {
         Page<CmrSearchHistory> page = historyMapper.paginate(
                 Math.max(query.getPageNum(), 1), Math.max(query.getPageSize(), 1), qw);
         return PageResult.of(page.getRecords().stream()
-                        .map(h -> HistoryVO.from(h, taskService.bizNoOf(h.getTaskId()), taskService.statusOf(h.getTaskId())))
+                        .map(h -> HistoryVO.from(h, taskService.bizNoOf(h.getTaskId()),
+                                taskService.statusOf(h.getTaskId()), replayTaskNoOf(h.getReplayOfTaskNo())))
                         .toList(),
                 page.getTotalRow(), query.getPageNum(), query.getPageSize());
     }
@@ -372,7 +389,8 @@ public class SearchService {
         DeliveredItems delivered = deliveredOf(history);
         return HistoryDetailVO.builder()
                 .history(HistoryVO.from(history, taskService.bizNoOf(history.getTaskId()),
-                        taskService.statusOf(history.getTaskId())))
+                        taskService.statusOf(history.getTaskId()),
+                        replayTaskNoOf(history.getReplayOfTaskNo())))
                 .strategySnapshotJson(history.getStrategySnapshotJson())
                 .items(delivered.items())
                 .excludedCount(delivered.excludedCount())
@@ -406,39 +424,55 @@ public class SearchService {
         if (!blank(history.getTargetModality())) {
             dto.setTargetModalities(List.of(history.getTargetModality()));
         }
-        Map<String, Object> snapshot = JsonUtils.read(
-                history.getStrategySnapshotJson() == null ? "{}" : history.getStrategySnapshotJson(),
-                new tools.jackson.core.type.TypeReference<Map<String, Object>>() {
+        // 评测重放（指定策略或归属评测）必须让新策略参数生效；仅纯历史重放才沿用原快照
+        boolean reuseSnapshot = strategyId == null && evalId == null;
+        if (reuseSnapshot) {
+            Map<String, Object> snapshot = JsonUtils.read(
+                    history.getStrategySnapshotJson() == null ? "{}" : history.getStrategySnapshotJson(),
+                    new tools.jackson.core.type.TypeReference<Map<String, Object>>() {
+                    });
+            if (snapshot.get("topK") instanceof Number n) {
+                dto.setTopK(n.intValue());
+            }
+            if (snapshot.get("rerank") instanceof Boolean rerank) {
+                dto.setRerank(rerank);
+            }
+            if (snapshot.get("weights") instanceof Map<?, ?> sourceWeights) {
+                Map<String, Integer> weights = new LinkedHashMap<>();
+                sourceWeights.forEach((key, value) -> {
+                    if (key != null && value instanceof Number number) {
+                        weights.put(String.valueOf(key), number.intValue());
+                    }
                 });
-        if (snapshot.get("topK") instanceof Number n) {
-            dto.setTopK(n.intValue());
-        }
-        if (snapshot.get("rerank") instanceof Boolean rerank) {
-            dto.setRerank(rerank);
-        }
-        if (snapshot.get("weights") instanceof Map<?, ?> sourceWeights) {
-            Map<String, Integer> weights = new LinkedHashMap<>();
-            sourceWeights.forEach((key, value) -> {
-                if (key != null && value instanceof Number number) {
-                    weights.put(String.valueOf(key), number.intValue());
+                if (!weights.isEmpty()) {
+                    dto.setWeights(weights);
                 }
-            });
-            if (!weights.isEmpty()) {
-                dto.setWeights(weights);
+            }
+            if (snapshot.get("threshold") instanceof Number number) {
+                dto.setThreshold(new BigDecimal(number.toString()));
             }
         }
-        if (snapshot.get("threshold") instanceof Number number) {
-            dto.setThreshold(new BigDecimal(number.toString()));
-        }
         SearchResultVO result = execute(dto);
-        // 标记重放来源，供评测与复盘串链
+        // 标记重放来源，供评测与复盘串链；搜索行为页「重新执行」按 query 归入已有评测
         CmrSearchHistory replay = historyMapper.selectOneById(result.getId());
         if (replay != null) {
             replay.setReplayOfTaskNo(history.getBizNo());
-            replay.setEvalId(evalId);
+            replay.setEvalId(evalId != null ? evalId : evaluationIdOfQuery(history.getQueryText()));
             historyMapper.update(replay);
         }
         return result;
+    }
+
+    /** 重新执行按 query 归入已有评测（数据流 3.6）；文件查询不归集 */
+    private Long evaluationIdOfQuery(String queryText) {
+        if (blank(queryText)) {
+            return null;
+        }
+        CmrEvaluation evaluation = evaluationMapper.selectOneByQuery(QueryWrapper.create()
+                .where(CMR_EVALUATION.QUERY.eq(queryText))
+                .orderBy(CMR_EVALUATION.ID.desc())
+                .limit(1));
+        return evaluation == null ? null : evaluation.getId();
     }
 
     /** 按场景取激活索引：场景匹配优先，兜底最新激活 */
@@ -511,7 +545,9 @@ public class SearchService {
         // 屏蔽条目与黑名单来源不再下发给检索端（屏蔽列表只影响展示，不影响历史快照）
         Set<String> blocked = blockedItemIds(itemIds);
         Set<String> blacklistedSources = blacklistedSources();
-        Map<String, ItemMetaService.ItemMeta> metas = itemMetaService.lookup(history.getIndexId(), itemIds);
+        Map<String, ItemMetaService.ItemMeta> metas = history.getIndexId() != null
+                ? itemMetaService.lookup(history.getIndexId(), itemIds)
+                : itemMetaService.lookupByDir(snapshotIndexDir(history), itemIds);
         Map<String, String> votes = votesOf(history.getBizNo());
         Set<String> favorites = favoriteItemIds();
         List<ResultItemVO> items = new ArrayList<>();
@@ -567,6 +603,21 @@ public class SearchService {
     /** 下发结果与剔除明细的聚合（避免重复查询条目快照） */
     private record DeliveredItems(List<ResultItemVO> items, int excludedCount,
                                   List<ExcludedItemVO> excludedItems) {
+    }
+
+    /** 快照中的索引目录（兜底索引无 indexId，回看时按目录直查 meta.db）；缺失返回 null */
+    private String snapshotIndexDir(CmrSearchHistory history) {
+        if (history.getStrategySnapshotJson() == null || history.getStrategySnapshotJson().isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode node = JsonUtils.readTree(history.getStrategySnapshotJson());
+            JsonNode dir = node == null ? null : node.get("indexDir");
+            return dir != null && dir.isTextual() && !dir.asText().isBlank() ? dir.asText() : null;
+        } catch (Exception e) {
+            log.debug("检索快照 indexDir 解析失败 searchId={} cause={}", history.getId(), e.getMessage(), e);
+            return null;
+        }
     }
 
     /** 黑名单：来源名 + 数据集 ID 两路匹配，命中即整源排除 */
@@ -687,17 +738,24 @@ private String datasetGrade(Long datasetId) {
             }
             effectiveVote = null;
         } else if (existing == null) {
-            com.hsmty.cmr.domain.search.entity.CmrItemVote entity =
-                    new com.hsmty.cmr.domain.search.entity.CmrItemVote();
-            entity.setId(idWorker.next());
-            entity.setTaskNo(voteKey);
-            entity.setSearchId(history.getId());
-            entity.setItemId(itemId);
-            entity.setVote(vote);
-            entity.setUserId(userId);
-            entity.setDelFlag("F");
-            entity.setCreateTime(LocalDateTime.now());
-            itemVoteMapper.insert(entity, true);
+            // 取消后再投票：唯一键 uk_vote 不含 del_flag，逻辑删除的旧行必须复活而不是新插
+            com.hsmty.cmr.domain.search.entity.CmrItemVote tombstone = findVoteIncludingDeleted(
+                    voteKey, itemId, userId);
+            if (tombstone != null) {
+                reviveVote(tombstone.getId(), vote);
+            } else {
+                com.hsmty.cmr.domain.search.entity.CmrItemVote entity =
+                        new com.hsmty.cmr.domain.search.entity.CmrItemVote();
+                entity.setId(idWorker.next());
+                entity.setTaskNo(voteKey);
+                entity.setSearchId(history.getId());
+                entity.setItemId(itemId);
+                entity.setVote(vote);
+                entity.setUserId(userId);
+                entity.setDelFlag("F");
+                entity.setCreateTime(LocalDateTime.now());
+                itemVoteMapper.insert(entity, true);
+            }
         } else if (!vote.equals(existing.getVote())) {
             existing.setVote(vote);
             itemVoteMapper.update(existing);
@@ -707,6 +765,27 @@ private String datasetGrade(Long datasetId) {
         result.put("upCount", countVotes(history.getId(), "up"));
         result.put("downCount", countVotes(history.getId(), "down"));
         return result;
+    }
+
+    /** 查含逻辑删除行的赞踩记录（绕过 del_flag='F' 过滤） */
+    private com.hsmty.cmr.domain.search.entity.CmrItemVote findVoteIncludingDeleted(
+            String taskNo, String itemId, Long userId) {
+        return LogicDeleteManager.execWithoutLogicDelete(() -> itemVoteMapper.selectOneByQuery(
+                QueryWrapper.create().where(CMR_ITEM_VOTE.TASK_NO.eq(taskNo)
+                        .and(CMR_ITEM_VOTE.ITEM_ID.eq(itemId))
+                        .and(CMR_ITEM_VOTE.USER_ID.eq(userId)))
+                        .limit(1)));
+    }
+
+    /** 复活被逻辑删除的赞踩行：恢复 del_flag='F' 并写入新方向 */
+    private void reviveVote(Long id, String vote) {
+        LogicDeleteManager.execWithoutLogicDelete(() -> {
+            UpdateChain.of(itemVoteMapper)
+                    .set(CMR_ITEM_VOTE.VOTE, vote)
+                    .set(CMR_ITEM_VOTE.DEL_FLAG, "F")
+                    .where(CMR_ITEM_VOTE.ID.eq(id))
+                    .update();
+        });
     }
 
     private long countVotes(Long searchId, String vote) {
@@ -728,6 +807,24 @@ private String datasetGrade(Long datasetId) {
             favoriteMapper.deleteById(existing.getId());
             return false;
         }
+        // 取消后再收藏：唯一键 uk_user_item 不含 del_flag，逻辑删除的旧行必须复活而不是新插
+        com.hsmty.cmr.domain.search.entity.CmrFavorite tombstone =
+                LogicDeleteManager.execWithoutLogicDelete(() -> favoriteMapper.selectOneByQuery(
+                        QueryWrapper.create().where(CMR_FAVORITE.USER_ID.eq(userId)
+                                .and(CMR_FAVORITE.ITEM_ID.eq(itemId)))
+                                .limit(1)));
+        if (tombstone != null) {
+            LogicDeleteManager.execWithoutLogicDelete(() -> {
+                UpdateChain.of(favoriteMapper)
+                        .set(CMR_FAVORITE.ITEM_NAME, itemName)
+                        .set(CMR_FAVORITE.SOURCE, source)
+                        .set(CMR_FAVORITE.TASK_NO, displayFavoriteTaskNo(taskNo))
+                        .set(CMR_FAVORITE.DEL_FLAG, "F")
+                        .where(CMR_FAVORITE.ID.eq(tombstone.getId()))
+                        .update();
+            });
+            return true;
+        }
         com.hsmty.cmr.domain.search.entity.CmrFavorite entity =
                 new com.hsmty.cmr.domain.search.entity.CmrFavorite();
         entity.setId(idWorker.next());
@@ -736,12 +833,17 @@ private String datasetGrade(Long datasetId) {
         entity.setItemName(itemName);
         entity.setSource(source);
         // 对外统一展示 TASK 任务号；解析不到时原样保留
-        CmrSearchHistory history = findHistory(taskNo);
-        entity.setTaskNo(history == null ? taskNo : displayTaskNo(history));
+        entity.setTaskNo(displayFavoriteTaskNo(taskNo));
         entity.setDelFlag("F");
         entity.setCreateTime(LocalDateTime.now());
         favoriteMapper.insert(entity, true);
         return true;
+    }
+
+    /** 收藏记录展示用任务号：能解析到任务时统一 TASK 形态 */
+    private String displayFavoriteTaskNo(String taskNo) {
+        CmrSearchHistory history = findHistory(taskNo);
+        return history == null ? taskNo : displayTaskNo(history);
     }
 
     /** 我的收藏 */

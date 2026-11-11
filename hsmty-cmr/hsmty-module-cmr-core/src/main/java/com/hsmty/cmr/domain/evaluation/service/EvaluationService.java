@@ -5,7 +5,6 @@ import com.hsmty.cmr.common.api.PageResult;
 import com.hsmty.cmr.common.exception.BizException;
 import com.hsmty.cmr.common.id.BizNoGenerator;
 import com.hsmty.cmr.common.id.SnowflakeIdWorker;
-import com.hsmty.cmr.common.util.JsonUtils;
 import com.hsmty.cmr.domain.evaluation.entity.CmrEvaluation;
 import com.hsmty.cmr.domain.evaluation.mapper.EvaluationMapper;
 import com.hsmty.cmr.domain.evaluation.mapper.HardCaseMapper;
@@ -27,7 +26,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.JsonNode;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -63,7 +61,6 @@ public class EvaluationService {
     private static final int DOWN_COUNT_DELTA = 1;
     private static final double EPSILON = 1e-12;
     private static final int TOP_N = 20;
-    private static final int SUMMARY_KEEP_DAYS = 30;
 
     private final EvaluationMapper evaluationMapper;
     private final HardCaseMapper hardCaseMapper;
@@ -158,7 +155,7 @@ public class EvaluationService {
                 .replays(replayRows)
                 .conclusion("unevaluated")
                 .reasons(List.of())
-                .checks(checks(base, replays))
+                .checks(checkData())
                 .build();
 
         if (replays.isEmpty()) {
@@ -372,61 +369,56 @@ public class EvaluationService {
         return Math.round(value * 10000.0) / 10000.0;
     }
 
-    /** 检查评测数据 4 项（只读）：基准存在、至少一次重放、策略快照可用、30 天内数据 */
-    private List<EvaluationCheckVO> checks(CmrSearchHistory base, List<CmrSearchHistory> replays) {
+    /**
+     * 检查评测数据 4 项（只读、全库口径）：样本够不够、有没有重复用、样本还有效吗、评价矛盾吗。
+     *
+     * <p>对应 P8「检查评测数据」按钮；仅统计逻辑未删除数据，不改动任何记录。
+     *
+     * @return 4 项检查结果
+     * @author cmr
+     * @since 2026-11-11
+     */
+    public List<EvaluationCheckVO> checkData() {
+        long evaluations = countOf(evaluationMapper.countEvaluations());
+        long baseItems = countOf(evaluationMapper.countBaseItems());
+        long reused = countOf(evaluationMapper.countReusedItems());
+        long invalid = countOf(evaluationMapper.countInvalidItems());
+        long contradictory = countOf(evaluationMapper.countContradictoryItems());
+
         List<EvaluationCheckVO> checks = new ArrayList<>(4);
-
-        boolean baseExists = base != null;
         checks.add(EvaluationCheckVO.builder()
-                .key("base_task")
-                .label("基准任务存在")
-                .ok(baseExists)
-                .detail(baseExists ? "基准任务 " + searchService.displayTaskNo(base) + " 存在"
-                        : "基准检索任务已不存在")
+                .key("sample_enough")
+                .label("样本够不够")
+                .ok(evaluations > 0 && baseItems > 0)
+                .detail("共 " + evaluations + " 个评测、基准样本 " + baseItems + " 条"
+                        + (evaluations > 0 && baseItems > 0 ? "" : "，样本不足无法评测"))
                 .build());
-
-        boolean hasReplay = !replays.isEmpty();
         checks.add(EvaluationCheckVO.builder()
-                .key("has_replay")
-                .label("至少 1 次重放")
-                .ok(hasReplay)
-                .detail(hasReplay ? "已有 " + replays.size() + " 次重放" : "尚无重放，无法判定优劣")
+                .key("sample_reuse")
+                .label("有没有重复用")
+                .ok(reused == 0)
+                .detail(reused == 0 ? "样本未在多个评测基准中重复出现"
+                        : "有 " + reused + " 条样本出现在多个评测基准中")
                 .build());
-
-        boolean snapshotUsable = snapshotUsable(base);
         checks.add(EvaluationCheckVO.builder()
-                .key("strategy_snapshot")
-                .label("策略快照可用")
-                .ok(snapshotUsable)
-                .detail(snapshotUsable ? "策略快照可解析" : "基准缺少可用的策略快照")
+                .key("sample_valid")
+                .label("样本还有效吗")
+                .ok(invalid == 0)
+                .detail(invalid == 0 ? "基准样本均未被屏蔽、来源均未进黑名单"
+                        : "有 " + invalid + " 条基准样本已被屏蔽或来源已进黑名单")
                 .build());
-
-        boolean within30 = base != null && base.getCreateTime() != null
-                && !base.getCreateTime().isBefore(LocalDateTime.now().minusDays(SUMMARY_KEEP_DAYS));
         checks.add(EvaluationCheckVO.builder()
-                .key("within_30_days")
-                .label("30 天内数据")
-                .ok(within30)
-                .detail(within30 ? "基准数据在 30 天内（" + base.getCreateTime() + "）"
-                        : base == null ? "基准任务缺失，无法判断数据时效" : "基准数据已超过 30 天")
+                .key("vote_contradiction")
+                .label("评价矛盾吗")
+                .ok(contradictory == 0)
+                .detail(contradictory == 0 ? "未发现同一结果在不同任务中既超有用又超无用"
+                        : "有 " + contradictory + " 条结果在不同任务中评价相反")
                 .build());
         return checks;
     }
 
-    /** 策略快照 JSON 容错解析：缺失或格式异常一律按不可用处理，不抛异常 */
-    private boolean snapshotUsable(CmrSearchHistory history) {
-        if (history == null || history.getStrategySnapshotJson() == null
-                || history.getStrategySnapshotJson().isBlank()) {
-            return false;
-        }
-        try {
-            JsonNode node = JsonUtils.readTree(history.getStrategySnapshotJson());
-            return node != null && node.isObject() && node.size() > 0;
-        } catch (Exception e) {
-            log.debug("策略快照解析失败，按不可用处理 searchId={} cause={}",
-                    history.getId(), e.getMessage(), e);
-            return false;
-        }
+    private long countOf(Long value) {
+        return value == null ? 0L : value;
     }
 
     @SuppressWarnings("unchecked")

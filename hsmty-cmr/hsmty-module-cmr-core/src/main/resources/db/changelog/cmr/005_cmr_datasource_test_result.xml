@@ -3,7 +3,18 @@
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <!-- 任一列已存在（含部分成功的历史环境）即标记执行，剩余列由 021 的逐列 changeSet 补齐 -->
     <changeSet id="cmr-datasource-test-result-20261109" author="cmr" context="mysql">
+        <validCheckSum>ANY</validCheckSum>
+        <preConditions onFail="MARK_RAN">
+            <or>
+                <columnExists tableName="cmr_datasource" columnName="last_test_connected"/>
+                <columnExists tableName="cmr_datasource" columnName="last_test_status_code"/>
+                <columnExists tableName="cmr_datasource" columnName="last_test_latency_ms"/>
+                <columnExists tableName="cmr_datasource" columnName="last_test_message"/>
+                <columnExists tableName="cmr_datasource" columnName="last_test_time"/>
+            </or>
+        </preConditions>
         <sql>
             ALTER TABLE cmr_datasource
                 ADD COLUMN last_test_connected TINYINT(1) COMMENT '最近测试是否连通:null=未测试/不适用' AFTER auth_config,

@@ -156,7 +156,7 @@ cmr:
     runtime: '${CMR_RUNTIME_DIR:../runtime}'
   # 数据源认证信息加密密钥，生产必须覆盖
   crypto:
-    key: '${CMR_CRYPTO_KEY:change-me-crypto-32bytes-0123456789!}'
+    key: '${CMR_CRYPTO_KEY:}'
   # 向量模型白名单：空表示不拦截建库
   model:
     whitelist: '${CMR_MODEL_WHITELIST:}'
@@ -179,7 +179,7 @@ cmr:
   # 检索默认参数；无激活索引（cmr_index.status=active）时使用 index-dir
   search:
     index-dir: '${CMR_SEARCH_INDEX_DIR:runtime/demo_index}'
-    top-k: 10
+    top-k: 20
     threshold: 0.60
     summary-days: 30
     weights:

@@ -67,7 +67,16 @@ public class HistoryVO {
 
     private LocalDateTime createTime;
 
-    public static HistoryVO from(CmrSearchHistory e, String taskBizNo, String taskStatus) {
+    /**
+     * PO 转 VO。
+     *
+     * @param e             检索历史
+     * @param taskBizNo     任务号（TASK 形态）
+     * @param taskStatus    任务状态
+     * @param replayTaskNo  重放来源任务号（对外统一 TASK 形态，可为 null）
+     * @return 检索历史出参
+     */
+    public static HistoryVO from(CmrSearchHistory e, String taskBizNo, String taskStatus, String replayTaskNo) {
         return HistoryVO.builder()
                 .id(e.getId()).bizNo(e.getBizNo()).resultSetId(e.getResultSetId()).taskId(e.getTaskId())
                 .indexId(e.getIndexId()).taskBizNo(taskBizNo).taskStatus(taskStatus)
@@ -79,7 +88,7 @@ public class HistoryVO {
                 .operatorId(e.getOperatorId()).operatorName(e.getOperatorName())
                 .strategyNo(e.getStrategyNo()).strategyVersion(e.getStrategyVersion())
                 .threshold(e.getThreshold()).sealed(e.getSealed())
-                .replayOfTaskNo(e.getReplayOfTaskNo())
+                .replayOfTaskNo(replayTaskNo)
                 .createTime(e.getCreateTime())
                 .build();
     }

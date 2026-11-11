@@ -4,6 +4,13 @@
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
     <changeSet id="cmr-search-target-modality-20261108" author="cmr" context="mysql">
+        <!-- 已在部分环境执行过：本次仅补幂等前置，校验和放行 -->
+        <validCheckSum>ANY</validCheckSum>
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="cmr_search_history" columnName="target_modality"/>
+            </not>
+        </preConditions>
         <sql>
             ALTER TABLE cmr_search_history
                 ADD COLUMN target_modality VARCHAR(16) COMMENT 'text/image/audio/video' AFTER query_modality;

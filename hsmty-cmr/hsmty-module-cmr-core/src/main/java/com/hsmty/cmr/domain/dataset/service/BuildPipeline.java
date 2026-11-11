@@ -120,7 +120,7 @@ public class BuildPipeline {
                 Map.of("uniqueId", uniqueId, "inputFile", r403.path("outputFile").asText())));
         String modelVersion = r404.path("modelVersion").asText(null);
         List<String> modelWhitelist = properties.getModel().getWhitelist();
-        BizException.assertTrue(modelVersion != null && modelVersion.isBlank(), "404 未返回向量模型版本");
+        BizException.assertNull(modelVersion, "404 未返回向量模型版本");
         BizException.assertTrue(!modelWhitelist.isEmpty() && !modelWhitelist.contains(modelVersion),
                 "向量模型不在白名单内: " + modelVersion);
 

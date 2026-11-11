@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 历史接入数据回填 upstream_dataset_id：file_root 形如 dataset/ds/{数据源bizNo}/{上游数据集ID}，
+         取末段回填；上游 ID 含特殊字符经 safeName 转写的极少数行需人工核对 -->
+    <changeSet id="cmr-dataset-upstream-backfill-20261111" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM cmr_dataset d
+                JOIN cmr_datasource s ON s.id = d.datasource_id
+                WHERE d.upstream_dataset_id IS NULL
+                  AND d.file_root LIKE CONCAT('dataset/ds/', s.biz_no, '/%')
+            </sqlCheck>
+        </preConditions>
+        <sql>
+            UPDATE cmr_dataset d
+            JOIN cmr_datasource s ON s.id = d.datasource_id
+            SET d.upstream_dataset_id = SUBSTRING_INDEX(d.file_root, '/', -1)
+            WHERE d.upstream_dataset_id IS NULL
+              AND d.file_root LIKE CONCAT('dataset/ds/', s.biz_no, '/%');
+        </sql>
+    </changeSet>
+
+    <!-- 接入去重的数据库兜底：同一数据源同一上游数据集唯一（手工登记为 NULL，MySQL 唯一索引允许多 NULL）。
+         已存在重复数据时跳过（MARK_RAN），待人工清理后由后续变更补齐 -->
+    <changeSet id="cmr-dataset-upstream-unique-20261111" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <not>
+                    <indexExists tableName="cmr_dataset" indexName="uk_cmr_dataset_upstream"/>
+                </not>
+                <sqlCheck expectedResult="0">
+                    SELECT COUNT(*) FROM (
+                        SELECT datasource_id, upstream_dataset_id
+                        FROM cmr_dataset
+                        WHERE upstream_dataset_id IS NOT NULL AND del_flag = 'F'
+                        GROUP BY datasource_id, upstream_dataset_id
+                        HAVING COUNT(*) > 1
+                    ) t
+                </sqlCheck>
+            </and>
+        </preConditions>
+        <createIndex tableName="cmr_dataset" indexName="uk_cmr_dataset_upstream" unique="true">
+            <column name="datasource_id"/>
+            <column name="upstream_dataset_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- 唯一索引就位后，020 建的同列非唯一索引冗余，删除 -->
+    <changeSet id="cmr-dataset-upstream-drop-redundant-index-20261111" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <indexExists tableName="cmr_dataset" indexName="idx_cmr_dataset_upstream"/>
+                <indexExists tableName="cmr_dataset" indexName="uk_cmr_dataset_upstream"/>
+            </and>
+        </preConditions>
+        <dropIndex tableName="cmr_dataset" indexName="idx_cmr_dataset_upstream"/>
+    </changeSet>
+
+</databaseChangeLog>

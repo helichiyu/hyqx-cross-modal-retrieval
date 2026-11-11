@@ -6,7 +6,9 @@ spring:
     password:
   liquibase:
     enabled: true
-    change-log: classpath:db/changelog/changelog-master.xml
+    # H2 约束名全局唯一，生产 changelog 的 MySQL 方言（重复约束名/COMMENT/ENGINE）在 H2 跑不通；
+    # 测试用最小 schema，仅建用例需要的表
+    change-log: classpath:db/changelog-test.xml
   data:
     redis:
       # 覆盖主配置中的 ENC(...)，测试环境不触发解密与真实连接
@@ -34,6 +36,9 @@ cmr:
   file:
     store: local
     local-root: ./target/test-files
+  # 测试环境密钥：仅用于上下文装配，不加密任何真实数据
+  crypto:
+    key: test-crypto-key-32bytes-0123456789ab
 
 logging:
   level:

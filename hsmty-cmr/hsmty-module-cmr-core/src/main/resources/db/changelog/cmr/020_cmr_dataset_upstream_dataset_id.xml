@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 记录上游数据集 ID，用于接入去重（同一数据源的同一上游数据集只允许接入一次） -->
+    <changeSet id="cmr-dataset-upstream-dataset-id-20261111" author="cmr" context="mysql,postgresql">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="cmr_dataset" columnName="upstream_dataset_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="cmr_dataset">
+            <column name="upstream_dataset_id" type="VARCHAR(128)" remarks="上游数据集 ID（接入去重锚点；手工登记为空）"
+                    afterColumn="datasource_id"/>
+        </addColumn>
+        <createIndex tableName="cmr_dataset" indexName="idx_cmr_dataset_upstream">
+            <column name="datasource_id"/>
+            <column name="upstream_dataset_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

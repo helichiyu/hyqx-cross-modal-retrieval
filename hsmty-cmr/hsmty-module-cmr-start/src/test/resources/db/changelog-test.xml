@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 测试专用最小 schema：H2 约束名全局唯一，与生产 changelog（MySQL 方言）解耦；
+         只建集成测试需要的表。生产结构以 db/changelog/cmr/ 为准，本文件不用于任何真实环境。 -->
+    <changeSet id="test-file-object-20261111" author="cmr">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="cmr_file_object"/>
+            </not>
+        </preConditions>
+        <createTable tableName="cmr_file_object">
+            <column name="id" type="BIGINT">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="biz_no" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="biz_type" type="VARCHAR(64)"/>
+            <column name="bucket" type="VARCHAR(128)"/>
+            <column name="object_key" type="VARCHAR(512)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="original_name" type="VARCHAR(255)"/>
+            <column name="content_type" type="VARCHAR(128)"/>
+            <column name="size" type="BIGINT"/>
+            <column name="sha256" type="CHAR(64)"/>
+            <column name="store_type" type="VARCHAR(16)"/>
+            <column name="status" type="VARCHAR(20)" defaultValue="active">
+                <constraints nullable="false"/>
+            </column>
+            <column name="create_id" type="BIGINT"/>
+            <column name="create_time" type="DATETIME"/>
+            <column name="update_id" type="BIGINT"/>
+            <column name="update_time" type="DATETIME"/>
+            <column name="del_flag" type="CHAR(1)" defaultValue="F">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="cmr_file_object" indexName="uk_cmr_file_object_biz_no" unique="true">
+            <column name="biz_no"/>
+        </createIndex>
+    </changeSet>
+
+
+    <!-- 启动时任务恢复会扫描 cmr_task（BaseEntity：id/create_id/create_time/update_id/update_time/del_flag） -->
+    <changeSet id="test-task-20261111" author="cmr">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="cmr_task"/>
+            </not>
+        </preConditions>
+        <createTable tableName="cmr_task">
+            <column name="id" type="BIGINT">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="biz_no" type="VARCHAR(32)"/>
+            <column name="type" type="VARCHAR(32)"/>
+            <column name="ref_id" type="BIGINT"/>
+            <column name="status" type="VARCHAR(20)"/>
+            <column name="fail_type" type="VARCHAR(32)"/>
+            <column name="fail_disposal" type="VARCHAR(32)"/>
+            <column name="retry_count" type="INT"/>
+            <column name="current_step" type="VARCHAR(64)"/>
+            <column name="payload_json" type="CLOB"/>
+            <column name="error_msg" type="VARCHAR(1024)"/>
+            <column name="started_time" type="DATETIME"/>
+            <column name="finished_time" type="DATETIME"/>
+            <column name="create_id" type="BIGINT"/>
+            <column name="create_time" type="DATETIME"/>
+            <column name="update_id" type="BIGINT"/>
+            <column name="update_time" type="DATETIME"/>
+            <column name="del_flag" type="CHAR(1)" defaultValue="F">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="test-task-log-20261111" author="cmr">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="cmr_task_log"/>
+            </not>
+        </preConditions>
+        <createTable tableName="cmr_task_log">
+            <column name="id" type="BIGINT">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="task_id" type="BIGINT"/>
+            <column name="step" type="VARCHAR(64)"/>
+            <column name="status" type="VARCHAR(20)"/>
+            <column name="operator_output_json" type="CLOB"/>
+            <column name="message" type="VARCHAR(1024)"/>
+            <column name="create_id" type="BIGINT"/>
+            <column name="create_time" type="DATETIME"/>
+            <column name="update_id" type="BIGINT"/>
+            <column name="update_time" type="DATETIME"/>
+            <column name="del_flag" type="CHAR(1)" defaultValue="F">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>

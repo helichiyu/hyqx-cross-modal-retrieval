@@ -1,8 +1,9 @@
 # hsmty-module-cmr-server（跨模态检索中心）
 
-按 HSMTY 平台基线（`client → core → start`）搭建的新工程，与仓库根目录的
-`cmr-backend` / `cmr-web` 并存，不覆盖原有代码。业务算子尚未迁移，当前交付的是
-可编译、可启动、可测试的架构骨架 + 文件对象能力。
+按 HSMTY 平台基线（`client → core → start`）搭建的跨模态检索服务，业务实现已从
+仓库根目录的 `cmr-backend` / `cmr-web` 全量迁移到本工程：数据源/库管理、检索（407 查询理解
++ 408 召回）、结果回看与摘要、搜索行为、策略版本、任务流水、效果评测、运营反馈均已有
+真实接口支撑。旧工程保留作功能基线，不再新增功能。
 
 ## 1. 目录
 
@@ -11,14 +12,14 @@ hsmty-cmr/
 ├── hsmty-module-cmr-client/   对外契约：Feign、DTO、VO
 ├── hsmty-module-cmr-core/     业务实现：Controller / Service / Mapper / PO / Liquibase
 ├── hsmty-module-cmr-start/    启动类、全局配置、application.yml、集成测试
-├── web/                       qiankun 子应用 cross-modal-search（前缀 cms）
+├── web/                       qiankun 子应用 cross-modal-search
 ├── deploy/                    docker compose 编排与 .env 样例
 ├── settings.example.xml       Maven 设置模板（复制为 settings.xml 并填凭据，settings.xml 不入库）
 └── Dockerfile                 后端镜像（Jenkins 构建后打包）
 ```
 
-后端根包 `com.hsmty.cmr`，启动类为 `com.hsmty.RunApplication`；前端路由前缀 `/cms`，
-部署路径 `/sdom-hsmty/`。
+后端根包 `com.hsmty.cmr`，启动类为 `com.hsmty.RunApplication`；业务接口统一为
+`/hs-api/cmr/**`；前端部署路径 `/sdom-hsmty/`。
 
 ## 2. 获取平台依赖
 
@@ -26,7 +27,7 @@ hsmty-cmr/
 
 - 模板仓库：`http://192.168.1.110:13000/hsmty/hsmty-module-cms-server`
 - Maven 仓库：`http://192.168.1.110:13001/repository/maven-public/`
-- 父工程：`com.hsmty:hsmty-module-starter:2.0.1`（本工程 `revision` 必须与父工程一致，父 POM 内 `${project.version}` 会按子工程版本插值）
+- 父工程：`com.hsmty:hsmty-module-starter:2.0.1`（本工程 `revision` 必须与父工程一致）
 
 首次使用复制脱敏模板并填入自己的 Nexus 账号（`settings.xml` 已被 git 忽略）：
 
@@ -34,37 +35,20 @@ hsmty-cmr/
 cp settings.example.xml settings.xml
 ```
 
-之后 CLI 构建统一使用 `mvn -s settings.xml`。只拉取依赖时通常可匿名访问公司 Nexus。
+之后 CLI 构建统一使用 `mvn -s settings.xml`。
 
 ## 3. 构建与运行
 
-首次构建：
-
 ```
 mvn -s settings.xml -DskipTests clean package
-```
-
-如本机无法解析平台依赖，可显式指定本地仓库（公司模板在 `/ruanjian/maven/repository`）：
-
-```
-mvn -s settings.xml -Dmaven.repo.local=C:/Users/<user>/.m2/repository -DskipTests clean package
-```
-
-执行测试（父工程默认 `skipTests=true`，必须显式关闭）：
-
-```
-mvn -s settings.xml -DskipTests=false test
-```
-
-启动：
-
-```
 java -jar hsmty-module-cmr-start/target/hsmty-module-cmr-start.jar
 ```
 
 - 端口 `8080`，上下文 `/hs-api`
 - 接口文档 `/hs-api/swagger-ui.html`，OpenAPI `/hs-api/v3/api-docs`
 - 业务接口统一为 `/hs-api/cmr/**`
+- 契约模块 `skipTests=true`；start 的 surefire 默认跳过测试，执行测试需显式
+  `-DskipTests=false`
 
 本地执行数据库变更：
 
@@ -84,19 +68,21 @@ LOCAL_DB_PASSWORD=... java -jar hsmty-module-cmr-start/target/hsmty-module-cmr-s
 
 ## 4. 接口与权限
 
-| 接口 | 方法 | 权限码 |
-| --- | --- | --- |
-| `/hs-api/cmr/files` | POST（上传） | `cmr:file:upload` |
-| `/hs-api/cmr/files` | GET（分页） | `cmr:file:page` |
-| `/hs-api/cmr/files/{id}` | GET（详情） | `cmr:file:detail` |
-| `/hs-api/cmr/files/{id}/content` | GET（下载） | `cmr:file:read` |
-| `/hs-api/cmr/files` | DELETE（批量删除） | `cmr:file:remove` |
-| `/hs-api/cmr/files/by-ids` | POST（Feign 批量查） | `cmr:file:read` |
-| `/hs-api/cmr/search/understand` | POST（407 查询理解代理） | `cmr:search:create` |
-| `/hs-api/cmr/search` | POST（408 检索并落库） | `cmr:search:create` |
+所有接口返回平台 `ApiResult`（成功 `code=0000`，业务失败码带前缀，如 `C1003`），
+分页返回 `ApiPageResult`（`current/limit/total/totalPage/rows`）。Controller 一律
+`@PreAuthorize` + `hasAnyAuthority`，权限码与 `Permissions` 常量、菜单数据三处一致。
 
-返回结构为平台 `ApiResult`：成功 `code=0000`，业务失败码带前缀（如 `C1003` 文件不存在、
-`C108` 权限不足），分页为 `current/limit/total/totalPage/rows`。
+| 业务域 | 基础路径（`/hs-api/cmr` 之后） | 主要能力 |
+| --- | --- | --- |
+| 鉴权/字典 | `auth`、`dict`、`recommend-words` | 当前用户、字典项、推荐词维护 |
+| 文件 | `file`、`files` | 上传、按路径下载、文件对象分页/详情/批量查 |
+| 库管理 | `datasets`、`datasources`、`datasource-blacklist`、`indexes` | 数据集审核/生产化/重建、数据源对接与测试、同步、上游数据集拉取与接入（401→406）、黑名单、索引激活 |
+| 检索 | `search`、`search-history` | 407 查询理解、408 检索落库、结果回看/重跑/点击埋点、收藏 |
+| 行为/摘要 | `search-behaviors`、`search-summary` | 行为流水、屏蔽条目与解除、任务摘要与封存、赞踩 |
+| 策略 | `strategies` | 草稿保存、发布、下线/上线、版本列表/回滚、跨策略与跨版本对比、一致性检查 |
+| 任务 | `tasks` | 任务分页/详情、失败任务处置状态 |
+| 评测 | `evaluations`、`eval-sets`、`eval-runs` | 新建评测、回放、难例样本、检查评测数据（`GET /evaluations/check-data` 4 项只读）、评测集标注与运行 |
+| 运营 | `feedbacks` | 差异/零结果反馈、重复任务合并、处置统计 |
 
 ### 检索算子
 
@@ -106,26 +92,27 @@ LOCAL_DB_PASSWORD=... java -jar hsmty-module-cmr-start/target/hsmty-module-cmr-s
 | --- | --- | --- |
 | `cmr.operator.base-url` | `http://127.0.0.1:6300` | 环境变量 `CMR_OPERATOR_BASE_URL`（compose 内 `http://cmr-operators:6300`） |
 | 在线链超时 | `connect 2s / read 60s` | 同左，按需覆盖 |
-| 批量链超时 | 预留 `1800000ms`，接入 401–406/409 时启用 | 同左 |
+| 批量链超时 | 预留 `1800000ms` | 同左 |
 
-已接入 407 查询理解（`/hs-api/cmr/search/understand`）与 408 检索
-（`/hs-api/cmr/search`），并用本地 6300 真实算子验证：407 覆盖歧义命中、过短提示、
-正常查询；408 返回结果集编号与条目，并写入 `cmr_search_history` / `cmr_result_item`。
-算子不可用时返回 `C9999` 与明确文案。
-
-408 的索引目录取自 `cmr_index` 中 `status=active` 的记录；没有激活索引时回落到
-`cmr.search.index-dir`（默认 `runtime/demo_index`）。权重默认四模态各 25、TopK 10、
-阈值 0.60，均可在 `cmr.search.*` 调整。
-
-算子返回自有信封（`{code:0,msg,data}`），因此 `CmrOperatorFeignClient` 使用专用 `CmrOperatorFeignConfig`
-（标准 Spring 编解码器），不复用平台的 `FeignResultDecoder`；原因见 `docs/对齐偏差登记.md`。
+已接入 407 查询理解（`/search/understand`）与 408 检索（`/search`）。408 内部完成
+阈值过滤、TopK 截断与分数排序，后端不再二次过滤/排序；`score` 为融合分、`alignScore`
+为原始余弦相似度，前端展示优先使用 `alignScore`。算子返回自有信封（`{code:0,msg,data}`），
+因此 `CmrOperatorFeignClient` 使用专用 `CmrOperatorFeignConfig`，不复用平台的
+`FeignResultDecoder`；原因见 `docs/对齐偏差登记.md`。
 
 ## 5. 数据库
 
-- 库：`sd_data_engineering`（与其它模块共用，按表前缀隔离）
-- 表：`cmr_file_object`、`cmr_index`、`cmr_search_history`、`cmr_result_item`
-- Liquibase：`core/src/main/resources/db/changelog/cmr/001–004_*.xml`，
-  由 `module-cmr-changelog.xml` → `start` 的 `changelog-master.xml` 挂载
+- 库：`sd_data_engineering`（与其它模块共用，按表前缀 `cmr_` 隔离）
+- 表：`cmr_file_object`、`cmr_dataset`、`cmr_datasource`、`cmr_datasource_blacklist`、
+  `cmr_index`、`cmr_search_history`、`cmr_result_item`、`cmr_click_event`、`cmr_item_vote`、
+  `cmr_favorite`、`cmr_blocked_item`、`cmr_task`、`cmr_task_log`、`cmr_strategy`、
+  `cmr_strategy_version`、`cmr_feedback`、`cmr_recommend_word`、`cmr_eval_set`、
+  `cmr_eval_item`、`cmr_eval_record`、`cmr_user`
+- 字典/菜单写入平台表 `sys_dict*` / `sys_menu`，业务模块不创建平台表
+- Liquibase：`core/src/main/resources/db/changelog/cmr/001–021_*.xml`，由
+  `module-cmr-changelog.xml` → `start` 的 `changelog-master.xml` 挂载；每个 changeSet
+  带 `preConditions onFail="MARK_RAN"` 幂等；已执行 changeSet 禁止修改
+  （004/005 属历史补幂等，已加 `validCheckSum ANY` 放行校验和；021 为 005 部分执行环境的逐列补齐）
 - 默认 `spring.liquibase.enabled=false`，按环境开启；`local` profile 自动开启
 
 ## 6. 文件存储
@@ -145,12 +132,13 @@ corepack pnpm@10.17.1 install
 corepack pnpm@10.17.1 dev
 ```
 
-- 开发端口 `9848`，`/hs-api` 代理到 `http://127.0.0.1:8080`
+- 默认开发端口 `9848`（`.env` 的 `VITE_PORT`）；`/hs-api` 代理到 `VITE_PROXY_TARGET`
+  （默认 `http://127.0.0.1:8080`，本机 `local` 联调可覆盖为 `18080`）
+- 部署路径固定 `/sdom-hsmty/`，qiankun 子应用名由 `VITE_QIANKUN_NAME` 控制
 - 类型检查 + 构建：`corepack pnpm@10.17.1 build`
 - 测试：`corepack pnpm@10.17.1 test`（vitest）
 - 静态检查：`corepack pnpm@10.17.1 lint`
-- 检索页已接 407 查询理解与 408 检索：先理解/澄清，再执行检索并展示结果条目
-- 菜单与字典先用前端静态配置占位（`menu.ts` / `dict.ts`），并入平台总前端后改为平台下发
+- 菜单与字典先用前端静态配置（`menu.ts` / `dict.ts`），并入平台总前端后改为平台下发
 - 本地开发需先通过 UAP 门户建立会话（子应用不提供登录页），否则业务接口返回 401；
   使用后端 `local` profile 联调时无需 UAP 会话
 
@@ -167,14 +155,12 @@ docker compose -p cmr-line --env-file deploy/.env -f deploy/docker-compose.yml u
 
 | 范围 | 命令 | 结果 |
 | --- | --- | --- |
-| 后端测试 | `mvn -s settings.xml -DskipTests=false -pl hsmty-module-cmr-start -am test` | 19 个用例：18 通过 + 1 个算子联调用例默认 `@Disabled`（core 2、start 17） |
-| 407 真实算子联调 | 本地 6300 算子启动后执行 `OperatorLiveSmokeTest` | 通过：歧义命中/过短提示/正常查询三类响应已核对 |
-| 408 真实环境验证 | `local` profile + 本机 MySQL/Redis + 6300 算子，curl `POST /hs-api/cmr/search` | 通过：返回结果集 `RST...`，`cmr_search_history` / `cmr_result_item` 已落库 |
+| 后端构建 | `mvn -s settings.xml -DskipTests -pl hsmty-module-cmr-core,hsmty-module-cmr-start -am package` | 通过 |
+| 后端测试 | `mvn -s settings.xml -DskipTests=false -pl hsmty-module-cmr-start -am test` | 19 个用例：18 通过 + 1 个算子联调用例默认 `@Disabled` |
+| 407/408 真实算子联调 | 本地 6300 算子 + `local` profile | 通过：歧义命中/过短提示/正常查询；检索返回真实条目并落库 |
 | 前端类型检查 + 构建 | `corepack pnpm@10.17.1 build` | 通过 |
 | 前端测试 | `corepack pnpm@10.17.1 test` | 7/7 通过 |
 | 前端静态检查 | `corepack pnpm@10.17.1 lint` | 0 error |
-
-测试用 H2 + 白名单 `/**`，不依赖真实数据库与 Redis；生产启动需按 `docs/待提供清单.md` 注入配置。
 
 ## 10. 待确认事项
 

@@ -25,5 +25,8 @@
     <include file="db/changelog/cmr/017_cmr_datasource_blacklist_dataset_id.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/cmr/018_cmr_datasource_missing_fields.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/cmr/019_cmr_strategy_offline_remark.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/020_cmr_dataset_upstream_dataset_id.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/021_cmr_datasource_test_result_columns.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/022_cmr_dataset_upstream_backfill.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

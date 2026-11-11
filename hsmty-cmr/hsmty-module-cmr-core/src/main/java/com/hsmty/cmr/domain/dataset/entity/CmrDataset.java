@@ -32,6 +32,9 @@ public class CmrDataset extends BaseEntity {
 
     private Long datasourceId;
 
+    /** 上游数据集 ID（接入去重锚点；手工登记为空） */
+    private String upstreamDatasetId;
+
     private String name;
 
     private String version;

@@ -46,6 +46,9 @@ cmr:
     local-root: ./data/files
   search:
     index-dir: 'runtime/demo_index'
+  # 本机联调用加密密钥，仅 local profile；共享/生产必须经 CMR_CRYPTO_KEY 覆盖
+  crypto:
+    key: '${CMR_CRYPTO_KEY:local-dev-crypto-32bytes-012345678!}'
 
 springdoc:
   swagger-ui:

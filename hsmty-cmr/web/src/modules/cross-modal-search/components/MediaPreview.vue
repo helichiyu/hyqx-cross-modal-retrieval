@@ -28,7 +28,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { http } from '../api/http'
+import { ElMessage } from 'element-plus'
+import { ApiError, http } from '../api/http'
 import { fileUrl } from '../api'
 
 const props = defineProps<{ path?: string | null }>()
@@ -78,8 +79,11 @@ async function load() {
     } else {
       objectUrl.value = URL.createObjectURL(blob)
     }
-  } catch {
-    // 加载失败保持占位态
+  } catch (error) {
+    // 加载失败保持占位态；鉴权类错误由全局 cms:unauthorized 处理，其余仅提示
+    if (error instanceof ApiError && error.status !== 401) {
+      ElMessage.warning(error.message)
+    }
   } finally {
     loading.value = false
   }
@@ -97,14 +101,22 @@ function download() {
   if (!props.path) {
     return
   }
-  http.blob(fileUrl(props.path, true)).then((blob) => {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = props.path!.split('/').pop() ?? 'file'
-    a.click()
-    URL.revokeObjectURL(url)
-  })
+  http
+    .blob(fileUrl(props.path, true))
+    .then((blob) => {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = props.path!.split('/').pop() ?? 'file'
+      a.click()
+      URL.revokeObjectURL(url)
+    })
+    .catch((error: unknown) => {
+      // 鉴权类错误由全局 cms:unauthorized 处理，其余提示下载失败
+      if (error instanceof ApiError && error.status !== 401) {
+        ElMessage.error(`下载失败：${error.message}`)
+      }
+    })
 }
 
 watch(() => props.path, load, { immediate: true })

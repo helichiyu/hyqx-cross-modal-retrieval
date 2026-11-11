@@ -23,6 +23,8 @@ public class DatasetVO {
 
     private Long datasourceId;
 
+    private String upstreamDatasetId;
+
     private String name;
 
     private String version;
@@ -48,6 +50,7 @@ public class DatasetVO {
     public static DatasetVO from(CmrDataset e) {
         return DatasetVO.builder()
                 .id(e.getId()).bizNo(e.getBizNo()).datasourceId(e.getDatasourceId())
+                .upstreamDatasetId(e.getUpstreamDatasetId())
                 .name(e.getName()).version(e.getVersion()).scene(e.getScene())
                 .status(e.getStatus()).stuckReason(e.getStuckReason())
                 .score(e.getScore()).decision(e.getDecision())

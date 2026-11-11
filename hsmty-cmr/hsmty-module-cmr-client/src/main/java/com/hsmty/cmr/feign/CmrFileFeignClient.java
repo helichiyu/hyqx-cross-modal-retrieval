@@ -26,6 +26,6 @@ import java.util.List;
 public interface CmrFileFeignClient {
 
     @Operation(summary = "根据 ID 批量查询文件元数据")
-    @PostMapping("/hs-api/cmr/files/by-ids")
+    @PostMapping("/cmr/files/by-ids")
     List<FileObjectVO> getByIdList(@RequestBody Collection<Long> idList);
 }

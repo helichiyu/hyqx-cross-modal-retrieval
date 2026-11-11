@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 覆盖 005 部分执行的历史环境：逐列补齐，幂等可重复执行 -->
+    <changeSet id="cmr-datasource-last-test-connected-20261111" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="cmr_datasource" columnName="last_test_connected"/>
+            </not>
+        </preConditions>
+        <sql>
+            ALTER TABLE cmr_datasource
+                ADD COLUMN last_test_connected TINYINT(1) COMMENT '最近测试是否连通:null=未测试/不适用' AFTER auth_config;
+        </sql>
+    </changeSet>
+    <changeSet id="cmr-datasource-last-test-status-code-20261111" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="cmr_datasource" columnName="last_test_status_code"/>
+            </not>
+        </preConditions>
+        <sql>
+            ALTER TABLE cmr_datasource ADD COLUMN last_test_status_code INT COMMENT '最近测试 HTTP 状态';
+        </sql>
+    </changeSet>
+    <changeSet id="cmr-datasource-last-test-latency-ms-20261111" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="cmr_datasource" columnName="last_test_latency_ms"/>
+            </not>
+        </preConditions>
+        <sql>
+            ALTER TABLE cmr_datasource ADD COLUMN last_test_latency_ms BIGINT COMMENT '最近测试耗时 ms';
+        </sql>
+    </changeSet>
+    <changeSet id="cmr-datasource-last-test-message-20261111" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="cmr_datasource" columnName="last_test_message"/>
+            </not>
+        </preConditions>
+        <sql>
+            ALTER TABLE cmr_datasource ADD COLUMN last_test_message VARCHAR(512) COMMENT '最近测试结果说明';
+        </sql>
+    </changeSet>
+    <changeSet id="cmr-datasource-last-test-time-20261111" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="cmr_datasource" columnName="last_test_time"/>
+            </not>
+        </preConditions>
+        <sql>
+            ALTER TABLE cmr_datasource ADD COLUMN last_test_time DATETIME COMMENT '最近测试时间';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

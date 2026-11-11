@@ -166,6 +166,9 @@ public class DatasourceService {
                 .findFirst()
                 .orElseThrow(() -> new BizException("上游数据集不存在或已被黑名单排除: " + datasetId));
 
+        // 去重：同一数据源的同一上游数据集只允许接入一次，避免重复下载与重复建库
+        BizException.assertTrue(datasetService.existsUpstream(datasource.getId(), datasetId), "该上游数据集已接入");
+
         Path dir = fileService.datasetRoot().resolve("ds").resolve(datasource.getBizNo()).resolve(safeName(datasetId));
         int fetched = pullItems(datasource, base, datasetId, dir);
         BizException.assertTrue(fetched <= 0, "上游数据集无可用条目: " + datasetId);
@@ -173,7 +176,7 @@ public class DatasourceService {
         String logicalRoot = "dataset/ds/" + datasource.getBizNo() + "/" + safeName(datasetId);
         String name = dto.getName() != null && !dto.getName().isBlank()
                 ? dto.getName() : String.valueOf(upstream.get("name"));
-        DatasetVO dataset = datasetService.registerUpstream(datasource.getId(), name,
+        DatasetVO dataset = datasetService.registerUpstream(datasource.getId(), datasetId, name,
                 dto.getVersion(), dto.getScene(), logicalRoot);
         log.info("数据源接入: source={} datasetId={} files={} dataset={}",
                 datasource.getBizNo(), datasetId, fetched, dataset.getBizNo());
@@ -545,7 +548,8 @@ public class DatasourceService {
     /**
      * 测试数据源连接并逐字段校验 4 项必填。
      *
-     * <p>连接成功仍以 4/4 齐全为准；测试失败只回写测试结果，不改连接状态（既有行为）。
+     * <p>连接状态按数据流状态机流转：地址不可达或接口报错 → {@code failed}；
+     * 连接成功且 4/4 齐全 → {@code connected}；仅缺必填字段（接口可达）→ 状态保持不变。
      *
      * @param id 数据源 ID
      * @return 测试结果（含逐字段 checks）
@@ -553,6 +557,7 @@ public class DatasourceService {
     public DatasourceTestVO test(Long id) {
         CmrDatasource datasource = requireDatasource(id);
         DatasourceTestVO result;
+        boolean unreachable = false;
         if (isPushProtocol(datasource.getProtocol())) {
             result = DatasourceTestVO.builder()
                     .connected(null)
@@ -570,38 +575,45 @@ public class DatasourceService {
         } else {
             result = testEndpoint(datasource);
             if (Boolean.TRUE.equals(result.getConnected())) {
-                result = checkRequiredFields(datasource, result);
+                try {
+                    result = checkRequiredFields(datasource, result);
+                } catch (BizException e) {
+                    // 接口可达但拉取上游数据集报错：按数据流状态机转为连接失败
+                    result.setConnected(false);
+                    result.setMessage(e.getMessage());
+                    result.setChecks(failedChecks(e.getMessage()));
+                    unreachable = true;
+                }
             } else {
                 // 连不上时仍返回 4 行结果，明确标出无法判定
                 result.setChecks(failedChecks(result.getMessage()));
+                unreachable = true;
             }
         }
-        return saveTestResult(datasource, result);
+        return saveTestResult(datasource, result, unreachable);
     }
 
-    /** 测试连接第二步：逐字段检测 4 项必填（dataset_id/name/item_count/modals），缺任一项判接入失败 */
+    /**
+     * 测试连接第二步：逐字段检测 4 项必填（dataset_id/name/item_count/modals），缺任一项判接入失败。
+     *
+     * <p>拉取上游数据集失败（地址不可达/接口报错）时抛出 {@link BizException}，由调用方决定连接状态。
+     */
     private DatasourceTestVO checkRequiredFields(CmrDatasource datasource, DatasourceTestVO result) {
-        try {
-            java.util.Map<String, Object> probe = fetchDatasets(datasource);
-            boolean ok = Boolean.TRUE.equals(probe.get("requiredOk"));
-            result.setConnected(ok);
-            result.setChecks(buildChecks(probe));
-            datasource.setRequiredOk(ok);
-            datasource.setMissingFields(joinFields(probe.get("missingFields")));
-            if (ok) {
-                result.setMessage("连接成功，4 项必填齐全");
-            } else {
-                Object issue = probe.get("itemIssue");
-                List<?> missing = probe.get("missingFields") instanceof List<?> list ? list : List.of();
-                String suffix = issue != null ? String.valueOf(issue)
-                        : "缺少 " + (missing.isEmpty() ? "必填字段"
-                        : String.join("/", missing.stream().map(String::valueOf).toList()));
-                result.setMessage("4 项必填缺失：" + suffix);
-            }
-        } catch (BizException e) {
-            result.setConnected(false);
-            result.setMessage(e.getMessage());
-            result.setChecks(failedChecks(e.getMessage()));
+        java.util.Map<String, Object> probe = fetchDatasets(datasource);
+        boolean ok = Boolean.TRUE.equals(probe.get("requiredOk"));
+        result.setConnected(ok);
+        result.setChecks(buildChecks(probe));
+        datasource.setRequiredOk(ok);
+        datasource.setMissingFields(joinFields(probe.get("missingFields")));
+        if (ok) {
+            result.setMessage("连接成功，4 项必填齐全");
+        } else {
+            Object issue = probe.get("itemIssue");
+            List<?> missing = probe.get("missingFields") instanceof List<?> list ? list : List.of();
+            String suffix = issue != null ? String.valueOf(issue)
+                    : "缺少 " + (missing.isEmpty() ? "必填字段"
+                    : String.join("/", missing.stream().map(String::valueOf).toList()));
+            result.setMessage("4 项必填缺失：" + suffix);
         }
         return result;
     }
@@ -656,7 +668,7 @@ public class DatasourceService {
         return REQUIRED_FIELDS.stream().map(field -> check(field, false, detail)).toList();
     }
 
-    private DatasourceTestVO saveTestResult(CmrDatasource datasource, DatasourceTestVO result) {
+    private DatasourceTestVO saveTestResult(CmrDatasource datasource, DatasourceTestVO result, boolean unreachable) {
         LocalDateTime testedAt = LocalDateTime.now();
         result.setTestedAt(testedAt);
         datasource.setLastTestConnected(result.getConnected());
@@ -664,9 +676,11 @@ public class DatasourceService {
         datasource.setLastTestLatencyMs(result.getLatencyMs());
         datasource.setLastTestMessage(result.getMessage());
         datasource.setLastTestTime(testedAt);
-        // 状态表：测试通过 → 已连接；测试未通过 → 状态保持原样
+        // 状态机：测试通过 → 已连接；地址不可达/接口报错 → 连接失败；仅缺必填字段 → 状态不变
         if (Boolean.TRUE.equals(result.getConnected())) {
             datasource.setConnectStatus("connected");
+        } else if (unreachable) {
+            datasource.setConnectStatus("failed");
         }
         datasourceMapper.update(datasource, false);
         return result;

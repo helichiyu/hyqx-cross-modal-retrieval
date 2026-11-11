@@ -44,6 +44,34 @@ function notifyUnauthorized() {
   window.dispatchEvent(new CustomEvent('cms:unauthorized'))
 }
 
+/**
+ * 文件流响应的统一错误处理：
+ * - 401 或鉴权错误码（C105/C106）触发重新登录；
+ * - 本后端业务错误统一走 HTTP 200 + JSON 信封，文件接口出错时返回的也是 JSON 信封，
+ *   必须按信封 code 拦截，避免把错误体当成媒体内容静默预览/下载。
+ */
+async function assertBlobResponseOk(resp: Response): Promise<void> {
+  const isJson = resp.headers.get('content-type')?.includes('application/json') ?? false
+  if (resp.ok && !isJson) {
+    return
+  }
+  const envelope = isJson
+    ? ((await resp.clone().json().catch(() => null)) as ApiEnvelope<null> | null)
+    : null
+  const code = typeof envelope?.code === 'string' ? envelope.code : undefined
+  if (resp.status === 401 || (code !== undefined && AUTH_FAILED_CODES.has(code))) {
+    notifyUnauthorized()
+    throw new ApiError('登录已过期，请重新登录', resp.status, code)
+  }
+  if (!resp.ok) {
+    throw new ApiError(envelope?.message || `文件获取失败(${resp.status})`, resp.status, code)
+  }
+  // HTTP 200 但携带业务错误信封（如文件不存在 C1008）
+  if (code !== undefined && code !== SUCCESS_CODE) {
+    throw new ApiError(envelope?.message || '文件获取失败', resp.status, code)
+  }
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -107,9 +135,7 @@ export const http = {
     const resp = await fetch(`${BASE}${path}${queryString(params ?? {})}`, {
       credentials: 'include',
     })
-    if (!resp.ok) {
-      throw new ApiError(`文件获取失败(${resp.status})`, resp.status)
-    }
+    await assertBlobResponseOk(resp)
     return resp.blob()
   },
   /** 携带 JSON 入参获取文件流（批量打包下载用） */
@@ -120,9 +146,7 @@ export const http = {
       body: JSON.stringify(body),
       credentials: 'include',
     })
-    if (!resp.ok) {
-      throw new ApiError(`文件获取失败(${resp.status})`, resp.status)
-    }
+    await assertBlobResponseOk(resp)
     return resp.blob()
   },
 }
