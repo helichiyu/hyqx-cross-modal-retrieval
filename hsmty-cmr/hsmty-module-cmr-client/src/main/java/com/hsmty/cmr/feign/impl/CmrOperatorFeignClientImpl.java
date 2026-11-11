@@ -1,8 +1,10 @@
 package com.hsmty.cmr.feign.impl;
 
 import com.hsmty.cmr.feign.CmrOperatorFeignClient;
+import com.hsmty.cmr.pojo.dto.OperatorSearchDTO;
 import com.hsmty.cmr.pojo.dto.QueryUnderstandDTO;
 import com.hsmty.cmr.pojo.vo.OperatorResult;
+import com.hsmty.cmr.pojo.vo.OperatorSearchResultVO;
 import com.hsmty.cmr.pojo.vo.QueryUnderstandVO;
 
 /**
@@ -15,6 +17,11 @@ public class CmrOperatorFeignClientImpl implements CmrOperatorFeignClient {
 
     @Override
     public OperatorResult<QueryUnderstandVO> queryUnderstand(QueryUnderstandDTO dto) {
+        return OperatorResult.failure("检索算子服务不可用");
+    }
+
+    @Override
+    public OperatorResult<OperatorSearchResultVO> retrieve(OperatorSearchDTO dto) {
         return OperatorResult.failure("检索算子服务不可用");
     }
 }

@@ -6,5 +6,8 @@
 
     <!-- 本模块变更入口：只增不删，新文件按三位序号追加 include -->
     <include file="db/changelog/cmr/001_cmr_file_object_init.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/002_cmr_index_init.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/003_cmr_search_history_init.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/004_cmr_result_item_init.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

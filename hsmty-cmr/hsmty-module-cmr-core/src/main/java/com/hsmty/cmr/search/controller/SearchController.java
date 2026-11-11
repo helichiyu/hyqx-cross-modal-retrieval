@@ -1,7 +1,9 @@
 package com.hsmty.cmr.search.controller;
 
 import com.hsmty.cmr.pojo.dto.QueryUnderstandDTO;
+import com.hsmty.cmr.pojo.dto.SearchCreateDTO;
 import com.hsmty.cmr.pojo.vo.QueryUnderstandVO;
+import com.hsmty.cmr.pojo.vo.SearchResultVO;
 import com.hsmty.cmr.search.service.SearchService;
 import com.hsmty.core.common.entity.ApiResult;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,5 +37,12 @@ public class SearchController {
     @PostMapping("understand")
     public ApiResult<QueryUnderstandVO> understand(@Valid @RequestBody QueryUnderstandDTO dto) {
         return ApiResult.success(searchService.understand(dto));
+    }
+
+    @Operation(summary = "执行检索（408 算子代理并落库）")
+    @PreAuthorize("hasAnyAuthority('cmr:search:create')")
+    @PostMapping
+    public ApiResult<SearchResultVO> search(@Valid @RequestBody SearchCreateDTO dto) {
+        return ApiResult.success(searchService.search(dto));
     }
 }

@@ -1,8 +1,10 @@
 package com.hsmty.cmr.feign;
 
 import com.hsmty.cmr.feign.fallback.CmrOperatorFeignClientFallbackFactory;
+import com.hsmty.cmr.pojo.dto.OperatorSearchDTO;
 import com.hsmty.cmr.pojo.dto.QueryUnderstandDTO;
 import com.hsmty.cmr.pojo.vo.OperatorResult;
+import com.hsmty.cmr.pojo.vo.OperatorSearchResultVO;
 import com.hsmty.cmr.pojo.vo.QueryUnderstandVO;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -27,4 +29,8 @@ public interface CmrOperatorFeignClient {
     @Operation(summary = "407m 查询理解")
     @PostMapping("/407m_query_understand/predict")
     OperatorResult<QueryUnderstandVO> queryUnderstand(@RequestBody QueryUnderstandDTO dto);
+
+    @Operation(summary = "408m 跨模态检索")
+    @PostMapping("/408m_retrieval/search")
+    OperatorResult<OperatorSearchResultVO> retrieve(@RequestBody OperatorSearchDTO dto);
 }

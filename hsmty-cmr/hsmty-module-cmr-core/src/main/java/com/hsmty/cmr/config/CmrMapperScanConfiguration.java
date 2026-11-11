@@ -13,7 +13,8 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 @MapperScan(basePackages = {
-        "com.hsmty.cmr.file.mapper"
+        "com.hsmty.cmr.file.mapper",
+        "com.hsmty.cmr.search.mapper"
 })
 public class CmrMapperScanConfiguration {
 }

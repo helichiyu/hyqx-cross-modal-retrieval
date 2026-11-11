@@ -3,15 +3,12 @@ import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { bindUnauthorizedListener, useSessionStore } from '@/core/auth'
+import { cmsMenus } from '@/modules/cross-modal-search/menu'
 
 const route = useRoute()
 const session = useSessionStore()
 
-const menus = [
-  { path: '/cms', title: '概览' },
-  { path: '/cms/search', title: '跨模态检索' },
-  { path: '/cms/files', title: '文件管理' },
-]
+const menus = cmsMenus
 
 const activeMenu = computed(() => `/${route.path.split('/').slice(0, 2).join('/')}`)
 

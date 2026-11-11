@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="cmr-create-search-history-20261111" author="cmr" context="mysql,postgresql">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="cmr_search_history"/>
+            </not>
+        </preConditions>
+
+        <createTable tableName="cmr_search_history" remarks="检索历史">
+            <column name="id" type="BIGINT" remarks="雪花主键">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_cmr_search_history"/>
+            </column>
+            <column name="biz_no" type="VARCHAR(32)" remarks="SRH 业务编号">
+                <constraints nullable="false"/>
+            </column>
+            <column name="result_set_id" type="VARCHAR(40)" remarks="RST 结果集编号（算子返回）">
+                <constraints nullable="false"/>
+            </column>
+            <column name="task_id" type="BIGINT" remarks="关联任务"/>
+            <column name="index_id" type="BIGINT" remarks="检索时激活索引"/>
+            <column name="query_text" type="VARCHAR(1024)" remarks="文本查询"/>
+            <column name="query_file" type="VARCHAR(256)" remarks="查询文件逻辑路径"/>
+            <column name="query_modality" type="VARCHAR(16)" remarks="查询模态"/>
+            <column name="clarified" type="TINYINT(1)" defaultValue="0" remarks="是否经澄清改写">
+                <constraints nullable="false"/>
+            </column>
+            <column name="scene" type="VARCHAR(64)" remarks="业务场景"/>
+            <column name="strategy_version_id" type="BIGINT" remarks="所用策略版本"/>
+            <column name="strategy_snapshot_json" type="JSON" remarks="weights/rerank/topK 快照"/>
+            <column name="item_count" type="INT" remarks="结果条数"/>
+            <column name="elapsed_ms" type="INT" remarks="服务端耗时（毫秒）"/>
+            <column name="adopt_status" type="VARCHAR(16)" defaultValue="unadopted" remarks="采用状态：unadopted/adopted/discarded">
+                <constraints nullable="false"/>
+            </column>
+            <column name="user_id" type="BIGINT" remarks="发起人"/>
+            <column name="operator_id" type="BIGINT" remarks="操作人 ID"/>
+            <column name="operator_name" type="VARCHAR(64)" remarks="操作人显示名"/>
+            <column name="strategy_no" type="VARCHAR(32)" remarks="策略业务编号"/>
+            <column name="strategy_version" type="INT" remarks="策略版本号快照"/>
+            <column name="threshold" type="DECIMAL(4,2)" remarks="本次生效相似度阈值"/>
+            <column name="sealed" type="CHAR(1)" defaultValue="F" remarks="是否封存：T 封存，F 未封存">
+                <constraints nullable="false"/>
+            </column>
+            <column name="replay_of_task_no" type="VARCHAR(32)" remarks="重放来源任务号"/>
+            <column name="eval_id" type="BIGINT" remarks="关联评测 ID"/>
+            <column name="summary_expire_time" type="DATETIME" remarks="摘要可回看截止时间"/>
+            <column name="create_id" type="BIGINT" remarks="创建人"/>
+            <column name="create_time" type="DATETIME" remarks="创建时间"/>
+            <column name="update_id" type="BIGINT" remarks="更新人"/>
+            <column name="update_time" type="DATETIME" remarks="更新时间"/>
+            <column name="del_flag" type="CHAR(1)" defaultValue="F" remarks="逻辑删除：F 正常，T 删除">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="cmr_search_history" indexName="uk_cmr_search_history_biz_no" unique="true">
+            <column name="biz_no"/>
+        </createIndex>
+        <createIndex tableName="cmr_search_history" indexName="uk_cmr_search_history_result_set_id" unique="true">
+            <column name="result_set_id"/>
+        </createIndex>
+        <createIndex tableName="cmr_search_history" indexName="idx_cmr_search_history_create_time">
+            <column name="create_time"/>
+        </createIndex>
+        <createIndex tableName="cmr_search_history" indexName="idx_cmr_search_history_index_id">
+            <column name="index_id"/>
+        </createIndex>
+        <createIndex tableName="cmr_search_history" indexName="idx_cmr_search_history_operator_create_time">
+            <column name="operator_id"/>
+            <column name="create_time"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

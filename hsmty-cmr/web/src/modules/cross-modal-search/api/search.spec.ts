@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http } from '@/core/http'
-import { understandQuery } from './search'
+import { executeSearch, understandQuery } from './search'
 
 vi.mock('@/core/http', () => ({
   http: { post: vi.fn() },
@@ -26,6 +26,30 @@ describe('检索接口', () => {
     expect(http.post).toHaveBeenCalledWith('/search/understand', {
       uniqueId: 'q_002',
       queryFile: 'runtime/407m_query_understand/input/q_002/dog.jpg',
+    })
+  })
+
+  it('执行检索提交到模块前缀下的 /search', async () => {
+    const expected = {
+      searchNo: 'SRH20261111ABCDEF',
+      resultSetId: 'RST20261111101546B22C45',
+      query: '苹果 照片',
+      count: 1,
+      items: [{ rank: 1, score: 0.87, modality: 'text' }],
+    }
+    vi.mocked(http.post).mockResolvedValue(expected)
+
+    await expect(executeSearch({
+      query: '苹果的照片',
+      clarified: true,
+      clarifiedQuery: '苹果 照片',
+      topK: 10,
+    })).resolves.toEqual(expected)
+    expect(http.post).toHaveBeenCalledWith('/search', {
+      query: '苹果的照片',
+      clarified: true,
+      clarifiedQuery: '苹果 照片',
+      topK: 10,
     })
   })
 })

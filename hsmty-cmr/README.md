@@ -72,6 +72,16 @@ java -jar hsmty-module-cmr-start/target/hsmty-module-cmr-start.jar
 java -jar hsmty-module-cmr-start/target/hsmty-module-cmr-start.jar --spring.liquibase.enabled=true
 ```
 
+本机联调使用 `local` profile（本机 MySQL + 单机 Redis + 6300 算子，端口 `18080`，
+自动开启 Liquibase）：
+
+```
+LOCAL_DB_PASSWORD=... java -jar hsmty-module-cmr-start/target/hsmty-module-cmr-start.jar --spring.profiles.active=local
+```
+
+`local` 会放行全部路径并由 `LocalDevSecurityConfiguration` 注入固定身份，仅限本机使用，
+不得用于共享/生产环境。
+
 ## 4. 接口与权限
 
 | 接口 | 方法 | 权限码 |
@@ -83,6 +93,7 @@ java -jar hsmty-module-cmr-start/target/hsmty-module-cmr-start.jar --spring.liqu
 | `/hs-api/cmr/files` | DELETE（批量删除） | `cmr:file:remove` |
 | `/hs-api/cmr/files/by-ids` | POST（Feign 批量查） | `cmr:file:read` |
 | `/hs-api/cmr/search/understand` | POST（407 查询理解代理） | `cmr:search:create` |
+| `/hs-api/cmr/search` | POST（408 检索并落库） | `cmr:search:create` |
 
 返回结构为平台 `ApiResult`：成功 `code=0000`，业务失败码带前缀（如 `C1003` 文件不存在、
 `C108` 权限不足），分页为 `current/limit/total/totalPage/rows`。
@@ -94,10 +105,17 @@ java -jar hsmty-module-cmr-start/target/hsmty-module-cmr-start.jar --spring.liqu
 | 配置 | 本地/测试默认 | 生产 |
 | --- | --- | --- |
 | `cmr.operator.base-url` | `http://127.0.0.1:6300` | 环境变量 `CMR_OPERATOR_BASE_URL`（compose 内 `http://cmr-operators:6300`） |
-| 在线链超时 | `connect 2s / read 15s` | 同左，按需覆盖 |
+| 在线链超时 | `connect 2s / read 60s` | 同左，按需覆盖 |
 | 批量链超时 | 预留 `1800000ms`，接入 401–406/409 时启用 | 同左 |
 
-目前已接入 407 查询理解（`/hs-api/cmr/search/understand`），并用本地 6300 真实算子验证了歧义命中、过短提示、正常查询三类响应；算子不可用时返回 `C9999` 与明确文案。408 检索需要数据集/索引/结果集落库，随检索域迁移接入。
+已接入 407 查询理解（`/hs-api/cmr/search/understand`）与 408 检索
+（`/hs-api/cmr/search`），并用本地 6300 真实算子验证：407 覆盖歧义命中、过短提示、
+正常查询；408 返回结果集编号与条目，并写入 `cmr_search_history` / `cmr_result_item`。
+算子不可用时返回 `C9999` 与明确文案。
+
+408 的索引目录取自 `cmr_index` 中 `status=active` 的记录；没有激活索引时回落到
+`cmr.search.index-dir`（默认 `runtime/demo_index`）。权重默认四模态各 25、TopK 10、
+阈值 0.60，均可在 `cmr.search.*` 调整。
 
 算子返回自有信封（`{code:0,msg,data}`），因此 `CmrOperatorFeignClient` 使用专用 `CmrOperatorFeignConfig`
 （标准 Spring 编解码器），不复用平台的 `FeignResultDecoder`；原因见 `docs/对齐偏差登记.md`。
@@ -105,10 +123,10 @@ java -jar hsmty-module-cmr-start/target/hsmty-module-cmr-start.jar --spring.liqu
 ## 5. 数据库
 
 - 库：`sd_data_engineering`（与其它模块共用，按表前缀隔离）
-- 表：`cmr_file_object`
-- Liquibase：`core/src/main/resources/db/changelog/cmr/001_cmr_file_object_init.xml`，
+- 表：`cmr_file_object`、`cmr_index`、`cmr_search_history`、`cmr_result_item`
+- Liquibase：`core/src/main/resources/db/changelog/cmr/001–004_*.xml`，
   由 `module-cmr-changelog.xml` → `start` 的 `changelog-master.xml` 挂载
-- 默认 `spring.liquibase.enabled=false`，按环境开启
+- 默认 `spring.liquibase.enabled=false`，按环境开启；`local` profile 自动开启
 
 ## 6. 文件存储
 
@@ -131,8 +149,10 @@ corepack pnpm@10.17.1 dev
 - 类型检查 + 构建：`corepack pnpm@10.17.1 build`
 - 测试：`corepack pnpm@10.17.1 test`（vitest）
 - 静态检查：`corepack pnpm@10.17.1 lint`
-- 检索页已接 407 查询理解：展示澄清选项、过短提示与查询模态；408 检索执行与结果页待索引域迁移后接入
-- 本地开发需先通过 UAP 门户建立会话（子应用不提供登录页），否则业务接口返回 401
+- 检索页已接 407 查询理解与 408 检索：先理解/澄清，再执行检索并展示结果条目
+- 菜单与字典先用前端静态配置占位（`menu.ts` / `dict.ts`），并入平台总前端后改为平台下发
+- 本地开发需先通过 UAP 门户建立会话（子应用不提供登录页），否则业务接口返回 401；
+  使用后端 `local` profile 联调时无需 UAP 会话
 
 ## 8. 部署
 
@@ -143,14 +163,15 @@ corepack pnpm@10.17.1 dev
 docker compose -p cmr-line --env-file deploy/.env -f deploy/docker-compose.yml up -d
 ```
 
-## 9. 验证状态（2026-11-10）
+## 9. 验证状态（2026-11-11）
 
 | 范围 | 命令 | 结果 |
 | --- | --- | --- |
-| 后端测试 | `mvn -s settings.xml -DskipTests=false -pl hsmty-module-cmr-start -am test` | 12/12 通过（core 2、start 10），另有 1 个算子联调用例默认 `@Disabled` |
+| 后端测试 | `mvn -s settings.xml -DskipTests=false -pl hsmty-module-cmr-start -am test` | 19 个用例：18 通过 + 1 个算子联调用例默认 `@Disabled`（core 2、start 17） |
 | 407 真实算子联调 | 本地 6300 算子启动后执行 `OperatorLiveSmokeTest` | 通过：歧义命中/过短提示/正常查询三类响应已核对 |
+| 408 真实环境验证 | `local` profile + 本机 MySQL/Redis + 6300 算子，curl `POST /hs-api/cmr/search` | 通过：返回结果集 `RST...`，`cmr_search_history` / `cmr_result_item` 已落库 |
 | 前端类型检查 + 构建 | `corepack pnpm@10.17.1 build` | 通过 |
-| 前端测试 | `corepack pnpm@10.17.1 test` | 4/4 通过 |
+| 前端测试 | `corepack pnpm@10.17.1 test` | 7/7 通过 |
 | 前端静态检查 | `corepack pnpm@10.17.1 lint` | 0 error |
 
 测试用 H2 + 白名单 `/**`，不依赖真实数据库与 Redis；生产启动需按 `docs/待提供清单.md` 注入配置。
