@@ -1,17 +1,22 @@
 # 跨模态检索中心 · 算子服务（唯一打包/部署单元）
-# 用法：在本目录（operators/）执行，权重放到 ./weight（三个模型子目录，见 docs/部署说明.md 第二节）
+# 用法：在本目录（交付包根目录）执行，权重放到 ./weight（三个模型子目录，见 docs/部署说明.md 第二节）
 #   docker compose up -d --build
-# 验证：curl http://127.0.0.1:6300/healthz
+# 验证：curl http://127.0.0.1:${CMR_OPERATOR_PORT:-17021}/healthz
+# 端口：宿主机端口由环境变量 CMR_OPERATOR_PORT 控制（默认 17021），容器内固定 6300
+name: op-cross-modal-search
 services:
-  cmr-operators:
+  op-cross-modal-search:
     build: .                       # 构建上下文只含算子服务（router + common + 9 算子）
-    image: cmr-operators:1.0
-    container_name: cmr-operators
+    image: op-cross-modal-search:1.0
+    container_name: op-cross-modal-search
     ports:
-      - "6300:6300"          # 对外唯一端口
+      - "${CMR_OPERATOR_PORT:-17021}:6300"   # 对外唯一端口，改宿主机端口只改 CMR_OPERATOR_PORT
     environment:
       CMR_MODEL_ROOT: /weight    # 覆盖 config.yaml 的 paths.model_root，无需改文件
+      TZ: Asia/Shanghai
     volumes:
-      - ./weight:/weight         # 模型权重（宿主机准备，不进镜像）
-      - ./runtime:/app/runtime   # 任务上传/输出/索引，落宿主机持久化
+      - ./weight:/weight:ro      # 模型权重（宿主机准备，不进镜像）
+      - ${CMR_HOST_RUNTIME_DIR:-./runtime}:/app/runtime   # 任务上传/输出/索引，落宿主机持久化
+      # 数据集只读共享：后端传入 dataset/... 逻辑路径、406 默认评测集都要求这里与后端挂同一份目录
+      - ${CMR_HOST_DATASET_DIR:-./dataset}:/app/dataset:ro
     restart: unless-stopped

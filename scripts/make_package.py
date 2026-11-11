@@ -3,7 +3,7 @@
 交付根目录为 operators/（含 Dockerfile、docker-compose.yml、config.yaml、map.json、
 requirements.txt、router/、common/ 与 9 个算子目录），压缩包内保持同样的顶层结构。
 
-产物 dist/cmr-operators.zip；不含 weight/、runtime/、dataset/、docs/、scripts/、tests/
+产物 dist/op-cross-modal-search.zip；不含 weight/、runtime/、dataset/、docs/、scripts/、tests/
 （模型权重、运行产物、文档与测试数据另行交付）。
 
 用法：python scripts/make_package.py
@@ -15,14 +15,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVICE_ROOT = ROOT / "operators"
-OUT = ROOT / "dist" / "cmr-operators.zip"
+OUT = ROOT / "dist" / "op-cross-modal-search.zip"
 
 # 不进交付包的目录/文件（运行产物、本地环境、权重）
 EXCLUDE_PARTS = {
     "__pycache__", "weight", "runtime", "dist",
     ".venv", "venv", "env", ".pytest_cache", ".mypy_cache", ".ruff_cache",
 }
-EXCLUDE_SUFFIXES = {".pyc", ".pyo", ".log"}
+EXCLUDE_SUFFIXES = {".pyc", ".pyo", ".log", ".env"}
+EXCLUDE_NAMES = {".env"}
 
 PKG_README = """# 跨模态检索中心 · 算子服务交付包
 
@@ -32,18 +33,27 @@ PKG_README = """# 跨模态检索中心 · 算子服务交付包
 
     docker compose up -d --build
 
-验证：
+验证（默认宿主机端口 17021，容器内固定 6300）：
 
-    curl http://127.0.0.1:6300/healthz
+    curl http://127.0.0.1:17021/healthz
 
-- 对外仅 6300 端口；任务与索引持久化在 ./runtime，权重挂载在 ./weight。
+- 服务名/容器名/镜像名均为 op-cross-modal-search，compose 项目名同名。
+- 宿主机端口用环境变量控制：CMR_OPERATOR_PORT=17021（不设置则默认 17021），只改这一处，无需改文件。
+- 任务与索引持久化在 ./runtime（可用 CMR_HOST_RUNTIME_DIR 指向宿主机其它目录），权重挂载在 ./weight。
+- 数据集目录默认 ./dataset，只读挂载到 /app/dataset（可用 CMR_HOST_DATASET_DIR 指向与后端共享的目录）；
+  后端传入 dataset/... 逻辑路径时必须挂载同一份数据，否则 401/406 找不到文件。
 - 配置只改 config.yaml（容器内可用环境变量 CMR_MODEL_ROOT 等覆盖路径，见 docker-compose.yml）。
 - 9 个算子的接口字段见随附《算子说明书》，调用样例见《接口调用示例》，分工见《前后端对接说明》。
 """
 
 
 def _excluded(rel: Path) -> bool:
-    return any(part in EXCLUDE_PARTS for part in rel.parts) or rel.suffix in EXCLUDE_SUFFIXES
+    return (
+        any(part in EXCLUDE_PARTS for part in rel.parts)
+        or rel.suffix in EXCLUDE_SUFFIXES
+        or rel.name in EXCLUDE_NAMES
+        or rel.name.startswith(".env.")
+    )
 
 
 def main() -> None:

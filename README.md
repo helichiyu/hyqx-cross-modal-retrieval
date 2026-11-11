@@ -36,7 +36,7 @@
 
 ```text
 ├── operators/              # 算子服务（唯一打包/部署单元，自包含）
-│   ├── Dockerfile          # 单容器打包，对外仅 6300 端口
+│   ├── Dockerfile          # 单容器打包，容器内 6300 端口（宿主机端口由 CMR_OPERATOR_PORT 控制）
 │   ├── docker-compose.yml  # 算子服务编排（在本目录执行）
 │   ├── config.yaml         # 统一配置（甲方只改这里）
 │   ├── map.json            # 算子映射表
@@ -84,4 +84,4 @@ docker compose up -d --build
 .venv/Scripts/python scripts/make_package.py
 ```
 
-生成 `dist/cmr-operators.zip`，内容即 `operators/` 目录（Dockerfile、compose、requirements、config、map.json、router/、9 个算子与 common/），解压后直接 `docker compose up -d --build`。
+生成 `dist/op-cross-modal-search.zip`，内容即 `operators/` 目录（Dockerfile、compose、requirements、config、map.json、router/、9 个算子与 common/），解压后直接 `docker compose up -d --build`。
