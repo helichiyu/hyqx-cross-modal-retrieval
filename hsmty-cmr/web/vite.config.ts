@@ -13,12 +13,28 @@ import { fileURLToPath, URL } from 'node:url'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const appName = env.VITE_QIANKUN_NAME || 'cross-modal-search'
+  const publicPath = env.VITE_PUBLIC_PATH || '/sdom-hsmty/'
 
   return {
-    base: env.VITE_PUBLIC_PATH || '/sdom-hsmty/',
+    base: publicPath,
     plugins: [
       vue(),
       qiankun(appName, { useDevMode: false }),
+      {
+        // 单独启动子应用时，根路径没有任何资源（base 是 /sdom-hsmty/），
+        // 开发态重定向到部署路径，避免打开 9848 端口看到空白页。
+        name: 'cms-dev-base-redirect',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            if (req.url === '/' || req.url === '') {
+              res.writeHead(302, { Location: publicPath })
+              res.end()
+              return
+            }
+            next()
+          })
+        },
+      },
     ],
     resolve: {
       alias: {
