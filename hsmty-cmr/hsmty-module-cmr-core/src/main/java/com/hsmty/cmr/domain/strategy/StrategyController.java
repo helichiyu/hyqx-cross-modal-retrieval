@@ -58,11 +58,25 @@ public class StrategyController {
         return ApiResult.success(strategyService.modelOptions());
     }
 
-    @Operation(summary = "策略一致性检查")
+    @Operation(summary = "策略一致性检查（单策略）")
     @PreAuthorize("hasAnyAuthority('cmr:strategy:detail')")
     @GetMapping("{id}/consistency")
     public ApiResult<Map<String, Object>> consistency(@PathVariable Long id) {
         return ApiResult.success(strategyService.consistency(id));
+    }
+
+    /**
+     * 全局一致性检查（P5）：固定 5 项（阈值区间、权重合计、权重非负、重排开关、默认策略）。
+     *
+     * @return 校验项列表 {@code {checks:[{key,label,ok,detail}]}}
+     * @author cmr
+     * @since 2026-11-11
+     */
+    @Operation(summary = "策略全局一致性检查（固定 5 项）")
+    @PreAuthorize("hasAnyAuthority('cmr:strategy:page')")
+    @GetMapping("consistency")
+    public ApiResult<Map<String, Object>> consistency() {
+        return ApiResult.success(strategyService.globalConsistency());
     }
 
     @Operation(summary = "新建策略（存草稿）")
@@ -109,13 +123,27 @@ public class StrategyController {
         return ApiResult.success(strategyService.versionsOf(id));
     }
 
-    @Operation(summary = "两版本参数 diff")
+    /**
+     * 参数 diff（变更评估）。
+     *
+     * <p>{@code compareId} 缺省时对比自身 from/to 两个版本；指定其它策略时对比两条策略的当前生效版本。
+     *
+     * @param id        基准策略主键
+     * @param from      起始版本号（compareId 缺省/自身时必填）
+     * @param to        目标版本号（compareId 缺省/自身时必填）
+     * @param compareId 对比策略主键，可选，缺省对比自身
+     * @return diff 结果
+     * @author cmr
+     * @since 2026-11-11
+     */
+    @Operation(summary = "参数 diff（支持跨策略对比）")
     @PreAuthorize("hasAnyAuthority('cmr:strategy:detail')")
     @GetMapping("{id}/diff")
     public ApiResult<Map<String, Object>> diff(@PathVariable Long id,
-                                               @RequestParam Integer from,
-                                               @RequestParam Integer to) {
-        return ApiResult.success(strategyService.diff(id, from, to));
+                                               @RequestParam(required = false) Integer from,
+                                               @RequestParam(required = false) Integer to,
+                                               @RequestParam(required = false) Long compareId) {
+        return ApiResult.success(strategyService.diff(id, from, to, compareId));
     }
 
     @Operation(summary = "回滚到指定版本")
@@ -140,7 +168,7 @@ public class StrategyController {
         return ApiResult.success();
     }
 
-    @Operation(summary = "策略重新上线（转草稿，需重新发布生效）")
+    @Operation(summary = "策略重新上线（直接生效）")
     @PreAuthorize("hasAnyAuthority('cmr:strategy:update')")
     @PostMapping("{id}/online")
     public ApiResult<Void> online(@PathVariable Long id) {

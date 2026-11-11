@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      数据源必填项缺失明细：列表页 DatasourceVO.missingFields 直接回显，
+      取值 dataset_id/name/item_count/modals，逗号分隔；NULL 表示尚未同步/测试、无法判定。
+    -->
+    <changeSet id="cmr-datasource-missing-fields-20261111" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="cmr_datasource" columnName="missing_fields"/></not>
+        </preConditions>
+        <sql>
+            ALTER TABLE cmr_datasource
+                ADD COLUMN missing_fields VARCHAR(64) COMMENT '缺失必填项，逗号分隔 dataset_id/name/item_count/modals' AFTER required_ok;
+        </sql>
+    </changeSet>
+</databaseChangeLog>

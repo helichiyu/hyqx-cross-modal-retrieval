@@ -89,10 +89,22 @@ export interface ResultItemVO {
   deleted: boolean
 }
 
+export interface ExcludedItemVO {
+  itemId: string
+  name: string | null
+  source: string | null
+  /** blacklist/quality/strategy */
+  reason: string
+}
+
 export interface HistoryDetailVO {
   history: HistoryVO
   strategySnapshotJson: string | null
   items: ResultItemVO[]
+  /** 本次下发前被剔除的条数 */
+  excludedCount?: number
+  /** 剔除明细，最多 100 条 */
+  excludedItems?: ExcludedItemVO[]
 }
 
 export interface UnderstandVO {
@@ -199,6 +211,8 @@ export interface DatasourceVO {
   connectStatus: 'unconnected' | 'connected' | 'failed' | string
   /** 上游 4 项必填是否齐全 */
   requiredOk: boolean
+  /** 缺失的必填项：dataset_id/name/item_count/modals */
+  missingFields?: string[]
   upstreamDatasetId: string | null
   vectorizedCount: number
   totalCount: number
@@ -211,12 +225,22 @@ export interface DatasourceVO {
   createTime: string | null
 }
 
+export interface DatasourceCheckVO {
+  /** dataset_id/name/item_count/modals */
+  field: string
+  label: string
+  ok: boolean
+  detail: string | null
+}
+
 export interface DatasourceTestVO {
   connected: boolean | null
   statusCode: number | null
   latencyMs: number | null
   message: string
   testedAt: string
+  /** 4 项必填逐字段检测结果 */
+  checks?: DatasourceCheckVO[]
 }
 
 export interface StrategyVO {
@@ -240,6 +264,8 @@ export interface StrategyVO {
 export interface StrategyVersionVO {
   id: Id
   strategyId: Id
+  /** 发布时的策略名快照 */
+  name?: string | null
   versionNo: number
   weightsJson: string
   rerank: boolean
@@ -349,15 +375,6 @@ export interface FeedbackVO {
   updateTime: string | null
 }
 
-export interface WordVO {
-  id: Id
-  bizNo: string
-  word: string
-  scene: string
-  enabled: boolean
-  sort: number
-}
-
 // ---------- 原型 v5 新增 ----------
 
 /** P1 策略下拉选项 */
@@ -378,6 +395,8 @@ export interface StrategyOptionVO {
 export interface BehaviorVO {
   id: Id
   taskNo: string
+  /** 检索号（SRH，内部业务号） */
+  srhNo?: string | null
   resultSetId: string
   taskId: Id | null
   taskBizNo: string | null
@@ -395,14 +414,38 @@ export interface BehaviorVO {
   zeroResult: boolean
   upCount: number
   downCount: number
+  /** 重新执行来源任务号（原任务号），普通检索为空 */
+  replayOfTaskNo?: string | null
+  createTime: string | null
+}
+
+/** P6 失败任务（系统自动处置，只读） */
+export interface FailedTaskVO {
+  id: Id
+  bizNo: string
+  queryText: string | null
+  failType: string | null
+  failDisposal: string | null
+  /** retrying/recovered/isolated */
+  handling: string
+  errorMsg: string | null
   createTime: string | null
 }
 
 /** P3 搜索结果摘要 */
 export interface SearchSummaryVO {
+  /** 任务号（TASK，对外展示） */
   taskNo: string
+  /** 检索号（SRH，内部业务号） */
+  srhNo?: string
   searchId: Id
   resultSetId: string
+  /** 任务状态：ready/running/done/failed */
+  taskStatus?: string | null
+  /** 任务失败原因 */
+  errorMsg?: string | null
+  /** 重放来源任务号（TASK）；普通检索为空 */
+  replayOfTaskNo?: string | null
   queryText: string | null
   queryModality: string | null
   targetModality: string | null
@@ -436,18 +479,51 @@ export interface EvaluationRowVO {
   latestTime: string | null
 }
 
+/** P8 单次评测指标（基准/重放共用） */
+export interface EvalMetricsVO {
+  taskNo?: string | null
+  time?: string | null
+  items: number | null
+  down: number | null
+  downRate: number | null
+  top20AvgSim: number | null
+  top1Sim: number | null
+  top20Overlap: number | null
+  avgSim: number | null
+  elapsedMs: number | null
+}
+
 /** P8 评测详情 */
 export interface EvaluationDetailVO {
   id: Id
   bizNo: string
   query: string
-  base: Record<string, unknown>
-  replays: Record<string, unknown>[]
-  latest?: Record<string, unknown>
+  base: Record<string, unknown> & EvalMetricsVO
+  replays: (Record<string, unknown> & EvalMetricsVO)[]
+  latest?: Record<string, unknown> & EvalMetricsVO
   conclusion: string
   reasons: string[]
   downRateDelta?: number
   resultDropRatio?: number
+  /** 检查评测数据 4 项只读结果 */
+  checks?: { key: string; label: string; ok: boolean; detail: string | null }[]
+}
+
+/** P8 难例样本 / 新建评测候选 */
+export interface HardCaseVO {
+  taskNo: string
+  query: string | null
+  downCount: number
+  resultSetId: string | null
+  createTime: string | null
+}
+
+/** 策略全局一致性检查项 */
+export interface ConsistencyCheckVO {
+  key: string
+  label: string
+  ok: boolean
+  detail: string | null
 }
 
 /** P4 屏蔽/黑名单 */

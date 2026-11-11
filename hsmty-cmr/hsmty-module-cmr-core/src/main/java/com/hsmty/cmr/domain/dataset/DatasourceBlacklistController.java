@@ -3,7 +3,9 @@ package com.hsmty.cmr.domain.dataset;
 import com.hsmty.core.common.entity.ApiResult;
 import com.hsmty.cmr.domain.dataset.entity.CmrDatasourceBlacklist;
 import com.hsmty.cmr.domain.dataset.service.DatasourceBlacklistService;
+import com.hsmty.cmr.domain.dataset.vo.DatasourceBlacklistSummaryVO;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -41,7 +43,19 @@ public class DatasourceBlacklistController {
         return ApiResult.success(blacklistService.list());
     }
 
-    @Operation(summary = "加入黑名单（按来源名整源排除）")
+    /**
+     * 按来源名聚合黑名单条数，供抽屉按来源展示。
+     *
+     * @return 来源名与条数
+     */
+    @Operation(summary = "按来源名汇总黑名单条数")
+    @PreAuthorize("hasAnyAuthority('cmr:dataset:page')")
+    @GetMapping("summary")
+    public ApiResult<List<DatasourceBlacklistSummaryVO>> summary() {
+        return ApiResult.success(blacklistService.summary());
+    }
+
+    @Operation(summary = "加入黑名单（按 datasetId 去重，检索按来源名整源排除）")
     @PreAuthorize("hasAnyAuthority('cmr:dataset:update')")
     @PostMapping
     public ApiResult<CmrDatasourceBlacklist> add(@Valid @RequestBody BlacklistDTO dto) {
@@ -58,18 +72,22 @@ public class DatasourceBlacklistController {
     }
 
     /**
-     * 黑名单入参
+     * 黑名单入参：datasetId 必填，其余字段可选（null 表示不更新/未知）。
      */
     @Data
     public static class BlacklistDTO {
 
+        @Schema(description = "上游数据集 ID", requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotBlank(message = "datasetId 不能为空")
         private String datasetId;
 
+        @Schema(description = "数据集名称")
         private String name;
 
-        @NotBlank(message = "来源名不能为空")
+        @Schema(description = "来源名，结果页按此匹配排除")
         private String sourceName;
 
+        @Schema(description = "数据源地址，须以 http:// 或 https:// 开头且不含空格")
         private String endpoint;
     }
 }

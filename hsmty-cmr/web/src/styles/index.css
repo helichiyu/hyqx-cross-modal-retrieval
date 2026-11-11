@@ -1,10 +1,5 @@
 :root {
   color-scheme: light;
-  font-family:
-    'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  font-size: 14px;
-  color: #303133;
-  background-color: #f5f7fa;
 }
 
 html,
@@ -13,16 +8,4 @@ body,
   height: 100%;
   margin: 0;
   padding: 0;
-}
-
-.cms-page-title {
-  margin: 0 0 16px;
-  font-size: 18px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.cms-placeholder {
-  color: #909399;
-  line-height: 1.8;
 }

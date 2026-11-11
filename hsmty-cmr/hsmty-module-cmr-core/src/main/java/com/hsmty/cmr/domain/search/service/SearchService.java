@@ -24,6 +24,8 @@ import com.hsmty.cmr.domain.search.mapper.FavoriteMapper;
 import com.hsmty.cmr.domain.search.mapper.ItemVoteMapper;
 import com.hsmty.cmr.domain.search.mapper.ResultItemMapper;
 import com.hsmty.cmr.domain.search.mapper.SearchHistoryMapper;
+import com.hsmty.cmr.domain.search.vo.BehaviorVO;
+import com.hsmty.cmr.domain.search.vo.ExcludedItemVO;
 import com.hsmty.cmr.domain.search.vo.HistoryDetailVO;
 import com.hsmty.cmr.domain.search.vo.HistoryVO;
 import com.hsmty.cmr.domain.search.vo.ResultItemVO;
@@ -76,6 +78,12 @@ public class SearchService {
 
     /** 文本查询少于该字数且未澄清时拒绝检索（P1 澄清规则） */
     private static final int CLARIFY_MIN_CHARS = 4;
+
+    /** 剔除明细最多返回 100 条（excludedCount 仍为全量） */
+    private static final int EXCLUDED_ITEM_LIMIT = 100;
+
+    /** 剔除原因：命中屏蔽条目或来源黑名单 */
+    private static final String EXCLUDE_REASON_BLACKLIST = "blacklist";
 
     private final SearchHistoryMapper historyMapper;
     private final ResultItemMapper resultItemMapper;
@@ -350,15 +358,25 @@ public class SearchService {
                 page.getTotalRow(), query.getPageNum(), query.getPageSize());
     }
 
+    /**
+     * 检索历史详情：结果集条目快照、策略快照与下发前剔除明细。
+     *
+     * @param id 检索历史 ID
+     * @return 详情视图
+     * @author cmr
+     * @since 2026-11-11
+     */
     public HistoryDetailVO detail(Long id) {
         CmrSearchHistory history = historyMapper.selectOneById(id);
         BizException.assertNull(history, "检索历史不存在");
-        List<ResultItemVO> items = itemsOf(history);
+        DeliveredItems delivered = deliveredOf(history);
         return HistoryDetailVO.builder()
                 .history(HistoryVO.from(history, taskService.bizNoOf(history.getTaskId()),
                         taskService.statusOf(history.getTaskId())))
                 .strategySnapshotJson(history.getStrategySnapshotJson())
-                .items(items)
+                .items(delivered.items())
+                .excludedCount(delivered.excludedCount())
+                .excludedItems(delivered.excludedItems())
                 .build();
     }
 
@@ -468,6 +486,21 @@ public class SearchService {
     }
 
     private List<ResultItemVO> itemsOf(CmrSearchHistory history) {
+        return deliveredOf(history).items();
+    }
+
+    /**
+     * 计算本次下发的条目与剔除明细。
+     *
+     * <p>沿用原黑名单剔除逻辑（屏蔽条目 + 来源黑名单），并在剔除时记录原因；
+     * 质量与策略过滤在 408 召回阶段完成，未进入本地快照，当前可见的剔除原因仅为 blacklist。
+     *
+     * @param history 检索历史
+     * @return 下发条目、剔除计数与剔除明细
+     * @author cmr
+     * @since 2026-11-11
+     */
+    private DeliveredItems deliveredOf(CmrSearchHistory history) {
         List<CmrResultItem> entities = resultItemMapper.selectListByQuery(QueryWrapper.create()
                         .where(CMR_RESULT_ITEM.SEARCH_ID.eq(history.getId()))
                         .orderBy(CMR_RESULT_ITEM.RANK.asc()));
@@ -481,12 +514,59 @@ public class SearchService {
         Map<String, ItemMetaService.ItemMeta> metas = itemMetaService.lookup(history.getIndexId(), itemIds);
         Map<String, String> votes = votesOf(history.getBizNo());
         Set<String> favorites = favoriteItemIds();
-        return entities.stream()
-                .filter(item -> item.getItemId() == null || !blocked.contains(item.getItemId()))
-                .filter(item -> !blacklistedSources.contains(item.getSource()))
-                .map(item -> toItemVO(item, metas.get(item.getItemId()),
-                        votes.get(item.getItemId()), favorites.contains(item.getItemId())))
-                .toList();
+        List<ResultItemVO> items = new ArrayList<>();
+        List<ExcludedItemVO> excludedItems = new ArrayList<>();
+        int excludedCount = 0;
+        for (CmrResultItem item : entities) {
+            String reason = excludedReasonOf(item, blocked, blacklistedSources);
+            if (reason == null) {
+                items.add(toItemVO(item, metas.get(item.getItemId()),
+                        votes.get(item.getItemId()), favorites.contains(item.getItemId())));
+                continue;
+            }
+            excludedCount++;
+            if (excludedItems.size() < EXCLUDED_ITEM_LIMIT) {
+                ItemMetaService.ItemMeta meta = metas.get(item.getItemId());
+                excludedItems.add(ExcludedItemVO.builder()
+                        .itemId(item.getItemId())
+                        .name(item.getItemName() != null ? item.getItemName()
+                                : (meta == null ? null : meta.name()))
+                        .source(item.getSource() != null ? item.getSource()
+                                : (meta == null ? null : meta.sourceFile()))
+                        .reason(reason)
+                        .build());
+            }
+        }
+        return new DeliveredItems(items, excludedCount, excludedItems);
+    }
+
+    /**
+     * 判断条目是否在本次下发前被剔除并给出原因。
+     *
+     * <p>当前读取侧只执行黑名单剔除（条目屏蔽 + 来源黑名单）；
+     * 质量（quality）与策略（strategy）剔除在 408 召回阶段完成，本地快照不可见。
+     *
+     * @param item 结果集条目快照
+     * @param blockedItemIds 已屏蔽条目 ID
+     * @param blacklistedSources 黑名单来源名/数据集 ID
+     * @return blacklist / quality / strategy；不剔除返回 null
+     * @author cmr
+     * @since 2026-11-11
+     */
+    private String excludedReasonOf(CmrResultItem item, Set<String> blockedItemIds,
+                                    Set<String> blacklistedSources) {
+        if (item.getItemId() != null && blockedItemIds.contains(item.getItemId())) {
+            return EXCLUDE_REASON_BLACKLIST;
+        }
+        if (item.getSource() != null && blacklistedSources.contains(item.getSource())) {
+            return EXCLUDE_REASON_BLACKLIST;
+        }
+        return null;
+    }
+
+    /** 下发结果与剔除明细的聚合（避免重复查询条目快照） */
+    private record DeliveredItems(List<ResultItemVO> items, int excludedCount,
+                                  List<ExcludedItemVO> excludedItems) {
     }
 
     /** 黑名单：来源名 + 数据集 ID 两路匹配，命中即整源排除 */
@@ -589,13 +669,15 @@ private String datasetGrade(Long datasetId) {
         BizException.assertTrue(blank(taskNo) || blank(itemId), "任务号与条目不能为空");
         BizException.assertTrue(!Set.of("up", "down", "none").contains(vote),
                 "投票只能是 up/down/none");
-        CmrSearchHistory history = requireHistoryByBizNo(taskNo);
+        CmrSearchHistory history = requireHistory(taskNo);
         BizException.assertTrue("T".equals(history.getSealed()), "任务已封存，赞/踩不可再改");
         Long userId = AuthContext.userId();
         BizException.assertNull(userId, "未登录");
+        // SRH/TASK 双形态入参统一按 SRH 落库，避免同一任务产生两套赞踩记录
+        String voteKey = history.getBizNo();
 
         com.hsmty.cmr.domain.search.entity.CmrItemVote existing = itemVoteMapper.selectOneByQuery(
-                QueryWrapper.create().where(CMR_ITEM_VOTE.TASK_NO.eq(taskNo)
+                QueryWrapper.create().where(CMR_ITEM_VOTE.TASK_NO.eq(voteKey)
                         .and(CMR_ITEM_VOTE.ITEM_ID.eq(itemId))
                         .and(CMR_ITEM_VOTE.USER_ID.eq(userId))));
         String effectiveVote = vote;
@@ -608,7 +690,7 @@ private String datasetGrade(Long datasetId) {
             com.hsmty.cmr.domain.search.entity.CmrItemVote entity =
                     new com.hsmty.cmr.domain.search.entity.CmrItemVote();
             entity.setId(idWorker.next());
-            entity.setTaskNo(taskNo);
+            entity.setTaskNo(voteKey);
             entity.setSearchId(history.getId());
             entity.setItemId(itemId);
             entity.setVote(vote);
@@ -653,7 +735,9 @@ private String datasetGrade(Long datasetId) {
         entity.setItemId(itemId);
         entity.setItemName(itemName);
         entity.setSource(source);
-        entity.setTaskNo(taskNo);
+        // 对外统一展示 TASK 任务号；解析不到时原样保留
+        CmrSearchHistory history = findHistory(taskNo);
+        entity.setTaskNo(history == null ? taskNo : displayTaskNo(history));
         entity.setDelFlag("F");
         entity.setCreateTime(LocalDateTime.now());
         favoriteMapper.insert(entity, true);
@@ -684,7 +768,7 @@ private String datasetGrade(Long datasetId) {
     /** 封存：锁定赞/踩，作为评测与复盘的固定样本 */
     @Transactional(rollbackFor = Exception.class)
     public void seal(String taskNo) {
-        CmrSearchHistory history = requireHistoryByBizNo(taskNo);
+        CmrSearchHistory history = requireHistory(taskNo);
         BizException.assertTrue("T".equals(history.getSealed()), "任务已封存");
         history.setSealed("T");
         historyMapper.update(history);
@@ -693,13 +777,18 @@ private String datasetGrade(Long datasetId) {
 
     /** 搜索结果摘要（P3）：Top-20 条目 + 赞/踩，30 天后过期 */
     public Map<String, Object> summary(String taskNo) {
-        CmrSearchHistory history = requireHistoryByBizNo(taskNo);
+        CmrSearchHistory history = requireHistory(taskNo);
         List<ResultItemVO> delivered = itemsOf(history);
         List<ResultItemVO> items = delivered.stream().limit(20).toList();
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("taskNo", history.getBizNo());
+        // 对外任务号统一为 TASK，SRH 另以 srhNo 下发给需要内部号的调用方
+        result.put("taskNo", displayTaskNo(history));
+        result.put("srhNo", history.getBizNo());
         result.put("searchId", history.getId());
         result.put("resultSetId", history.getResultSetId());
+        result.put("taskStatus", taskService.statusOf(history.getTaskId()));
+        result.put("errorMsg", taskService.errorMsgOf(history.getTaskId()));
+        result.put("replayOfTaskNo", replayTaskNoOf(history.getReplayOfTaskNo()));
         result.put("queryText", history.getQueryText());
         result.put("queryModality", history.getQueryModality());
         result.put("targetModality", history.getTargetModality());
@@ -721,19 +810,52 @@ private String datasetGrade(Long datasetId) {
         return result;
     }
 
-    /** 搜索行为流水（P6）：任务级分页，含赞踩计数与失败状态 */
-    public PageResult<Map<String, Object>> behaviors(PageQuery query, String keyword,
-                                                     String operatorName, Boolean zeroResult,
-                                                     LocalDateTime from, LocalDateTime to) {
+    /**
+     * 搜索行为流水（P6）：任务级分页，含赞踩计数、封存状态与重放来源。
+     *
+     * @param query 分页参数（每页 10 条）
+     * @param keyword 关键词：同时模糊匹配任务号 / 输入内容 / 操作人 / 重放来源任务号
+     * @param operatorName 操作人（模糊）
+     * @param zeroResult true 只看零结果
+     * @param downCount true 只看踩数大于 0 的记录
+     * @param taskNo 任务号（精确）
+     * @param replayOfTaskNo 重放来源任务号（精确）
+     * @param from 创建时间起
+     * @param to 创建时间止
+     * @return 行为流水分页
+     * @author cmr
+     * @since 2026-11-11
+     */
+    public PageResult<BehaviorVO> behaviors(PageQuery query, String keyword, String operatorName,
+                                            Boolean zeroResult, Boolean downCount, String taskNo,
+                                            String replayOfTaskNo, LocalDateTime from, LocalDateTime to) {
         QueryWrapper qw = QueryWrapper.create().from(CMR_SEARCH_HISTORY);
         if (!blank(keyword)) {
-            qw.where(CMR_SEARCH_HISTORY.QUERY_TEXT.like(keyword));
+            String like = "%" + keyword + "%";
+            qw.where("(biz_no LIKE ? OR query_text LIKE ? OR operator_name LIKE ? OR replay_of_task_no LIKE ?"
+                            + " OR task_id IN (SELECT id FROM cmr_task WHERE biz_no LIKE ?))",
+                    like, like, like, like, like);
         }
         if (!blank(operatorName)) {
             qw.where(CMR_SEARCH_HISTORY.OPERATOR_NAME.like(operatorName));
         }
         if (Boolean.TRUE.equals(zeroResult)) {
             qw.where(CMR_SEARCH_HISTORY.ITEM_COUNT.eq(0));
+        }
+        if (Boolean.TRUE.equals(downCount)) {
+            qw.where("EXISTS (SELECT 1 FROM cmr_item_vote v WHERE v.search_id = cmr_search_history.id"
+                    + " AND v.vote = 'down' AND v.del_flag = 'F')");
+        }
+        if (!blank(taskNo)) {
+            // 兼容 SRH 检索号与 TASK 任务号两种过滤形态
+            String no = taskNo.trim();
+            qw.where("(biz_no = ? OR task_id IN (SELECT id FROM cmr_task WHERE biz_no = ?))", no, no);
+        }
+        if (!blank(replayOfTaskNo)) {
+            // 历史表记录的是来源 SRH；入参为 TASK 时先换算为 SRH
+            CmrSearchHistory source = findHistory(replayOfTaskNo);
+            qw.where(CMR_SEARCH_HISTORY.REPLAY_OF_TASK_NO.eq(
+                    source == null ? replayOfTaskNo.trim() : source.getBizNo()));
         }
         if (from != null) {
             qw.where(CMR_SEARCH_HISTORY.CREATE_TIME.ge(from));
@@ -744,30 +866,30 @@ private String datasetGrade(Long datasetId) {
         qw.orderBy(CMR_SEARCH_HISTORY.ID.desc());
         Page<CmrSearchHistory> page = historyMapper.paginate(
                 Math.max(query.getPageNum(), 1), Math.max(query.getPageSize(), 1), qw);
-        List<Map<String, Object>> records = page.getRecords().stream().map(h -> {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", h.getId());
-            item.put("taskNo", h.getBizNo());
-            item.put("resultSetId", h.getResultSetId());
-            item.put("taskId", h.getTaskId());
-            item.put("taskBizNo", taskService.bizNoOf(h.getTaskId()));
-            item.put("taskStatus", taskService.statusOf(h.getTaskId()));
-            item.put("queryText", h.getQueryText());
-            item.put("queryModality", h.getQueryModality());
-            item.put("targetModality", h.getTargetModality());
-            item.put("operatorName", h.getOperatorName());
-            item.put("strategyNo", h.getStrategyNo());
-            item.put("strategyVersion", h.getStrategyVersion());
-            item.put("threshold", h.getThreshold());
-            item.put("itemCount", h.getItemCount());
-            item.put("elapsedMs", h.getElapsedMs());
-            item.put("sealed", "T".equals(h.getSealed()));
-            item.put("zeroResult", h.getItemCount() != null && h.getItemCount() == 0);
-            item.put("upCount", countVotes(h.getId(), "up"));
-            item.put("downCount", countVotes(h.getId(), "down"));
-            item.put("createTime", h.getCreateTime());
-            return item;
-        }).toList();
+        List<BehaviorVO> records = page.getRecords().stream().map(h -> BehaviorVO.builder()
+                .id(h.getId())
+                .taskNo(displayTaskNo(h))
+                .srhNo(h.getBizNo())
+                .resultSetId(h.getResultSetId())
+                .taskId(h.getTaskId())
+                .taskBizNo(taskService.bizNoOf(h.getTaskId()))
+                .taskStatus(taskService.statusOf(h.getTaskId()))
+                .queryText(h.getQueryText())
+                .queryModality(h.getQueryModality())
+                .targetModality(h.getTargetModality())
+                .operatorName(h.getOperatorName())
+                .strategyNo(h.getStrategyNo())
+                .strategyVersion(h.getStrategyVersion())
+                .threshold(h.getThreshold())
+                .itemCount(h.getItemCount())
+                .elapsedMs(h.getElapsedMs())
+                .sealed("T".equals(h.getSealed()))
+                .zeroResult(h.getItemCount() != null && h.getItemCount() == 0)
+                .upCount(countVotes(h.getId(), "up"))
+                .downCount(countVotes(h.getId(), "down"))
+                .replayOfTaskNo(replayTaskNoOf(h.getReplayOfTaskNo()))
+                .createTime(h.getCreateTime())
+                .build()).toList();
         return PageResult.of(records, page.getTotalRow(), query.getPageNum(), query.getPageSize());
     }
 
@@ -818,11 +940,72 @@ private String datasetGrade(Long datasetId) {
         blockedItemMapper.insert(entity, true);
     }
 
-    private CmrSearchHistory requireHistoryByBizNo(String taskNo) {
-        CmrSearchHistory history = historyMapper.selectOneByQuery(QueryWrapper.create()
-                .where(CMR_SEARCH_HISTORY.BIZ_NO.eq(taskNo)));
+    /**
+     * 按任务号解析检索历史（不存在时抛业务异常）。
+     *
+     * <p>原型与数据流以 TASK 任务号对外展示，历史表内部仍以 SRH 为业务号，
+     * 因此两种形态都要接受：先按 SRH 精确匹配，未命中再按所属任务号反查。</p>
+     *
+     * @param taskNo SRH 检索号或 TASK 任务号
+     * @return 检索历史
+     * @author cmr
+     * @since 2026-11-11
+     */
+    public CmrSearchHistory requireHistory(String taskNo) {
+        CmrSearchHistory history = findHistory(taskNo);
         BizException.assertNull(history, "检索任务不存在: " + taskNo);
         return history;
+    }
+
+    /**
+     * 按 SRH / TASK 双形态查找检索历史，找不到返回 null（不抛异常）。
+     *
+     * @param taskNo SRH 检索号或 TASK 任务号
+     * @return 检索历史；不存在时返回 null
+     * @author cmr
+     * @since 2026-11-11
+     */
+    public CmrSearchHistory findHistory(String taskNo) {
+        if (blank(taskNo)) {
+            return null;
+        }
+        String no = taskNo.trim();
+        CmrSearchHistory history = historyMapper.selectOneByQuery(QueryWrapper.create()
+                .where(CMR_SEARCH_HISTORY.BIZ_NO.eq(no)));
+        if (history != null) {
+            return history;
+        }
+        Long taskId = taskService.idOfByBizNo(no);
+        if (taskId == null) {
+            return null;
+        }
+        return historyMapper.selectOneByQuery(QueryWrapper.create()
+                .where(CMR_SEARCH_HISTORY.TASK_ID.eq(taskId)));
+    }
+
+    /**
+     * 对外展示的任务号：优先 TASK 任务号，缺失时回落 SRH。
+     *
+     * @param history 检索历史
+     * @return 任务号（TASK）
+     * @author cmr
+     * @since 2026-11-11
+     */
+    public String displayTaskNo(CmrSearchHistory history) {
+        if (history == null) {
+            return null;
+        }
+        String taskBizNo = taskService.bizNoOf(history.getTaskId());
+        return blank(taskBizNo) ? history.getBizNo() : taskBizNo;
+    }
+
+    /** 重放来源任务号统一展示为 TASK（历史内部记录的是 SRH） */
+    private String replayTaskNoOf(String replayOfSrhNo) {
+        if (blank(replayOfSrhNo)) {
+            return null;
+        }
+        CmrSearchHistory source = findHistory(replayOfSrhNo);
+        return source == null ? replayOfSrhNo : displayTaskNo(source);
     }
 
     private String currentOperatorName() {
@@ -834,11 +1017,18 @@ private String datasetGrade(Long datasetId) {
                 ? user.nickname() : user.username();
     }
 
+    /**
+     * 归一化目标模态：为空/缺省返回 null，表示不限定目标模态（408 四模态召回）。
+     *
+     * @param targetModalities 前端传入的目标模态
+     * @return 不可变列表；null 表示全部模态
+     * @author cmr
+     * @since 2026-11-11
+     */
     private List<String> normalizedTargetModalities(List<String> targetModalities) {
-        if (targetModalities == null) {
+        if (targetModalities == null || targetModalities.isEmpty()) {
             return null;
         }
-        BizException.assertTrue(targetModalities.isEmpty(), "目标模态不能为空");
         boolean invalid = targetModalities.stream()
                 .anyMatch(value -> value == null || value.isBlank()
                         || !Set.of("text", "image", "audio", "video").contains(value));

@@ -1,345 +1,1353 @@
 <template>
   <div class="page-card">
     <header class="cm-page-header">
-      <div>
+      <div class="ph-main">
         <h1 class="cm-page-title">数据源库管理</h1>
-        <p class="cm-page-subtitle">
-          只登记数据源、拉取上游元数据、维护黑名单；数据集文件仍在来源方，检索按条目 ID 引用，不做数据出域。
-        </p>
       </div>
-      <div class="cm-flex">
-        <el-button type="primary" @click="openCreate">登记数据源</el-button>
-        <el-button @click="loadAll">刷新</el-button>
-      </div>
+      <button class="dev-entry" type="button" title="研发说明" @click="devOpen = true">
+        <span class="de-q" aria-hidden="true">?</span>研发说明
+      </button>
     </header>
 
-    <el-card shadow="never">
-      <template #header>
-        <div class="cm-flex-between">
-          <span>数据源列表</span>
-          <span class="text-secondary">连接状态 · 4 项必填校验 · 同步元数据</span>
+    <section class="cm-panel lib-panel" aria-label="数据源">
+      <div class="panel-head">
+        <div class="sec-head">
+          <span class="sec-idx" aria-hidden="true">1</span>
+          <span class="sec-title">数据源</span>
         </div>
-      </template>
-      <el-table v-loading="loading" :data="sources" size="small" empty-text="暂无数据源">
-        <el-table-column label="数据源" min-width="200">
-          <template #default="{ row }">
-            <div class="cell-name">{{ row.name }}</div>
-            <div class="cell-sub mono">{{ row.bizNo }}</div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="endpoint" label="接口地址" min-width="220" show-overflow-tooltip />
-        <el-table-column label="连接状态" width="110">
-          <template #default="{ row }">
-            <el-tag :type="statusTagType(row.connectStatus)" effect="light" size="small">
-              {{ statusLabel(row.connectStatus) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="必填校验" width="110">
-          <template #default="{ row }">
-            <el-tag :type="row.requiredOk ? 'success' : 'warning'" effect="plain" size="small">
-              {{ row.requiredOk ? '4 项齐全' : '有缺失' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="条目数" width="110">
-          <template #default="{ row }">
-            {{ row.vectorizedCount }} / {{ row.totalCount }}
-          </template>
-        </el-table-column>
-        <el-table-column label="上次同步" width="160">
-          <template #default="{ row }">{{ row.lastSyncTime || '—' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="210" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" :loading="syncingIds.has(row.id)" @click="sync(row)">同步</el-button>
-            <el-button link type="primary" @click="loadRemote(row)">数据集</el-button>
-            <el-button link type="danger" @click="openBlacklist(row)">拉黑</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <el-card v-if="remote" shadow="never">
-      <template #header>
-        <div class="cm-flex-between">
-          <span>上游数据集 · {{ remoteSourceName }}</span>
-          <span class="text-secondary">
-            共 {{ remote.datasetCount }} 个 / 条目 {{ remote.totalItems }} 条
-            <el-tag v-if="remote.itemIssue" type="warning" size="small" effect="plain" class="ml8">
-              条目契约：{{ remote.itemIssue }}
-            </el-tag>
-          </span>
-        </div>
-      </template>
-      <el-table :data="remote.datasets" size="small" empty-text="上游未返回数据集">
-        <el-table-column prop="datasetId" label="dataset_id" min-width="160" />
-        <el-table-column prop="name" label="名称" min-width="160" />
-        <el-table-column prop="itemCount" label="条目数" width="100" />
-        <el-table-column label="必填" width="90">
-          <template #default="{ row }">
-            <el-tag :type="row.requiredOk ? 'success' : 'danger'" size="small" effect="plain">
-              {{ row.requiredOk ? '通过' : '缺失' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <el-card shadow="never">
-      <template #header>
-        <div class="cm-flex-between">
-          <span>数据源黑名单</span>
-          <span class="text-secondary">按来源名整源排除，可随时移出</span>
-        </div>
-      </template>
-      <el-table :data="blacklist" size="small" empty-text="暂无黑名单">
-        <el-table-column prop="sourceName" label="来源名" min-width="160" />
-        <el-table-column prop="datasetId" label="dataset_id" min-width="140" />
-        <el-table-column prop="name" label="数据集名称" min-width="160" />
-        <el-table-column prop="createTime" label="加入时间" width="170" />
-        <el-table-column label="操作" width="90">
-          <template #default="{ row }">
-            <el-button link type="danger" @click="removeBlacklistRow(row)">移出</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <el-card shadow="never">
-      <template #header>接入契约（只读）</template>
-      <div class="contract">
-        <div class="contract-row">
-          <span class="contract-key">接口</span>
-          <div>
-            <div v-for="endpoint in contractEndpoints" :key="endpoint" class="mono">{{ endpoint }}</div>
-          </div>
-        </div>
-        <div class="contract-row">
-          <span class="contract-key">数据集必填</span>
-          <div>
-            <div class="mono">{{ contractDatasetRequired }}</div>
-            <div class="text-secondary">可选：modal_types</div>
-          </div>
-        </div>
-        <div class="contract-row">
-          <span class="contract-key">条目必填</span>
-          <div>
-            <div class="mono">{{ contractItemRequired }}</div>
-            <div class="text-secondary">{{ contractModalRule }}</div>
-          </div>
-        </div>
-        <div class="contract-row">
-          <span class="contract-key">说明</span>
-          <div class="text-secondary">{{ contractPushMode }}</div>
+        <div class="ph-tools">
+          <el-button class="ghost-btn" @click="openContract">接口对接定义</el-button>
+          <el-button class="ghost-btn" @click="openBlacklist">黑名单 ({{ blacklist.length }})</el-button>
+          <el-button type="primary" class="primary-btn" @click="openCreate">＋ 对接数据源</el-button>
+          <span class="hint">共 {{ sources.length }} 条</span>
         </div>
       </div>
-    </el-card>
 
-    <el-dialog v-model="createVisible" title="登记数据源" width="520px">
-      <el-form label-width="96px" :model="createForm">
+      <el-table v-loading="loading" :data="sources" empty-text="暂无数据源">
+        <el-table-column label="名称" min-width="170">
+          <template #default="{ row }">
+            <span class="ds-nm">{{ row.name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="地址" min-width="200">
+          <template #default="{ row }">
+            <span class="mono src-addr">{{ row.endpoint }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="96">
+          <template #default="{ row }">
+            <span class="badge" :class="statusClass(row.connectStatus)">{{ statusLabel(row.connectStatus) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="字段完备" width="92">
+          <template #default="{ row }">
+            <el-tooltip :content="fieldTip(row)" placement="top">
+              <span class="badge" :class="fieldClass(row)">{{ fieldRatio(row) }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column label="向量化" width="124">
+          <template #default="{ row }">
+            <el-tooltip :content="vecHint(row)" placement="top">
+              <span class="vec-num" :class="vecClass(row)">{{ vecText(row) }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column label="上次同步" width="152">
+          <template #default="{ row }">
+            <span class="cell-time">{{ row.lastSyncTime ? fmtTime(row.lastSyncTime) : '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="172" fixed="right">
+          <template #default="{ row }">
+            <div class="row-ops">
+              <el-button class="op-btn" :disabled="testingId === row.id" @click="testConnection(row)">
+                {{ testingId === row.id ? '测试中…' : '测试连接' }}
+              </el-button>
+              <el-button
+                v-if="row.connectStatus === 'connected'"
+                class="op-btn sync"
+                :disabled="syncingId === row.id"
+                @click="sync(row)"
+              >
+                {{ syncingId === row.id ? '同步中…' : '同步' }}
+              </el-button>
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
+    </section>
+
+    <!-- 接口对接定义：只读契约 -->
+    <el-dialog v-model="contractOpen" title="接口对接定义" width="780px" class="contract-dialog">
+      <div v-loading="contractLoading" class="contract-body">
+        <p class="contract-lead">
+          上游只提供原始文件与元数据，不提供向量。{{ contractPushMode }}
+        </p>
+
+        <div v-if="contractError" class="contract-error">{{ contractError }}</div>
+
+        <template v-else>
+          <div class="contract-sec">
+            <div class="hb-t">数据集级字段</div>
+            <table class="contract-table">
+              <thead>
+                <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="field in datasetFieldRows" :key="field.field">
+                  <td class="mk">{{ field.field }}</td>
+                  <td>{{ field.type }}</td>
+                  <td>{{ field.required }}</td>
+                  <td>{{ field.desc }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="contract-sec">
+            <div class="hb-t">条目级字段</div>
+            <table class="contract-table">
+              <thead>
+                <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="field in itemFieldRows" :key="field.field">
+                  <td class="mk">{{ field.field }}</td>
+                  <td>{{ field.type }}</td>
+                  <td>{{ field.required }}</td>
+                  <td>{{ field.desc }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p v-if="contractModalRule" class="field-tip">{{ contractModalRule }}</p>
+          </div>
+
+          <div class="contract-sec">
+            <div class="hb-t">modals 每项结构</div>
+            <div class="struct-box">
+              <div class="struct-line">{ type: "image", url: "…jpg" }</div>
+              <div class="struct-line">{ type: "text", content: "…" } 或 { type: "text", url: "…" }</div>
+              <div class="struct-line">{ type: "audio", url: "…wav" }</div>
+              <div class="struct-line">{ type: "video", url: "…mp4" }</div>
+            </div>
+          </div>
+
+          <div class="contract-sec">
+            <div class="hb-t">接口</div>
+            <div class="api-list">
+              <div v-for="api in contractApiRows" :key="api.raw" class="api-row">
+                <span class="api-m">{{ api.method }}</span>
+                <span class="api-p">{{ api.path }}</span>
+                <span class="api-d">{{ api.desc }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="contract-sec">
+            <div class="hb-t">示例请求</div>
+            <div class="struct-box">
+              <div class="struct-line">GET {base}/datasets</div>
+              <div class="struct-line">Accept: application/json</div>
+            </div>
+          </div>
+
+          <div class="contract-sec">
+            <div class="hb-t">示例响应</div>
+            <div class="struct-box">
+              <div class="struct-line">[ { "dataset_id": "ds-001", "name": "示例数据集",</div>
+              <div class="struct-line">    "item_count": 1200, "modal_types": ["image", "text"] } ]</div>
+              <div class="struct-line">{ "item_id": "it-0001", "modals": [</div>
+              <div class="struct-line">    { "type": "image", "url": "https://…/1.jpg" },</div>
+              <div class="struct-line">    { "type": "text", "content": "…" } ] }</div>
+            </div>
+          </div>
+
+          <div class="contract-sec">
+            <div class="hb-t">关键约束</div>
+            <ul class="rule-list">
+              <li>每个数据集的模态构成可以不同，由条目级 <b>modals</b> 声明</li>
+              <li>同一条目下的多个模态即对齐关系，无需额外字段</li>
+              <li>缺 <b>modals</b> → 无法确定模态，不可接入</li>
+            </ul>
+          </div>
+        </template>
+      </div>
+      <template #footer>
+        <el-button @click="contractOpen = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 测试连接：逐字段检测 -->
+    <el-dialog v-model="probeOpen" :title="probeTitle" width="720px" class="probe-dialog">
+      <div class="probe-body">
+        <div v-if="probeLoading" class="probe-loading">
+          <span class="dot" />
+          正在逐字段检测…
+        </div>
+        <template v-else-if="probeResult">
+          <div class="probe-meta">
+            <span class="badge" :class="probeStatus.cls">{{ probeStatus.label }}</span>
+            <span class="probe-meta-text">{{ probeResult.message }}</span>
+            <span
+              v-if="probeResult.statusCode != null || probeResult.latencyMs != null"
+              class="hint"
+            >
+              HTTP {{ probeResult.statusCode ?? '—' }} · {{ probeResult.latencyMs ?? '—' }} ms
+            </span>
+          </div>
+          <div v-if="probeChecks.length" class="probe-list">
+            <div
+              v-for="check in probeChecks"
+              :key="check.field"
+              class="pf-row"
+              :class="check.ok ? 'ok' : 'bad'"
+            >
+              <span class="pf-mark" aria-hidden="true">{{ check.ok ? '✓' : '✗' }}</span>
+              <span class="pf-label">{{ check.field }}</span>
+              <span class="pf-val">{{ checkValue(check) }}</span>
+            </div>
+          </div>
+          <div class="probe-concl" :class="probeConclusionClass">
+            <b>结论：{{ probeConclusionTitle }}</b> —— {{ probeConclusion }}
+          </div>
+        </template>
+        <div v-else class="probe-concl bad">
+          <b>结论：检测失败</b> —— {{ probeError || '未获取到检测结果' }}
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="probeOpen = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 对接数据源 -->
+    <el-dialog v-model="createOpen" title="对接数据源" width="460px">
+      <el-form :model="createForm" label-width="84px">
         <el-form-item label="名称" required>
-          <el-input v-model="createForm.name" maxlength="40" placeholder="如：数据集管理-生产池" />
+          <el-input v-model="createForm.name" maxlength="40" placeholder="高质量数据集平台" />
         </el-form-item>
-        <el-form-item label="接口地址" required>
-          <el-input v-model="createForm.endpoint" maxlength="200" placeholder="https://ds.example/prod" />
+        <el-form-item label="来源地址" required :error="createAddrError">
+          <el-input
+            v-model="createForm.endpoint"
+            maxlength="160"
+            placeholder="http://ds-platform/api"
+            @blur="createTouched = true"
+          />
+        </el-form-item>
+        <el-form-item label="协议">
+          <el-select v-model="createForm.protocol" style="width: 100%">
+            <el-option label="接口拉取" value="pull" />
+            <el-option label="推送接收" value="push" />
+          </el-select>
         </el-form-item>
         <el-form-item label="认证方式">
           <el-select v-model="createForm.authType" style="width: 100%">
+            <el-option label="无" value="none" />
             <el-option label="Token" value="token" />
             <el-option label="Basic" value="basic" />
-            <el-option label="无" value="none" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="createForm.authType !== 'none'" label="认证信息" required>
+        <el-form-item v-if="createForm.authType !== 'none'" label="认证信息" required :error="createAuthError">
           <el-input
             v-model="createForm.authConfig"
             maxlength="200"
             :placeholder="createForm.authType === 'basic' ? 'username:password' : '访问 Token'"
           />
         </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="createForm.remark" maxlength="60" />
+        <el-form-item label="备注">
+          <el-input v-model="createForm.remark" maxlength="60" placeholder="选填" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="createVisible = false">取消</el-button>
-        <el-button type="primary" :loading="creating" @click="submitCreate">保存</el-button>
+        <el-button @click="createOpen = false">取消</el-button>
+        <el-button type="primary" :loading="creating" @click="submitCreate">对接</el-button>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="blacklistVisible" title="加入黑名单" width="460px">
-      <el-form label-width="90px">
+    <!-- 黑名单：右侧 560px 抽屉 -->
+    <el-drawer v-model="blacklistOpen" class="bl-drawer" size="560px" :with-header="true">
+      <template #header>
+        <div class="bh-main">
+          <h3>黑名单</h3>
+          <p class="bh-sub">被屏蔽的数据集不出现在检索结果中</p>
+        </div>
+        <span class="hint bl-hint">共 {{ blacklist.length }} 条</span>
+      </template>
+      <el-table :data="blacklist" empty-text="黑名单为空">
+        <el-table-column label="数据集 ID" min-width="104">
+          <template #default="{ row }">
+            <span class="mono ds-id">{{ row.datasetId || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="名称" min-width="96">
+          <template #default="{ row }">
+            <span class="ds-nm">{{ row.name || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="来源名" min-width="116">
+          <template #default="{ row }">{{ row.sourceName || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="地址" min-width="116">
+          <template #default="{ row }">
+            <span class="mono src-addr">{{ row.endpoint || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="58" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="removeRow(row)">移出</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button type="primary" @click="openAddBlacklist">＋ 添加黑名单</el-button>
+      </template>
+    </el-drawer>
+
+    <!-- 添加黑名单 -->
+    <el-dialog v-model="addBlOpen" title="添加黑名单" width="460px">
+      <el-form :model="blForm" label-width="84px">
+        <el-form-item label="数据集 ID" required :error="blIdError">
+          <el-input v-model="blForm.datasetId" maxlength="40" placeholder="PKG261025F9K2VB" />
+        </el-form-item>
+        <el-form-item label="名称" required>
+          <el-input v-model="blForm.name" maxlength="40" placeholder="四模态产物" />
+        </el-form-item>
         <el-form-item label="来源名" required>
-          <el-input v-model="blacklistForm.sourceName" placeholder="结果页按来源名排除" />
+          <el-input v-model="blForm.sourceName" maxlength="60" placeholder="产线作业语料包v2.3" />
+          <div class="field-tip">与结果页「来源」一致才生效</div>
         </el-form-item>
-        <el-form-item label="dataset_id">
-          <el-input v-model="blacklistForm.datasetId" />
-        </el-form-item>
-        <el-form-item label="名称">
-          <el-input v-model="blacklistForm.name" />
+        <el-form-item label="地址" required :error="blAddrError">
+          <el-input
+            v-model="blForm.endpoint"
+            maxlength="120"
+            placeholder="https://ds.example/prod/4mod/v2"
+            @blur="blTouched = true"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="blacklistVisible = false">取消</el-button>
-        <el-button type="danger" :loading="blacklisting" @click="submitBlacklist">加入</el-button>
+        <el-button @click="addBlOpen = false">取消</el-button>
+        <el-button type="primary" :loading="adding" @click="submitAddBlacklist">添加</el-button>
       </template>
     </el-dialog>
+
+    <DevNotesDrawer v-model="devOpen" title="研发需求说明">
+      <div>
+        <div class="hb-t">一、定位</div>
+        <ul class="help-list">
+          <li>把上游的<b>数据集平台</b>对接进来，作为检索的数据来源。</li>
+          <li>不需要被检索的数据集放进<b>黑名单</b>排除掉。</li>
+          <li>本页只有两块：数据源列表 + 黑名单抽屉；接口对接定义、测试连接、对接数据源都是数据源块内的弹窗。</li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="hb-t">二、数据源</div>
+        <table class="help-table">
+          <thead>
+            <tr><th>项</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mk">名称</td><td>数据源名称，必填</td></tr>
+            <tr><td class="mk">来源地址</td><td>以 <b>http://</b> 或 <b>https://</b> 开头，必填且不能含空格</td></tr>
+            <tr><td class="mk">状态</td><td>已连接 / 未连接 / 连接失败</td></tr>
+            <tr><td class="mk">上次同步</td><td>最近一次同步时间，格式 yyyy-MM-dd HH:mm</td></tr>
+            <tr>
+              <td class="mk">测试连接</td>
+              <td>每行都可发起；弹窗逐项检测 4 个必填字段（dataset_id / name / item_count / modals）；4 项齐全才置为已连接，缺项则接入失败、状态不变并展示原因</td>
+            </tr>
+            <tr><td class="mk">字段完备</td><td>4 个必填字段的提供比例；全提供为绿色 4/4，缺项为红色如 3/4，悬浮显示缺失字段；未测试过显示「—」</td></tr>
+            <tr>
+              <td class="mk">向量化</td>
+              <td>已连接的数据源显示「已完成 / 总数」（千分位，如 27,930 / 27,930），全部完成为绿色，未完成橙色并悬浮显示百分比；未连接显示「—」</td>
+            </tr>
+            <tr><td class="mk">操作</td><td>每行「测试连接」；已连接的数据源额外显示「同步」，点击刷新上次同步时间</td></tr>
+            <tr><td class="mk">对接</td><td>「＋ 对接数据源」在数据源块头右侧，填名称与来源地址等，加入列表末尾，初始为未连接</td></tr>
+            <tr><td class="mk">列表列</td><td>名称 / 地址 / 状态 / 字段完备 / 向量化 / 上次同步 / 操作，共 7 列</td></tr>
+          </tbody>
+        </table>
+        <p class="help-note">对接记录由后端 <b>datasources</b> 保存，刷新保持；来源地址属于部署配置。</p>
+      </div>
+
+      <div>
+        <div class="hb-t">三、黑名单</div>
+        <table class="help-table">
+          <thead>
+            <tr><th>字段</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mk">数据集 ID</td><td>必填，且不与已有记录重复</td></tr>
+            <tr><td class="mk">名称</td><td>必填</td></tr>
+            <tr><td class="mk">来源名</td><td>必填，与结果页结果条目的「来源」同名，如 <b>产线作业语料包v2.3</b>；P2 按它做数据源级排除</td></tr>
+            <tr><td class="mk">地址</td><td>必填，以 http:// 或 https:// 开头且不能含空格</td></tr>
+          </tbody>
+        </table>
+        <ul class="help-list">
+          <li><b>入口</b>：数据源块头「黑名单 (N)」，点开为右侧 560px 抽屉，N 为黑名单条数；列表为 数据集 ID / 名称 / 来源名 / 地址 / 操作（移出）。</li>
+          <li><b>添加</b>：「＋ 添加黑名单」填数据集 ID / 名称 / 来源名 / 地址，提交后置顶。</li>
+          <li><b>生效</b>：结果页按「来源名」匹配结果条目的来源并排除其条目；可随时移出，刷新后按最新黑名单重算。</li>
+          <li><b>存储</b>：后端 <b>datasource-blacklist</b>，按 datasetId 去重，刷新保持。</li>
+          <li><b>空态</b>：黑名单为空。</li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="hb-t">四、接口对接定义</div>
+        <p class="help-lead">上游只提供<b>原始文件与元数据</b>，<b>不提供向量</b>。下面是拉取原始数据集所需的字段与接口。</p>
+        <table class="help-table">
+          <thead>
+            <tr><th>项</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mk">上游提供</td><td><b>原始文件与元数据</b>；向量由平台自己抽，上游不需要提供</td></tr>
+            <tr><td class="mk">数据集级</td><td>3 个必填：<b>dataset_id</b>、<b>name</b>、<b>item_count</b>；1 个可选：<b>modal_types</b>（仅用于展示）</td></tr>
+            <tr><td class="mk">条目级</td><td>2 个必填：<b>item_id</b>、<b>modals</b>（1~4 个模态，每条自己声明）</td></tr>
+            <tr><td class="mk">modals</td><td>每项 <b>{ type:"image", url }</b> / <b>{ type:"text", content 或 url }</b> / <b>{ type:"audio", url }</b> / <b>{ type:"video", url }</b></td></tr>
+            <tr><td class="mk">对齐</td><td>同一条目下的多个模态即<b>天然对齐</b>，<b>不需要</b>额外字段</td></tr>
+            <tr><td class="mk">接口</td><td><b>GET {base}/datasets</b> 列出数据集；<b>GET {base}/datasets/{id}</b> 数据集详情；<b>GET {base}/datasets/{id}/items</b> 条目列表（分页）</td></tr>
+            <tr><td class="mk">入口</td><td>数据源块头「接口对接定义」按钮，弹窗只读展示字段表、示例请求/响应与关键约束</td></tr>
+          </tbody>
+        </table>
+        <ul class="help-list">
+          <li>每个数据集的<b>模态构成可以不同</b>，由条目级 <b>modals</b> 逐条声明。</li>
+          <li>同一条目下的多个模态即对齐关系，<b>无需额外字段</b>。</li>
+          <li>缺 <b>modals</b> → 无法确定模态，<b>不可接入</b>。</li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="hb-t">五、平台侧处理</div>
+        <p class="help-lead"><b>接入 → 检测契约 → 拉取原始数据集 → 自动向量化（图文对齐 · CLIP双塔 v3）→ 写入向量库 → 可检索</b></p>
+        <ul class="help-list">
+          <li>向量由平台抽取，上游不需要提供向量。</li>
+          <li>统一向量空间固定为「图文对齐 · CLIP双塔 v3」，不可切换（见 P5 策略管理的向量参数）。</li>
+        </ul>
+      </div>
+    </DevNotesDrawer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import {
   addBlacklist,
   createDatasource,
   datasourceContract,
-  datasourceDatasets,
   listBlacklist,
   listDatasources,
   removeBlacklist,
   syncDatasource,
+  testDatasource,
 } from '../../api'
-import type { DatasourceBlacklistVO, DatasourceVO, RemoteDatasetsVO } from '../../api/types'
+import type {
+  DatasourceBlacklistVO,
+  DatasourceCheckVO,
+  DatasourceTestVO,
+  DatasourceVO,
+} from '../../api/types'
+import { fmtTime } from '../../utils/format'
+import DevNotesDrawer from '../../components/DevNotesDrawer.vue'
+
+/** 上游 4 项必填的固定数量（与契约 dataset_id/name/item_count/modals 一致） */
+const REQUIRED_TOTAL = 4
+
+const NUM_FMT = new Intl.NumberFormat('en-US')
+
+interface ContractFieldNode {
+  required?: string[]
+  optional?: string[]
+  modalRule?: string
+}
+
+interface ContractBody {
+  endpoints?: string[]
+  dataset?: ContractFieldNode
+  item?: ContractFieldNode
+  pushMode?: string
+}
+
+interface FieldRow {
+  field: string
+  type: string
+  required: string
+  desc: string
+}
+
+/** 字段类型与说明展示文案（字段名来自契约，类型与说明为展示补充） */
+const FIELD_META: Record<string, { type: string; desc: string }> = {
+  dataset_id: { type: 'string', desc: '数据集唯一标识' },
+  name: { type: 'string', desc: '数据集名称' },
+  item_count: { type: 'int', desc: '条目数' },
+  modal_types: { type: 'array', desc: '声明包含哪些模态，仅用于展示' },
+  item_id: { type: 'string', desc: '条目唯一标识' },
+  modals: { type: 'array', desc: '1~4 个模态，每条自己声明' },
+}
 
 const loading = ref(false)
 const creating = ref(false)
-const blacklisting = ref(false)
+const adding = ref(false)
 const sources = ref<DatasourceVO[]>([])
 const blacklist = ref<DatasourceBlacklistVO[]>([])
-const remote = ref<RemoteDatasetsVO | null>(null)
-const remoteSourceName = ref('')
-const syncingIds = ref(new Set<string>())
-const contract = ref<Record<string, unknown>>({})
+const testingId = ref('')
+const syncingId = ref('')
 
-const createVisible = ref(false)
-const createForm = ref({ name: '', endpoint: '', authType: 'token', authConfig: '', remark: '' })
-const blacklistVisible = ref(false)
-const blacklistForm = ref({ sourceName: '', datasetId: '', name: '' })
+const devOpen = ref(false)
 
-const contractEndpoints = computed(() => (contract.value.endpoints as string[]) ?? [])
-const contractDatasetRequired = computed(
-  () => ((contract.value.dataset as Record<string, unknown>)?.required as string[])?.join(' / ') ?? '',
-)
-const contractItemRequired = computed(
-  () => ((contract.value.item as Record<string, unknown>)?.required as string[])?.join(' / ') ?? '',
-)
-const contractModalRule = computed(
-  () => ((contract.value.item as Record<string, unknown>)?.modalRule as string) ?? '',
-)
-const contractPushMode = computed(() => (contract.value.pushMode as string) ?? '')
+const createOpen = ref(false)
+const createTouched = ref(false)
+const createForm = ref({
+  name: '',
+  endpoint: '',
+  protocol: 'pull',
+  authType: 'none',
+  authConfig: '',
+  remark: '',
+})
 
-function statusLabel(status: string) {
-  return { connected: '已连接', failed: '连接失败', unconnected: '未连接' }[status] ?? status
+const blacklistOpen = ref(false)
+const addBlOpen = ref(false)
+const blTouched = ref(false)
+const blForm = ref({ datasetId: '', name: '', sourceName: '', endpoint: '' })
+
+const probeOpen = ref(false)
+const probeLoading = ref(false)
+const probeSource = ref<DatasourceVO | null>(null)
+const probeResult = ref<DatasourceTestVO | null>(null)
+const probeError = ref('')
+
+const contractOpen = ref(false)
+const contractLoading = ref(false)
+const contractLoaded = ref(false)
+const contractError = ref('')
+const contract = ref<ContractBody>({})
+
+const probeTitle = computed(() =>
+  probeSource.value ? `测试连接 · ${probeSource.value.name}` : '测试连接',
+)
+
+const probeChecks = computed<DatasourceCheckVO[]>(() => probeResult.value?.checks ?? [])
+
+/** 接口层状态：连接成功或拿到上游 2xx/3xx 响应视为可达；无法判定时显示不适用 */
+const probeStatus = computed<{ label: string; cls: string }>(() => {
+  const r = probeResult.value
+  if (!r) {
+    return { label: '', cls: 'gray' }
+  }
+  if (r.connected) {
+    return { label: '接口可达', cls: 'ok' }
+  }
+  if (r.statusCode != null && r.statusCode >= 200 && r.statusCode < 400) {
+    return { label: '接口可达', cls: 'ok' }
+  }
+  if (r.statusCode == null && r.connected == null) {
+    return { label: '不适用', cls: 'gray' }
+  }
+  return { label: '接口不可达', cls: 'fail' }
+})
+
+/** 真正的逐字段缺失项：detail 与整体 message 相同的是连接级失败，不算字段缺失 */
+const probeMissingChecks = computed(() =>
+  probeChecks.value.filter((check) => !check.ok && check.detail !== probeResult.value?.message),
+)
+
+const probeConclusionTitle = computed(() => {
+  const r = probeResult.value
+  if (!r) {
+    return ''
+  }
+  if (r.connected == null) {
+    return '不适用'
+  }
+  return r.connected ? '接入成功' : '接入失败'
+})
+
+const probeConclusionClass = computed(() => {
+  const r = probeResult.value
+  if (!r || r.connected == null) {
+    return 'gray'
+  }
+  return r.connected ? 'ok' : 'bad'
+})
+
+const probeConclusion = computed(() => {
+  const r = probeResult.value
+  if (!r) {
+    return ''
+  }
+  if (r.connected) {
+    return '4 项必填齐全，已开始向量化。'
+  }
+  if (r.connected == null) {
+    return `${r.message}。`
+  }
+  const missing = probeMissingChecks.value
+  if (missing.length) {
+    return `上游缺少 ${missing.length} 个必填字段（${missing
+      .map((check) => check.label)
+      .join('、')}），补齐后可重新测试。`
+  }
+  return `${r.message}，状态保持不变。`
+})
+
+const contractPushMode = computed(() => contract.value.pushMode ?? '')
+
+const contractModalRule = computed(() => contract.value.item?.modalRule ?? '')
+
+const datasetFieldRows = computed(() => buildFieldRows(contract.value.dataset))
+
+const itemFieldRows = computed(() => buildFieldRows(contract.value.item))
+
+const contractApiRows = computed(() =>
+  (contract.value.endpoints ?? []).map((raw) => {
+    const matched = raw.match(/^([A-Za-z]+)\s+(.+)$/)
+    const method = matched?.[1] ?? 'GET'
+    const path = matched?.[2] ?? raw
+    return { raw, method, path, desc: apiDescription(path) }
+  }),
+)
+
+const createAddrError = computed(() => addressError(createForm.value.endpoint, createTouched.value))
+
+const createAuthError = computed(() => {
+  if (createForm.value.authType === 'none' || !createTouched.value) {
+    return ''
+  }
+  const auth = createForm.value.authConfig.trim()
+  if (!auth) {
+    return '认证信息不能为空'
+  }
+  if (createForm.value.authType === 'basic' && !auth.includes(':')) {
+    return '格式必须为 username:password'
+  }
+  return ''
+})
+
+const blIdError = computed(() => {
+  const datasetId = blForm.value.datasetId.trim()
+  if (!datasetId) {
+    return blTouched.value ? '请填写数据集 ID' : ''
+  }
+  if (blacklist.value.some((row) => row.datasetId === datasetId)) {
+    return '该数据集已在黑名单'
+  }
+  return ''
+})
+
+const blAddrError = computed(() => addressError(blForm.value.endpoint, blTouched.value))
+
+function buildFieldRows(node?: ContractFieldNode): FieldRow[] {
+  if (!node) {
+    return []
+  }
+  const rows: FieldRow[] = []
+  for (const field of node.required ?? []) {
+    const meta = FIELD_META[field] ?? { type: 'string', desc: '' }
+    rows.push({ field, required: '必填', ...meta })
+  }
+  for (const field of node.optional ?? []) {
+    const meta = FIELD_META[field] ?? { type: 'string', desc: '' }
+    rows.push({ field, required: '可选', ...meta })
+  }
+  return rows
 }
 
-function statusTagType(status: string) {
-  return status === 'connected' ? 'success' : status === 'failed' ? 'danger' : 'info'
+function apiDescription(path: string): string {
+  if (path.includes('/items')) {
+    return '条目列表（item_id / modals），分页'
+  }
+  if (/\/datasets\/?$/.test(path.replace(/\?.*$/, ''))) {
+    return '列出数据集（dataset_id / name / item_count）'
+  }
+  if (path.includes('/datasets/')) {
+    return '数据集详情'
+  }
+  return ''
 }
 
-async function loadAll() {
+function addressError(value: string, touched: boolean): string {
+  const address = value.trim()
+  if (!address) {
+    return touched ? '请填写地址' : ''
+  }
+  if (!/^https?:\/\//i.test(address)) {
+    return '地址需以 http:// 或 https:// 开头'
+  }
+  if (/\s/.test(address)) {
+    return '地址中不能有空格'
+  }
+  return ''
+}
+
+function statusLabel(status: string): string {
+  if (status === 'connected') {
+    return '已连接'
+  }
+  if (status === 'failed') {
+    return '连接失败'
+  }
+  return '未连接'
+}
+
+function statusClass(status: string): string {
+  if (status === 'connected') {
+    return 'ok'
+  }
+  if (status === 'failed') {
+    return 'fail'
+  }
+  return 'off'
+}
+
+function fieldRatio(row: DatasourceVO): string {
+  const missing = row.missingFields
+  if (missing == null) {
+    return '—'
+  }
+  return `${REQUIRED_TOTAL - missing.length}/${REQUIRED_TOTAL}`
+}
+
+function fieldClass(row: DatasourceVO): string {
+  const missing = row.missingFields
+  if (missing == null) {
+    return 'gray'
+  }
+  return missing.length ? 'fail' : 'ok'
+}
+
+function fieldTip(row: DatasourceVO): string {
+  const missing = row.missingFields
+  if (missing == null) {
+    return '尚未测试连接，字段完备未判定'
+  }
+  return missing.length ? `缺少：${missing.join('、')}` : `${REQUIRED_TOTAL} 个必填字段全部提供`
+}
+
+function vecAvailable(row: DatasourceVO): boolean {
+  return row.connectStatus === 'connected' && Number(row.totalCount) > 0
+}
+
+function vecText(row: DatasourceVO): string {
+  if (!vecAvailable(row)) {
+    return '—'
+  }
+  return `${NUM_FMT.format(Number(row.vectorizedCount) || 0)} / ${NUM_FMT.format(Number(row.totalCount) || 0)}`
+}
+
+function vecClass(row: DatasourceVO): string {
+  if (!vecAvailable(row)) {
+    return 'none'
+  }
+  return Number(row.vectorizedCount) >= Number(row.totalCount) ? 'done' : 'part'
+}
+
+function vecHint(row: DatasourceVO): string {
+  const base = '平台接入后自动抽取向量写入向量库，使用「图文对齐 · CLIP双塔 v3」'
+  if (!vecAvailable(row)) {
+    return base
+  }
+  const percent = Math.round((Number(row.vectorizedCount) / Number(row.totalCount)) * 100)
+  return percent >= 100 ? base : `${base}；已完成 ${percent}%`
+}
+
+function checkValue(check: DatasourceCheckVO): string {
+  if (check.detail) {
+    return check.detail
+  }
+  return check.ok ? '已提供' : '未提供'
+}
+
+async function loadSources() {
   loading.value = true
   try {
-    const [sourceRows, blacklistRows, contractBody] = await Promise.all([
-      listDatasources(),
-      listBlacklist(),
-      datasourceContract(),
-    ])
-    sources.value = sourceRows
-    blacklist.value = blacklistRows
-    contract.value = contractBody
+    sources.value = await listDatasources()
+  } catch (error) {
+    ElMessage.error((error as Error).message)
   } finally {
     loading.value = false
   }
 }
 
+async function loadBlacklistRows() {
+  try {
+    blacklist.value = await listBlacklist()
+  } catch (error) {
+    ElMessage.error((error as Error).message)
+  }
+}
+
+function openBlacklist() {
+  blacklistOpen.value = true
+  void loadBlacklistRows()
+}
+
 function openCreate() {
-  createForm.value = { name: '', endpoint: '', authType: 'token', authConfig: '', remark: '' }
-  createVisible.value = true
+  createTouched.value = false
+  createForm.value = {
+    name: '',
+    endpoint: '',
+    protocol: 'pull',
+    authType: 'none',
+    authConfig: '',
+    remark: '',
+  }
+  createOpen.value = true
 }
 
 async function submitCreate() {
-  if (!createForm.value.name.trim() || !createForm.value.endpoint.trim()) {
-    ElMessage.warning('名称与接口地址必填')
+  createTouched.value = true
+  const name = createForm.value.name.trim()
+  const endpoint = createForm.value.endpoint.trim()
+  if (!name) {
+    ElMessage.error('请填写名称')
+    return
+  }
+  if (!endpoint) {
+    ElMessage.error('请填写地址')
+    return
+  }
+  const addrError = addressError(endpoint, true)
+  if (addrError) {
+    ElMessage.error(addrError)
+    return
+  }
+  if (createForm.value.authType !== 'none' && !createForm.value.authConfig.trim()) {
+    ElMessage.error('认证信息不能为空')
+    return
+  }
+  if (createForm.value.authType === 'basic' && !createForm.value.authConfig.includes(':')) {
+    ElMessage.error('basic 认证信息格式必须为 username:password')
     return
   }
   creating.value = true
   try {
-    await createDatasource({ ...createForm.value, protocol: 'pull' })
-    ElMessage.success('数据源已登记')
-    createVisible.value = false
-    await loadAll()
-  } catch (e) {
-    ElMessage.error((e as Error).message)
+    await createDatasource({
+      name,
+      endpoint,
+      protocol: createForm.value.protocol,
+      authType: createForm.value.authType,
+      authConfig: createForm.value.authConfig,
+      remark: createForm.value.remark,
+    })
+    ElMessage.success('已对接数据源')
+    createOpen.value = false
+    await loadSources()
+  } catch (error) {
+    ElMessage.error((error as Error).message)
   } finally {
     creating.value = false
   }
 }
 
 async function sync(row: DatasourceVO) {
-  syncingIds.value.add(row.id)
+  syncingId.value = row.id
   try {
     const result = await syncDatasource(row.id)
-    ElMessage.success(
-      `同步成功：数据集 ${result.datasetCount} 个，必填校验${result.requiredOk ? '通过' : '存在缺失'}`,
-    )
-    await loadAll()
-  } catch (e) {
-    ElMessage.error((e as Error).message)
-    await loadAll()
+    ElMessage.success(`已同步 ${result.datasetCount} 个数据集`)
+    await loadSources()
+  } catch (error) {
+    ElMessage.error((error as Error).message)
+    await loadSources()
   } finally {
-    syncingIds.value.delete(row.id)
+    syncingId.value = ''
   }
 }
 
-async function loadRemote(row: DatasourceVO) {
+async function testConnection(row: DatasourceVO) {
+  probeSource.value = row
+  probeResult.value = null
+  probeError.value = ''
+  probeOpen.value = true
+  probeLoading.value = true
+  testingId.value = row.id
   try {
-    remote.value = await datasourceDatasets(row.id)
-    remoteSourceName.value = row.name
-  } catch (e) {
-    ElMessage.error((e as Error).message)
+    const result = await testDatasource(row.id)
+    probeResult.value = result
+    if (result.connected) {
+      ElMessage.success('连接成功，已开始向量化')
+    } else if (result.connected == null) {
+      ElMessage.warning(result.message)
+    } else {
+      const missing = probeMissingChecks.value
+      ElMessage.error(
+        missing.length ? `接入失败：缺少 ${missing.length} 个必填字段` : `接入失败：${result.message}`,
+      )
+    }
+  } catch (error) {
+    probeError.value = (error as Error).message
+    ElMessage.error((error as Error).message)
+  } finally {
+    probeLoading.value = false
+    testingId.value = ''
+    await loadSources()
   }
 }
 
-function openBlacklist(row: DatasourceVO) {
-  blacklistForm.value = { sourceName: row.name, datasetId: row.upstreamDatasetId ?? '', name: row.name }
-  blacklistVisible.value = true
+function openContract() {
+  contractOpen.value = true
+  void ensureContract()
 }
 
-async function submitBlacklist() {
-  if (!blacklistForm.value.sourceName.trim()) {
-    ElMessage.warning('来源名必填')
+async function ensureContract() {
+  if (contractLoaded.value || contractLoading.value) {
     return
   }
-  blacklisting.value = true
+  contractLoading.value = true
+  contractError.value = ''
   try {
-    await addBlacklist({ ...blacklistForm.value })
-    ElMessage.success('已加入黑名单')
-    blacklistVisible.value = false
-    blacklist.value = await listBlacklist()
-  } catch (e) {
-    ElMessage.error((e as Error).message)
+    contract.value = (await datasourceContract()) as unknown as ContractBody
+    contractLoaded.value = true
+  } catch (error) {
+    contractError.value = (error as Error).message
   } finally {
-    blacklisting.value = false
+    contractLoading.value = false
   }
 }
 
-async function removeBlacklistRow(row: DatasourceBlacklistVO) {
-  await ElMessageBox.confirm(`确认把来源「${row.sourceName}」移出黑名单？`, '移出黑名单', { type: 'warning' })
-  await removeBlacklist(row.id)
-  blacklist.value = await listBlacklist()
-  ElMessage.success('已移出')
+function openAddBlacklist() {
+  blTouched.value = false
+  blForm.value = { datasetId: '', name: '', sourceName: '', endpoint: '' }
+  addBlOpen.value = true
 }
 
-onMounted(loadAll)
+async function submitAddBlacklist() {
+  blTouched.value = true
+  const datasetId = blForm.value.datasetId.trim()
+  const name = blForm.value.name.trim()
+  const sourceName = blForm.value.sourceName.trim()
+  const endpoint = blForm.value.endpoint.trim()
+  if (!datasetId) {
+    ElMessage.error('请填写数据集 ID')
+    return
+  }
+  if (blacklist.value.some((row) => row.datasetId === datasetId)) {
+    ElMessage.error('该数据集已在黑名单')
+    return
+  }
+  if (!name) {
+    ElMessage.error('请填写名称')
+    return
+  }
+  if (!sourceName) {
+    ElMessage.error('请填写来源名')
+    return
+  }
+  if (!endpoint) {
+    ElMessage.error('请填写地址')
+    return
+  }
+  const addrError = addressError(endpoint, true)
+  if (addrError) {
+    ElMessage.error(addrError)
+    return
+  }
+  adding.value = true
+  try {
+    await addBlacklist({ datasetId, name, sourceName, endpoint })
+    ElMessage.success('已加入黑名单')
+    addBlOpen.value = false
+    await loadBlacklistRows()
+  } catch (error) {
+    ElMessage.error((error as Error).message)
+  } finally {
+    adding.value = false
+  }
+}
+
+async function removeRow(row: DatasourceBlacklistVO) {
+  try {
+    await removeBlacklist(row.id)
+    ElMessage.success('已移出黑名单')
+    await loadBlacklistRows()
+  } catch (error) {
+    ElMessage.error((error as Error).message)
+  }
+}
+
+onMounted(() => {
+  void loadSources()
+  void loadBlacklistRows()
+})
 </script>
 
 <style scoped>
-.cell-name { font-weight: 600; color: var(--text-primary); }
-.cell-sub { color: var(--muted); font-size: 12px; }
-.ml8 { margin-left: 8px; }
-.contract { display: flex; flex-direction: column; gap: 12px; }
-.contract-row { display: flex; gap: 16px; font-size: 13px; }
-.contract-key { width: 88px; flex-shrink: 0; color: var(--muted); }
+/* 容器：原型 1180 / 18-24-40 / gap 14（在 .page-card 基线上局部覆写） */
+.page-card {
+  max-width: 1180px;
+  padding: 18px 24px 40px;
+  gap: 14px;
+}
+
+.ph-main { min-width: 0; }
+
+/* 面板头 */
+.lib-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sec-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sec-idx {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--system-blue);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+.sec-title { font-size: 15px; font-weight: 700; color: #1f2a44; white-space: nowrap; }
+.ph-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.hint {
+  font-size: 11.5px;
+  color: var(--muted-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 工具条按钮 */
+.ghost-btn.el-button {
+  height: 32px;
+  padding: 0 16px;
+  border-color: var(--control-line-soft);
+  background: #fff;
+  color: #475467;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ghost-btn.el-button:hover {
+  border-color: #b9c9ff;
+  background: var(--system-blue-weak);
+  color: var(--system-blue);
+}
+.primary-btn.el-button { height: 30px; padding: 0 14px; font-size: 12.5px; font-weight: 600; }
+
+/* 表格单元 */
+.ds-nm { font-size: 12.5px; color: #273244; }
+.ds-id { font-size: 11.5px; font-weight: 600; color: #273244; }
+.src-addr { word-break: break-all; }
+.cell-time { color: #475467; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* 向量化列 */
+.vec-num {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+}
+.vec-num.done { color: var(--success); }
+.vec-num.part { color: var(--warning); }
+.vec-num.none { color: #aab4c8; }
+
+/* 行内操作 */
+.row-ops { display: flex; flex-wrap: wrap; gap: 4px; }
+.row-ops :deep(.el-button + .el-button) { margin-left: 0 !important; }
+.op-btn.el-button {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--control-line-soft);
+  border-radius: 5px;
+  background: #fff;
+  color: var(--system-blue);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.op-btn.el-button:hover {
+  border-color: #b9c9ff;
+  background: var(--system-blue-weak);
+  color: var(--system-blue);
+}
+.op-btn.sync.el-button {
+  border-color: var(--system-blue);
+  background: var(--system-blue);
+  color: #fff;
+}
+.op-btn.sync.el-button:hover {
+  border-color: var(--system-blue-hover);
+  background: var(--system-blue-hover);
+  color: #fff;
+}
+.op-btn.el-button.is-disabled,
+.op-btn.el-button.is-disabled:hover {
+  opacity: 0.6;
+  border-color: var(--control-line-soft);
+  background: #fff;
+  color: var(--muted);
+}
+
+/* 小标题（弹窗与研发说明共用） */
+.hb-t {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+  color: #1f2a44;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.hb-t::before {
+  content: '';
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--system-blue);
+}
+
+.field-tip { margin-top: 2px; font-size: 11px; color: var(--muted-soft); line-height: 1.4; }
+
+/* 接口对接定义 */
+.contract-body { display: flex; flex-direction: column; gap: 11px; min-height: 80px; }
+.contract-lead {
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px dashed #cdd9f5;
+  border-radius: 8px;
+  background: var(--system-blue-weak);
+  color: #475467;
+  font-size: 12px;
+  line-height: 1.75;
+}
+.contract-error {
+  padding: 12px;
+  border: 1px dashed #f7d4d5;
+  border-radius: 8px;
+  background: #fdf0f0;
+  color: #b42318;
+  font-size: 12px;
+}
+.contract-sec { display: flex; flex-direction: column; gap: 6px; }
+.contract-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.contract-table th {
+  padding: 6px 9px;
+  border: 1px solid #e6edf8;
+  background: #f4f6fb;
+  color: #7a8493;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+.contract-table td {
+  padding: 5px 9px;
+  border: 1px solid #eef2f8;
+  color: #475467;
+  line-height: 1.6;
+  vertical-align: top;
+}
+.contract-table td.mk,
+.mk {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: #273244;
+  white-space: nowrap;
+}
+.struct-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid #eef2f8;
+  border-radius: 8px;
+  background: var(--content-soft);
+}
+.struct-line {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #365070;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.api-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  border: 1px solid #eef2f8;
+  border-radius: 8px;
+  background: var(--content-soft);
+}
+.api-row { display: flex; align-items: baseline; gap: 9px; min-width: 0; font-size: 11.5px; line-height: 1.65; }
+.api-m {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border: 1px solid #dbe5ff;
+  border-radius: 4px;
+  background: #eef3ff;
+  color: #1d4ed8;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+.api-p {
+  flex: 0 0 auto;
+  color: #273244;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.api-d { min-width: 0; color: #7a8493; }
+.rule-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #475467;
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+.rule-list li { position: relative; padding-left: 13px; }
+.rule-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--warning);
+}
+.rule-list b { color: #1f2a44; font-weight: 700; }
+
+/* 测试连接 */
+.probe-body { display: flex; flex-direction: column; gap: 11px; }
+.probe-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: #475467;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.probe-meta-text { min-width: 0; word-break: break-word; }
+.probe-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #eef2f8;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+.pf-row {
+  display: grid;
+  grid-template-columns: 16px minmax(96px, 132px) 1fr;
+  gap: 8px;
+  padding: 6px 11px;
+  border-bottom: 1px solid #f1f5fa;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.pf-row:last-child { border-bottom: 0; }
+.pf-mark { font-weight: 700; text-align: center; }
+.pf-row.ok .pf-mark { color: var(--success); }
+.pf-row.bad .pf-mark { color: var(--error); }
+.pf-label {
+  color: #273244;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  word-break: break-all;
+}
+.pf-val { min-width: 0; color: #475467; word-break: break-word; }
+.pf-val .pf-miss { color: var(--error); font-weight: 600; }
+.probe-concl { padding: 9px 12px; border-radius: 7px; font-size: 12px; line-height: 1.75; }
+.probe-concl.ok { border: 1px solid #cdebd7; background: #eef9f1; color: #1e7b3c; }
+.probe-concl.bad { border: 1px solid #f7d4d5; background: #fdf0f0; color: #b42318; }
+.probe-concl.gray { border: 1px solid #e4e8f0; background: #f0f2f7; color: #5c6573; }
+.probe-concl b { font-weight: 700; }
+.probe-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed #dbe5f5;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.probe-loading .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--system-blue);
+  animation: probePulse 1s ease-in-out infinite;
+}
+@keyframes probePulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
+/* 黑名单抽屉头 */
+.bh-main { min-width: 0; }
+.bh-main h3 { margin: 0; color: #1f2937; font-size: 15px; font-weight: 700; line-height: 1.4; }
+.bh-sub { margin: 2px 0 0; color: #9aa6bd; font-size: 11.5px; line-height: 1.5; }
+.bl-hint { flex: 0 0 auto; margin-right: 4px; }
+
+/* 研发说明抽屉内的列表（标题栏样式由 DevNotesDrawer 提供） */
+.help-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #475467;
+  font-size: 11.5px;
+  line-height: 1.75;
+}
+.help-list li { margin: 2px 0; }
+.help-list b { color: #1f2a44; font-weight: 700; }
+
+/* 弹窗体高度上限（原型 72vh） */
+:global(.contract-dialog .el-dialog__body),
+:global(.probe-dialog .el-dialog__body) {
+  max-height: 72vh;
+  overflow-y: auto;
+}
+:global(.contract-dialog) {
+  max-width: calc(100vw - 32px);
+}
+
+/* 抽屉内部（Teleport 到 body，用页级唯一类名限定） */
+:global(.bl-drawer .el-drawer__footer) {
+  padding: 12px 18px;
+  border-top: 1px solid #e4eaf3;
+  background: #fff;
+  text-align: right;
+}
+:global(.bl-drawer .el-table) {
+  --el-table-border-color: #eef2f8;
+  --el-table-header-bg-color: #f4f6fb;
+  --el-table-header-text-color: #7a8493;
+  --el-table-row-hover-bg-color: #f8fbff;
+  --el-table-text-color: #344054;
+  border: 1px solid #eef2f8;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 12px;
+}
+:global(.bl-drawer .el-table th.el-table__cell) {
+  padding: 7px 8px;
+  color: #7a8493;
+  font-size: 11px;
+  font-weight: 600;
+}
+:global(.bl-drawer .el-table td.el-table__cell) { padding: 6px 8px; }
+:global(.bl-drawer .el-table .cell) { line-height: 1.5; }
+
+@media (max-width: 1000px) {
+  .page-card { padding: 14px 14px 28px; }
+}
 </style>

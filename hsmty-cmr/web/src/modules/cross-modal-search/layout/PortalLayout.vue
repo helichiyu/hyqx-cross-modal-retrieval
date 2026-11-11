@@ -2,8 +2,7 @@
   <div class="workspace">
     <aside class="sidebar">
       <nav class="nav-scroll">
-        <template v-for="(group, groupIndex) in navGroups" :key="groupIndex">
-          <div v-if="group.title" class="nav-group-title">{{ group.title }}</div>
+        <template v-for="(group, groupIndex) in visibleGroups" :key="groupIndex">
           <RouterLink
             v-for="item in group.items"
             :key="item.path"
@@ -12,7 +11,7 @@
             class="nav-item"
             :class="{ active: isActive(item.path) }"
           >
-            <span class="ico"><el-icon><component :is="item.icon" /></el-icon></span>
+            <span class="ico"><el-icon :size="16"><component :is="item.icon" /></el-icon></span>
             <span>{{ item.title }}</span>
           </RouterLink>
           <div v-if="group.divider" class="nav-divider" />
@@ -27,33 +26,45 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
+const auth = useAuthStore()
 
+/** 原型 v5 左栏顺序：检索台（独立）→ 管理四项 */
 const navGroups = [
   {
-    title: '',
     divider: true,
-    items: [
-      { path: '/search', title: '检索台', icon: 'Search' },
-      { path: '/behaviors', title: '搜索行为', icon: 'Clock' },
-    ],
+    items: [{ path: '/search', title: '检索台', icon: 'Search', permission: 'cmr:search:create' }],
   },
   {
-    title: '',
     divider: false,
     items: [
-      { path: '/library', title: '数据源库管理', icon: 'FolderOpened' },
-      { path: '/strategies', title: '策略管理', icon: 'SetUp' },
-      { path: '/operation', title: '结果运营', icon: 'Service' },
-      { path: '/evaluation', title: '效果评测', icon: 'DataAnalysis' },
+      { path: '/library', title: '数据源库管理', icon: 'Coin', permission: 'cmr:dataset:page' },
+      { path: '/strategies', title: '策略管理', icon: 'SetUp', permission: 'cmr:strategy:page' },
+      { path: '/behaviors', title: '搜索行为', icon: 'DocumentCopy', permission: 'cmr:search:page' },
+      { path: '/operation', title: '结果运营', icon: 'Star', permission: 'cmr:feedback:page' },
+      { path: '/evaluation', title: '效果评测', icon: 'Histogram', permission: 'cmr:eval:page' },
     ],
   },
 ]
 
+/** 权限码未就绪（本地无 UAP）时保守全量展示，避免菜单整列消失 */
+function canVisit(permission: string) {
+  return !auth.user || auth.permissions.has(permission)
+}
+
+const visibleGroups = computed(() =>
+  navGroups
+    .map((group) => ({ ...group, items: group.items.filter((item) => canVisit(item.permission)) }))
+    .filter((group) => group.items.length > 0),
+)
+
+/** 仅精确命中高亮：结果页/摘要页属于检索流程，不点亮检索台 */
 function isActive(path: string) {
-  return route.path === path || route.path.startsWith(`${path}/`)
+  return route.path === path
 }
 </script>
 
@@ -80,22 +91,14 @@ function isActive(path: string) {
 .nav-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 14px 12px;
-}
-
-.nav-group-title {
-  margin: 8px 10px 6px;
-  color: #98a2b3;
-  font-size: 11px;
-  line-height: 16px;
+  padding: 10px 12px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 9px;
-  min-height: 36px;
-  padding: 0 10px;
+  padding: 9px 10px;
   margin-bottom: 2px;
   border-radius: 6px;
   color: #344054;
@@ -150,7 +153,7 @@ function isActive(path: string) {
   .workspace { flex-direction: column; }
   .sidebar { position: relative; width: 100%; height: auto; border-right: 0; border-bottom: 1px solid var(--content-line); }
   .nav-scroll { display: flex; align-items: center; gap: 4px; overflow-x: auto; padding: 8px 10px; }
-  .nav-item { flex: 0 0 auto; min-height: 34px; }
+  .nav-item { flex: 0 0 auto; padding: 8px 10px; }
   .nav-divider { width: 1px; height: 22px; margin: 0 5px; flex: 0 0 1px; }
   .main { height: auto; min-height: 0; overflow: visible; }
 }

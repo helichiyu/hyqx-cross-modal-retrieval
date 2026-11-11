@@ -2,11 +2,11 @@ import { defineModule } from '@/core/module'
 import { useAuthStore } from './stores/auth'
 
 /**
- * 跨模态检索模块（旧版 cmr-web 全量复刻）。
+ * 跨模态检索模块。
  *
- * <p>路由与旧版一一对应：检索台、检索结果、搜索结果摘要、数据源库管理、
- * 搜索行为、任务管理/详情、策略管理、效果评测、结果运营。
- * 登录页已移除，身份由平台 UAP 统一提供。
+ * <p>页面与原型 v5 一一对应：检索台（P1）、检索结果（P2）、结果摘要（P3）、
+ * 数据源库管理（P4）、策略管理（P5）、搜索行为（P6）、结果运营（P7）、效果评测（P8）。
+ * 失败任务并入搜索行为展示，不单独提供任务管理入口；登录由平台 UAP 统一负责。
  */
 export default defineModule({
   name: 'cross-modal-search',
@@ -16,7 +16,7 @@ export default defineModule({
     const auth = useAuthStore()
     await auth.ensureLoaded()
     const permission = to.meta.permission as string | undefined
-    if (permission && !auth.permissions.has(permission)) {
+    if (permission && auth.user && !auth.permissions.has(permission)) {
       // 缺权限时回到检索台，避免与兜底路由互相重定向
       return to.path === '/search' ? true : { path: '/search' }
     }
@@ -50,25 +50,7 @@ export default defineModule({
           path: 'library',
           name: 'library',
           component: () => import('./views/dataset/LibraryView.vue'),
-          meta: { title: '数据源库管理', icon: 'FolderOpened', permission: 'cmr:dataset:page' },
-        },
-        {
-          path: 'behaviors',
-          name: 'behaviors',
-          component: () => import('./views/search/BehaviorView.vue'),
-          meta: { title: '搜索行为', icon: 'Clock', permission: 'cmr:search:page' },
-        },
-        {
-          path: 'tasks',
-          name: 'tasks',
-          component: () => import('./views/task/TaskManageView.vue'),
-          meta: { title: '任务管理', icon: 'List', permission: 'cmr:task:page', hidden: true },
-        },
-        {
-          path: 'tasks/:id',
-          name: 'task-detail',
-          component: () => import('./views/task/TaskDetailView.vue'),
-          meta: { title: '任务详情', icon: 'Tickets', permission: 'cmr:task:page', hidden: true },
+          meta: { title: '数据源库管理', icon: 'Coin', permission: 'cmr:dataset:page' },
         },
         {
           path: 'strategies',
@@ -77,20 +59,22 @@ export default defineModule({
           meta: { title: '策略管理', icon: 'SetUp', permission: 'cmr:strategy:page' },
         },
         {
-          path: 'evaluation',
-          name: 'evaluation',
-          component: () => import('./views/evaluation/EvaluationView.vue'),
-          meta: { title: '效果评测', icon: 'DataAnalysis', permission: 'cmr:eval:page' },
+          path: 'behaviors',
+          name: 'behaviors',
+          component: () => import('./views/search/BehaviorView.vue'),
+          meta: { title: '搜索行为', icon: 'DocumentCopy', permission: 'cmr:search:page' },
         },
         {
           path: 'operation',
           name: 'operation',
           component: () => import('./views/operation/OperationView.vue'),
-          meta: { title: '结果运营', icon: 'Service', permission: 'cmr:feedback:page' },
+          meta: { title: '结果运营', icon: 'Star', permission: 'cmr:feedback:page' },
         },
         {
-          path: 'history',
-          redirect: '/behaviors',
+          path: 'evaluation',
+          name: 'evaluation',
+          component: () => import('./views/evaluation/EvaluationView.vue'),
+          meta: { title: '效果评测', icon: 'Histogram', permission: 'cmr:eval:page' },
         },
       ],
     },

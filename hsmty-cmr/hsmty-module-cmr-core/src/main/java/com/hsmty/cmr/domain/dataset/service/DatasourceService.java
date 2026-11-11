@@ -13,6 +13,7 @@ import com.hsmty.cmr.domain.dataset.mapper.DatasourceBlacklistMapper;
 import com.hsmty.cmr.domain.dataset.mapper.DatasourceMapper;
 import com.hsmty.cmr.domain.dataset.mapper.DatasetMapper;
 import com.hsmty.cmr.domain.dataset.vo.DatasetVO;
+import com.hsmty.cmr.domain.dataset.vo.DatasourceCheckVO;
 import com.hsmty.cmr.domain.dataset.vo.DatasourceTestVO;
 import com.hsmty.cmr.domain.dataset.vo.DatasourceVO;
 import com.hsmty.cmr.file.FileService;
@@ -34,9 +35,12 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.hsmty.cmr.domain.dataset.entity.table.CmrDatasetTableDef.CMR_DATASET;
 import static com.hsmty.cmr.domain.dataset.entity.table.CmrDatasourceTableDef.CMR_DATASOURCE;
@@ -54,6 +58,22 @@ public class DatasourceService {
 
     private static final Set<String> PULL_PROTOCOLS = Set.of("pull", "http", "api");
     private static final Set<String> PUSH_PROTOCOLS = Set.of("push", "upload");
+
+    /** 上游 4 项必填的固定顺序（与契约 dataset_id|name|item_count|modals 一致） */
+    private static final List<String> REQUIRED_FIELDS = List.of("dataset_id", "name", "item_count", "modals");
+
+    /** 4 项必填的中文名（测试连接面板逐字段展示） */
+    private static final java.util.Map<String, String> REQUIRED_FIELD_LABELS;
+
+    static {
+        java.util.Map<String, String> labels = new LinkedHashMap<>();
+        labels.put("dataset_id", "数据集 ID");
+        labels.put("name", "名称");
+        labels.put("item_count", "条目数");
+        labels.put("modals", "模态字段");
+        REQUIRED_FIELD_LABELS = java.util.Collections.unmodifiableMap(labels);
+    }
+
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(3))
             .followRedirects(HttpClient.Redirect.NORMAL)
@@ -113,6 +133,7 @@ public class DatasourceService {
             throw e;
         }
         datasource.setRequiredOk(Boolean.TRUE.equals(result.get("requiredOk")));
+        datasource.setMissingFields(joinFields(result.get("missingFields")));
         datasource.setUpstreamDatasetId((String) result.get("firstDatasetId"));
         datasource.setTotalCount((Integer) result.get("totalItems"));
         datasource.setLastSyncTime(LocalDateTime.now());
@@ -293,12 +314,25 @@ public class DatasourceService {
         boolean requiredOk = true;
         Integer totalItems = 0;
         String firstDatasetId = null;
+        // 缺失必填项取各数据集并集（同一字段只需列一次），最终按契约固定顺序输出
+        Set<String> missingFields = new LinkedHashSet<>();
         for (java.util.Map<String, Object> ds : allowed) {
             String datasetId = str(ds.get("dataset_id"));
             String name = str(ds.get("name"));
             Integer itemCount = intOf(ds.get("item_count"));
-            boolean ok = datasetId != null && name != null && itemCount != null;
+            List<String> datasetMissing = new ArrayList<>();
+            if (datasetId == null) {
+                datasetMissing.add("dataset_id");
+            }
+            if (name == null) {
+                datasetMissing.add("name");
+            }
+            if (itemCount == null) {
+                datasetMissing.add("item_count");
+            }
+            boolean ok = datasetMissing.isEmpty();
             requiredOk = requiredOk && ok;
+            missingFields.addAll(datasetMissing);
             if (firstDatasetId == null) {
                 firstDatasetId = datasetId;
             }
@@ -309,43 +343,76 @@ public class DatasourceService {
             brief.put("itemCount", itemCount);
             brief.put("modalTypes", ds.get("modal_types"));
             brief.put("requiredOk", ok);
+            brief.put("missingFields", datasetMissing);
             briefs.add(brief);
         }
         // 抽样校验条目契约：item_id + modals（1-4 项）
-        String itemIssue = sampleItemCheck(datasource, base, firstDatasetId);
+        ItemCheck itemCheck = sampleItemCheck(datasource, base, firstDatasetId);
+        if (itemCheck.field() != null) {
+            missingFields.add(itemCheck.field());
+        }
+        List<String> orderedMissing = REQUIRED_FIELDS.stream().filter(missingFields::contains).toList();
         java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
         result.put("datasetCount", briefs.size());
         result.put("datasets", briefs);
-        result.put("requiredOk", requiredOk && itemIssue == null);
+        result.put("requiredOk", requiredOk && itemCheck.detail() == null);
+        result.put("missingFields", orderedMissing);
         result.put("firstDatasetId", firstDatasetId);
+        result.put("firstDataset", briefs.isEmpty() ? null : briefs.get(0));
         result.put("totalItems", totalItems);
-        result.put("itemIssue", itemIssue);
+        result.put("itemIssue", itemCheck.detail());
         result.put("skippedBlacklisted", skippedBlacklisted);
         return result;
     }
 
-    private String sampleItemCheck(CmrDatasource datasource, String base, String datasetId) {
+    /**
+     * 抽样校验条目契约（item_id + modals，1-4 项）。
+     *
+     * @return 命中字段与说明；字段为 null 表示问题不在 4 项必填之内
+     */
+    private ItemCheck sampleItemCheck(CmrDatasource datasource, String base, String datasetId) {
         if (datasetId == null) {
-            return "缺少 dataset_id，无法校验条目契约";
+            return new ItemCheck("dataset_id", "缺少 dataset_id，无法校验条目契约");
         }
         try {
             String body = getJson(datasource, base + "/datasets/" + datasetId + "/items?page=1&size=1");
             java.util.List<java.util.Map<String, Object>> items = unwrapList(body, "items");
             if (items.isEmpty()) {
-                return null;
+                return ItemCheck.OK;
             }
             java.util.Map<String, Object> item = items.get(0);
             if (str(item.get("item_id")) == null) {
-                return "条目缺少 item_id";
+                return new ItemCheck(null, "条目缺少 item_id");
             }
             Object modals = item.get("modals");
             if (!(modals instanceof java.util.List<?> list) || list.isEmpty() || list.size() > 4) {
-                return "条目 modals 必须为 1-4 项";
+                return new ItemCheck("modals", "条目 modals 必须为 1-4 项");
             }
-            return null;
+            return ItemCheck.OK;
         } catch (BizException e) {
-            return e.getMessage();
+            return new ItemCheck(null, e.getMessage());
         }
+    }
+
+    /** 条目契约抽样结果：field 为命中的必填字段（可为 null），detail 为说明 */
+    private record ItemCheck(String field, String detail) {
+
+        private static final ItemCheck OK = new ItemCheck(null, null);
+    }
+
+    /**
+     * 缺失项落库：逗号分隔；齐全为空串，未知为 null。
+     *
+     * @param value fetchDatasets 返回的 missingFields 列表
+     * @return 落库字符串
+     */
+    @SuppressWarnings("unchecked")
+    private String joinFields(Object value) {
+        if (!(value instanceof List<?> list)) {
+            return null;
+        }
+        List<String> fields = (List<String>) list;
+        return fields.isEmpty() ? "" : String.join(",", fields);
     }
 
     private String getJson(CmrDatasource datasource, String url) {
@@ -475,6 +542,14 @@ public class DatasourceService {
         return DatasourceVO.from(ds);
     }
 
+    /**
+     * 测试数据源连接并逐字段校验 4 项必填。
+     *
+     * <p>连接成功仍以 4/4 齐全为准；测试失败只回写测试结果，不改连接状态（既有行为）。
+     *
+     * @param id 数据源 ID
+     * @return 测试结果（含逐字段 checks）
+     */
     public DatasourceTestVO test(Long id) {
         CmrDatasource datasource = requireDatasource(id);
         DatasourceTestVO result;
@@ -496,6 +571,9 @@ public class DatasourceService {
             result = testEndpoint(datasource);
             if (Boolean.TRUE.equals(result.getConnected())) {
                 result = checkRequiredFields(datasource, result);
+            } else {
+                // 连不上时仍返回 4 行结果，明确标出无法判定
+                result.setChecks(failedChecks(result.getMessage()));
             }
         }
         return saveTestResult(datasource, result);
@@ -507,17 +585,75 @@ public class DatasourceService {
             java.util.Map<String, Object> probe = fetchDatasets(datasource);
             boolean ok = Boolean.TRUE.equals(probe.get("requiredOk"));
             result.setConnected(ok);
+            result.setChecks(buildChecks(probe));
+            datasource.setRequiredOk(ok);
+            datasource.setMissingFields(joinFields(probe.get("missingFields")));
             if (ok) {
                 result.setMessage("连接成功，4 项必填齐全");
             } else {
                 Object issue = probe.get("itemIssue");
-                result.setMessage("4 项必填缺失：" + (issue == null ? "上游数据集字段不全" : issue));
+                List<?> missing = probe.get("missingFields") instanceof List<?> list ? list : List.of();
+                String suffix = issue != null ? String.valueOf(issue)
+                        : "缺少 " + (missing.isEmpty() ? "必填字段"
+                        : String.join("/", missing.stream().map(String::valueOf).toList()));
+                result.setMessage("4 项必填缺失：" + suffix);
             }
         } catch (BizException e) {
             result.setConnected(false);
             result.setMessage(e.getMessage());
+            result.setChecks(failedChecks(e.getMessage()));
         }
         return result;
+    }
+
+    /**
+     * 把 fetchDatasets 的缺失项转成逐字段检测结果（4 行，顺序固定）。
+     *
+     * @param probe fetchDatasets 返回结果
+     * @return 逐字段检测结果
+     */
+    @SuppressWarnings("unchecked")
+    private List<DatasourceCheckVO> buildChecks(java.util.Map<String, Object> probe) {
+        List<String> missing = probe.get("missingFields") instanceof List<?> list
+                ? (List<String>) list : List.of();
+        java.util.Map<String, Object> first = probe.get("firstDataset") instanceof java.util.Map<?, ?> map
+                ? (java.util.Map<String, Object>) map : java.util.Map.of();
+        String itemIssue = (String) probe.get("itemIssue");
+        Object modalTypes = first.get("modalTypes");
+
+        boolean modalsOk = itemIssue == null && !missing.contains("modals");
+        List<DatasourceCheckVO> checks = new ArrayList<>();
+        checks.add(check("dataset_id", !missing.contains("dataset_id"),
+                missing.contains("dataset_id") ? "上游数据集缺少 dataset_id" : str(first.get("datasetId"))));
+        checks.add(check("name", !missing.contains("name"),
+                missing.contains("name") ? "上游数据集缺少 name" : str(first.get("name"))));
+        checks.add(check("item_count", !missing.contains("item_count"),
+                missing.contains("item_count") ? "上游数据集缺少 item_count"
+                        : (first.get("itemCount") == null ? null : String.valueOf(first.get("itemCount")))));
+        checks.add(check("modals", modalsOk, modalsOk ? modalDetail(modalTypes) : itemIssue));
+        return checks;
+    }
+
+    private DatasourceCheckVO check(String field, boolean ok, String detail) {
+        return DatasourceCheckVO.builder()
+                .field(field)
+                .label(REQUIRED_FIELD_LABELS.get(field))
+                .ok(ok)
+                .detail(detail)
+                .build();
+    }
+
+    /** 模态字段说明：优先展示上游 modal_types，缺省返回 null */
+    private String modalDetail(Object modalTypes) {
+        if (modalTypes instanceof List<?> list) {
+            return list.isEmpty() ? null : list.stream().map(String::valueOf).collect(Collectors.joining(","));
+        }
+        return modalTypes == null ? null : String.valueOf(modalTypes);
+    }
+
+    /** 连接失败时的 4 行结果：均标为不通过，说明统一取连接失败原因 */
+    private List<DatasourceCheckVO> failedChecks(String detail) {
+        return REQUIRED_FIELDS.stream().map(field -> check(field, false, detail)).toList();
     }
 
     private DatasourceTestVO saveTestResult(CmrDatasource datasource, DatasourceTestVO result) {

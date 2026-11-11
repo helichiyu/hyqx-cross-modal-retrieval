@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      策略版本名快照：发布/回滚时落当时的策略名，供版本历史与 diff 展示。
+      历史版本无法还原发布时名称，保持 NULL（前端按未知展示）。
+    -->
+    <changeSet id="cmr-strategy-version-name-20261111" author="cmr" context="mysql,postgresql">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="cmr_strategy_version" columnName="name"/></not>
+        </preConditions>
+        <addColumn tableName="cmr_strategy_version">
+            <column name="name" type="varchar(128)" remarks="发布时的策略名快照"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

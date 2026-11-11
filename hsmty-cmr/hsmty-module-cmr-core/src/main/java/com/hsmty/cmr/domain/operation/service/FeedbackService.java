@@ -30,9 +30,11 @@ import static com.hsmty.cmr.domain.operation.entity.table.CmrFeedbackTableDef.CM
 
 /**
  * 反馈单服务（P7）：两个入口（标记不匹配 / 零结果分析）→ 一个判断 → 三个去向（数据流 3.7）
+ * <p>
+ * 处置阶段按入口类型强校验「判断 → 去向」固定映射，非法组合直接抛业务异常。
  *
  * @author cmr
- * @since 2026-11-03
+ * @since 2026-11-11
  */
 @Slf4j
 @Service
@@ -50,9 +52,13 @@ public class FeedbackService {
         BizException.assertTrue(!CmrFeedback.ENTRY_MISMATCH.equals(dto.getEntryType())
                 && !CmrFeedback.ENTRY_ZERO.equals(dto.getEntryType()), "非法反馈入口: " + dto.getEntryType());
         CmrSearchHistory history = null;
-        if (notBlank(dto.getSourceTaskNo())) {
-            history = searchHistoryMapper.selectOneByQuery(QueryWrapper.create()
-                    .where("biz_no = ?", dto.getSourceTaskNo()));
+        String sourceTaskNo = dto.getSourceTaskNo();
+        if (notBlank(sourceTaskNo)) {
+            // 兼容 SRH/TASK 两种形态，登记时统一存 TASK 任务号
+            history = searchService.findHistory(sourceTaskNo);
+            if (history != null) {
+                sourceTaskNo = searchService.displayTaskNo(history);
+            }
         }
         BizException.assertTrue(CmrFeedback.ENTRY_MISMATCH.equals(dto.getEntryType()) && history == null,
                 "标记不匹配必须指定有效的来源任务");
@@ -60,13 +66,13 @@ public class FeedbackService {
         // 同一任务重复标记不匹配：返回已有待处理反馈单，避免运营重复处置
         if (CmrFeedback.ENTRY_MISMATCH.equals(dto.getEntryType())) {
             CmrFeedback pending = feedbackMapper.selectOneByQuery(QueryWrapper.create()
-                    .where(CMR_FEEDBACK.SOURCE_TASK_NO.eq(dto.getSourceTaskNo())
+                    .where(CMR_FEEDBACK.SOURCE_TASK_NO.eq(sourceTaskNo)
                             .and(CMR_FEEDBACK.ENTRY_TYPE.eq(CmrFeedback.ENTRY_MISMATCH))
                             .and(CMR_FEEDBACK.STATUS.eq(CmrFeedback.STATUS_PENDING)))
                     .orderBy(CMR_FEEDBACK.ID.desc())
                     .limit(1));
             if (pending != null) {
-                log.info("反馈重复提交，返回待处理单: {} task={}", pending.getBizNo(), dto.getSourceTaskNo());
+                log.info("反馈重复提交，返回待处理单: {} task={}", pending.getBizNo(), sourceTaskNo);
                 return FeedbackVO.from(pending);
             }
         }
@@ -75,7 +81,7 @@ public class FeedbackService {
         feedback.setId(idWorker.next());
         feedback.setBizNo(bizNoGenerator.next(BizNoGenerator.PREFIX_FEEDBACK));
         feedback.setSearchId(history == null ? null : history.getId());
-        feedback.setSourceTaskNo(dto.getSourceTaskNo());
+        feedback.setSourceTaskNo(sourceTaskNo);
         feedback.setSourceQuery(dto.getSourceQuery() != null ? dto.getSourceQuery()
                 : (history == null ? null : history.getQueryText()));
         feedback.setEntryType(dto.getEntryType());
@@ -88,7 +94,7 @@ public class FeedbackService {
         feedback.setDelFlag("F");
         feedback.setCreateTime(LocalDateTime.now());
         feedbackMapper.insert(feedback, true);
-        log.info("反馈登记: {} entry={} task={}", feedback.getBizNo(), dto.getEntryType(), dto.getSourceTaskNo());
+        log.info("反馈登记: {} entry={} task={}", feedback.getBizNo(), dto.getEntryType(), sourceTaskNo);
         return FeedbackVO.from(feedback);
     }
 
@@ -137,13 +143,23 @@ public class FeedbackService {
     }
 
     /**
-     * 处置：登记判断与去向；去向为“屏蔽数据”时同步写入屏蔽列表，条目不再下发
+     * 处置反馈单：按入口类型校验「判断 → 去向」固定映射后登记判断与去向。
+     * <p>
+     * 固定映射：zero → need_data/supplement；mismatch → data_bad/block 或 match_bad/strategy。
+     * 去向为「屏蔽数据」时同步写入屏蔽列表，相关条目不再下发。
+     *
+     * @param id  反馈单主键
+     * @param dto 处置入参（judgment/disposition/resultNote）
+     * @author cmr
+     * @since 2026-11-11
      */
     @Transactional(rollbackFor = Exception.class)
     public void handle(Long id, FeedbackHandleDTO dto) {
         CmrFeedback feedback = requireFeedback(id);
         BizException.assertTrue(CmrFeedback.STATUS_HANDLED.equals(feedback.getStatus()),
                 "反馈已处理，不可重复操作");
+        String entryType = feedback.getEntryType() != null ? feedback.getEntryType() : feedback.getType();
+        validateDispositionMapping(entryType, dto.getJudgment(), dto.getDisposition());
         feedback.setJudgment(dto.getJudgment());
         feedback.setDisposition(dto.getDisposition());
         feedback.setResultNote(dto.getResultNote());
@@ -160,6 +176,34 @@ public class FeedbackService {
         feedbackMapper.update(feedback);
         log.info("反馈处置: {} judgment={} disposition={}", feedback.getBizNo(),
                 dto.getJudgment(), dto.getDisposition());
+    }
+
+    /**
+     * 校验「入口类型 → 判断 → 去向」的固定映射。
+     * <p>
+     * 合法组合：zero → need_data/supplement；mismatch → data_bad/block、match_bad/strategy。
+     *
+     * @param entryType   入口类型：mismatch/zero
+     * @param judgment    处理判断
+     * @param disposition 处置去向
+     * @author cmr
+     * @since 2026-11-11
+     */
+    private void validateDispositionMapping(String entryType, String judgment, String disposition) {
+        boolean legal;
+        if (CmrFeedback.ENTRY_ZERO.equals(entryType)) {
+            legal = CmrFeedback.JUDGMENT_NEED_DATA.equals(judgment)
+                    && CmrFeedback.DISPOSITION_SUPPLEMENT.equals(disposition);
+        } else if (CmrFeedback.ENTRY_MISMATCH.equals(entryType)) {
+            legal = (CmrFeedback.JUDGMENT_DATA_BAD.equals(judgment)
+                    && CmrFeedback.DISPOSITION_BLOCK.equals(disposition))
+                    || (CmrFeedback.JUDGMENT_MATCH_BAD.equals(judgment)
+                    && CmrFeedback.DISPOSITION_STRATEGY.equals(disposition));
+        } else {
+            throw new BizException("反馈入口类型非法，无法处置: " + entryType);
+        }
+        BizException.assertTrue(!legal, "非法处置组合[" + entryType + " → " + judgment + "/" + disposition
+                + "]；合法组合为 zero → need_data/supplement、mismatch → data_bad/block 或 match_bad/strategy");
     }
 
     public CmrFeedback requireFeedback(Long id) {

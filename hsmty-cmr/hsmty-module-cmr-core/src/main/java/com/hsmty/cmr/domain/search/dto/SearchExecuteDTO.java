@@ -1,8 +1,8 @@
 package com.hsmty.cmr.domain.search.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
@@ -10,7 +10,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 执行检索入参（query/queryFile 二选一；weights/rerank/topK 不传用场景生效策略）
+ * 执行检索入参（query/queryFile 二选一；weights/rerank/topK 不传用场景生效策略）。
+ *
+ * <p>目标模态允许为空：为空表示不限定目标模态，由 408 召回四模态后按策略融合。
  *
  * @author cmr
  * @since 2026-11-03
@@ -31,8 +33,8 @@ public class SearchExecuteDTO {
     /** 407 澄清选定后的改写 query */
     private String clarifiedQuery;
 
-    /** 目标模态；不传时由 408 按四模态召回 */
-    @NotEmpty(message = "目标模态不能为空")
+    /** 目标模态；不传或为空时由 408 按四模态召回（不限定目标模态） */
+    @Schema(description = "目标模态；为空表示不限定目标模态", example = "[\"image\",\"text\"]")
     private List<@Pattern(regexp = "text|image|audio|video", message = "目标模态只能是 text/image/audio/video") String> targetModalities;
 
     private Boolean clarified = false;

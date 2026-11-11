@@ -3,6 +3,7 @@ package com.hsmty.cmr.domain.dataset.entity;
 import com.hsmty.cmr.common.entity.BaseEntity;
 import com.hsmty.cmr.config.AuditListener;
 import com.mybatisflex.annotation.Table;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -39,6 +40,10 @@ public class CmrDatasource extends BaseEntity {
 
     /** 上游 4 项必填是否齐全 */
     private Boolean requiredOk;
+
+    /** 缺失的必填项，逗号分隔（dataset_id/name/item_count/modals）；null=未判定 */
+    @Schema(description = "缺失的必填项，逗号分隔：dataset_id/name/item_count/modals")
+    private String missingFields;
 
     /** 上游 dataset_id */
     private String upstreamDatasetId;

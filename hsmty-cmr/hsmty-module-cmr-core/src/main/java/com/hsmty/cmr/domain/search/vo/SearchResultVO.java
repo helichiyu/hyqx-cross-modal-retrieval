@@ -1,5 +1,6 @@
 package com.hsmty.cmr.domain.search.vo;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Data;
 
@@ -28,6 +29,8 @@ public class SearchResultVO {
 
     private String queryModality;
 
+    /** 首个目标模态；为 null 表示本次检索不限定目标模态（四模态召回） */
+    @Schema(description = "首个目标模态；为 null 表示不限定目标模态", nullable = true)
     private String targetModality;
 
     private Integer itemCount;

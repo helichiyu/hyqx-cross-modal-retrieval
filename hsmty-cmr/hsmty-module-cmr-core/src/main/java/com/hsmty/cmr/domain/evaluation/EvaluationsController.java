@@ -8,6 +8,8 @@ import com.hsmty.cmr.domain.evaluation.dto.EvaluationCreateDTO;
 import com.hsmty.cmr.domain.evaluation.dto.EvaluationReplayDTO;
 import com.hsmty.cmr.domain.evaluation.entity.CmrEvaluation;
 import com.hsmty.cmr.domain.evaluation.service.EvaluationService;
+import com.hsmty.cmr.domain.evaluation.vo.EvaluationDetailVO;
+import com.hsmty.cmr.domain.evaluation.vo.HardCaseVO;
 import com.hsmty.cmr.domain.search.vo.SearchResultVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -53,10 +55,33 @@ public class EvaluationsController {
         return ApiResult.success(evaluationService.create(dto.getBaseTaskNo()));
     }
 
-    @Operation(summary = "评测详情（基准 vs 重放 + 退化原因）")
+    /**
+     * 难例样本集：有点踩的检索任务分页，按被踩条目数倒序。
+     *
+     * @param query 分页参数
+     * @return 难例样本分页
+     * @author cmr
+     * @since 2026-11-11
+     */
+    @Operation(summary = "难例样本集（点踩任务分页，按被踩条目数倒序）")
+    @PreAuthorize("hasAnyAuthority('cmr:eval:page')")
+    @GetMapping("hard-cases")
+    public ApiResult<PageResult<HardCaseVO>> hardCases(PageQuery query) {
+        return ApiPageResult.success(evaluationService.hardCases(query));
+    }
+
+    /**
+     * 评测详情：基准 vs 最近重放、退化原因、统一指标与 4 项只读数据检查。
+     *
+     * @param id 评测主键
+     * @return 评测详情
+     * @author cmr
+     * @since 2026-11-11
+     */
+    @Operation(summary = "评测详情（基准 vs 重放 + 退化原因 + 数据检查）")
     @PreAuthorize("hasAnyAuthority('cmr:eval:page')")
     @GetMapping("{id}")
-    public ApiResult<Map<String, Object>> detail(@PathVariable Long id) {
+    public ApiResult<EvaluationDetailVO> detail(@PathVariable Long id) {
         return ApiResult.success(evaluationService.detail(id));
     }
 

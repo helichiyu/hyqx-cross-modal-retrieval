@@ -5,6 +5,7 @@ import com.hsmty.core.common.entity.ApiResult;
 import com.hsmty.cmr.common.api.PageQuery;
 import com.hsmty.cmr.common.api.PageResult;
 import com.hsmty.cmr.domain.search.service.SearchService;
+import com.hsmty.cmr.domain.search.vo.BehaviorVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -34,17 +35,37 @@ public class SearchBehaviorController {
 
     private final SearchService searchService;
 
-    @Operation(summary = "行为流水分页（关键词/操作人/零结果/时间范围）")
+    /**
+     * 行为流水分页。
+     *
+     * @param query 分页参数（每页 10 条）
+     * @param keyword 关键词：任务号 / 输入内容 / 操作人 / 重放来源任务号
+     * @param operatorName 操作人（模糊）
+     * @param zeroResult true 只看零结果
+     * @param downCount true 只看踩数大于 0
+     * @param taskNo 任务号（精确）
+     * @param replayOfTaskNo 重放来源任务号（精确）
+     * @param from 创建时间起
+     * @param to 创建时间止
+     * @return 行为流水分页
+     * @author cmr
+     * @since 2026-11-11
+     */
+    @Operation(summary = "行为流水分页（关键词/操作人/零结果/踩数/任务号/重放来源/时间范围）")
     @PreAuthorize("hasAnyAuthority('cmr:search:page')")
     @GetMapping
-    public ApiResult<PageResult<Map<String, Object>>> page(
+    public ApiResult<PageResult<BehaviorVO>> page(
             PageQuery query,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String operatorName,
             @RequestParam(required = false) Boolean zeroResult,
+            @RequestParam(required = false) Boolean downCount,
+            @RequestParam(required = false) String taskNo,
+            @RequestParam(required = false) String replayOfTaskNo,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime to) {
-        return ApiPageResult.success(searchService.behaviors(query, keyword, operatorName, zeroResult, from, to));
+        return ApiPageResult.success(searchService.behaviors(query, keyword, operatorName, zeroResult,
+                downCount, taskNo, replayOfTaskNo, from, to));
     }
 
     @Operation(summary = "屏蔽条目列表")

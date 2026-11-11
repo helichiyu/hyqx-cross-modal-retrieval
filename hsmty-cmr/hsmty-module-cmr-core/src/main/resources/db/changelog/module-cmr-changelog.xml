@@ -21,5 +21,8 @@
     <include file="db/changelog/cmr/013_cmr_result_item_quality_grade.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/cmr/014_cmr_reset_initial_password.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/cmr/015_cmr_feedback_search_id_nullable.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/016_cmr_strategy_version_name.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/017_cmr_datasource_blacklist_dataset_id.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/018_cmr_datasource_missing_fields.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

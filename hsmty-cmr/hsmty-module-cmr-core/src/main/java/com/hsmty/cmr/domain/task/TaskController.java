@@ -11,6 +11,7 @@ import com.hsmty.cmr.domain.evaluation.mapper.EvalRecordMapper;
 import com.hsmty.cmr.domain.search.entity.CmrSearchHistory;
 import com.hsmty.cmr.domain.search.mapper.SearchHistoryMapper;
 import com.hsmty.cmr.domain.task.entity.CmrTask;
+import com.hsmty.cmr.domain.task.vo.FailedTaskVO;
 import com.hsmty.cmr.domain.task.vo.TaskDetailVO;
 import com.hsmty.cmr.domain.task.vo.TaskLogVO;
 import com.hsmty.cmr.domain.task.vo.TaskVO;
@@ -72,6 +73,22 @@ public class TaskController {
         Page<CmrTask> page = taskService.page(qw, query);
         List<TaskVO> vos = page.getRecords().stream().map(this::toVO).toList();
         return ApiPageResult.success(PageResult.of(vos, page.getTotalRow(), query.getPageNum(), query.getPageSize()));
+    }
+
+    /**
+     * 失败任务分页（P6）：重试中 / 已恢复 / 已转隔离，系统自动处置，只读。
+     *
+     * @param query 分页参数（默认每页 10 条）
+     * @return 失败任务分页
+     * @author cmr
+     * @since 2026-11-11
+     */
+    @Operation(summary = "失败任务分页（重试中/已恢复/已转隔离）")
+    @PreAuthorize("hasAnyAuthority('cmr:task:page')")
+    @GetMapping("failed")
+    public ApiResult<PageResult<FailedTaskVO>> failed(PageQuery query,
+                                                      @RequestParam(required = false) String keyword) {
+        return ApiPageResult.success(taskService.failedPage(query, keyword));
     }
 
     @Operation(summary = "任务详情（含步骤日志）")

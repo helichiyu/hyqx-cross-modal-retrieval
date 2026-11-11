@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      黑名单改为按 datasetId 去重（dataset_id 必填，来源名可选），
+      来源名放开 NOT NULL：未填来源名的记录仅按 datasetId 参与排除，不计入来源汇总。
+    -->
+    <changeSet id="cmr-datasource-blacklist-source-name-nullable-20261111" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cmr_datasource_blacklist'
+                  AND COLUMN_NAME = 'source_name' AND IS_NULLABLE = 'YES'
+            </sqlCheck>
+        </preConditions>
+        <sql>
+            ALTER TABLE cmr_datasource_blacklist MODIFY COLUMN source_name VARCHAR(128) NULL COMMENT '来源名（结果页按此匹配排除，缺省为空）';
+        </sql>
+    </changeSet>
+
+    <!-- 去重查询按 dataset_id 进行，补索引 -->
+    <changeSet id="cmr-datasource-blacklist-index-dataset-id-20261111" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists tableName="cmr_datasource_blacklist" indexName="idx_dataset_id"/></not>
+        </preConditions>
+        <createIndex tableName="cmr_datasource_blacklist" indexName="idx_dataset_id">
+            <column name="dataset_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

@@ -9,7 +9,10 @@ import type {
   DatasourceVO,
   EvaluationDetailVO,
   EvaluationRowVO,
+  FailedTaskVO,
+  HardCaseVO,
   RemoteDatasetsVO,
+  ConsistencyCheckVO,
   SearchSummaryVO,
   StrategyOptionVO,
   MismatchItem,
@@ -33,7 +36,6 @@ import type {
   TaskVO,
   UnderstandVO,
   UserVO,
-  WordVO,
 } from './types'
 
 // ---------- 鉴权 / 字典 ----------
@@ -89,6 +91,10 @@ export const datasourceContract = () => http.get<Record<string, unknown>>('datas
 
 export const listBlacklist = () => http.get<DatasourceBlacklistVO[]>('datasource-blacklist')
 
+/** 黑名单按来源名汇总条数（P4 抽屉） */
+export const blacklistSummary = () =>
+  http.get<{ sourceName: string; count: number }[]>('datasource-blacklist/summary')
+
 export const addBlacklist = (body: Record<string, unknown>) =>
   http.post<DatasourceBlacklistVO>('datasource-blacklist', body)
 
@@ -106,6 +112,10 @@ export const pageTasks = (params: Record<string, unknown>) =>
 
 export const taskDetail = (id: Id) => http.get<TaskDetailVO>(`tasks/${id}`)
 
+/** P6 失败任务：重试中 / 已恢复 / 已转隔离（系统自动处置，只读） */
+export const failedTasks = (params: Record<string, unknown> = {}) =>
+  http.get<PageResult<FailedTaskVO>>('tasks/failed', params)
+
 // ---------- 策略 ----------
 
 export const pageStrategies = (params: Record<string, unknown> = {}) =>
@@ -113,7 +123,9 @@ export const pageStrategies = (params: Record<string, unknown> = {}) =>
 
 export const strategyModelOptions = () => http.get<Record<string, unknown>>('strategies/model-options')
 
-export const strategyConsistency = (id: Id) => http.get<Record<string, unknown>>(`strategies/${id}/consistency`)
+/** 全局一致性检查（固定 5 项） */
+export const strategyConsistency = () =>
+  http.get<{ checks: ConsistencyCheckVO[] }>('strategies/consistency')
 
 export const strategyDetail = (id: Id) => http.get<StrategyDetailVO>(`strategies/${id}`)
 
@@ -132,9 +144,9 @@ export const discardDraft = (id: Id) =>
 export const strategyVersions = (id: Id) =>
   http.get<StrategyVersionVO[]>(`strategies/${id}/versions`)
 
-/** from/to 为版本号（versionNo） */
-export const strategyDiff = (id: Id, from: number, to: number) =>
-  http.get<Record<string, unknown>>(`strategies/${id}/diff`, { from, to })
+/** from/to 为版本号（versionNo）；compareId 指定对比策略，缺省对比自身 */
+export const strategyDiff = (id: Id, from: number, to: number, compareId?: Id) =>
+  http.get<Record<string, unknown>>(`strategies/${id}/diff`, { from, to, compareId })
 
 export const rollbackStrategy = (id: Id, versionNo: number) =>
   http.post<StrategyVersionVO>(`strategies/${id}/rollback`, { versionNo })
@@ -148,9 +160,6 @@ export const onlineStrategy = (id: Id) => http.post<void>(`strategies/${id}/onli
 
 // ---------- 检索 ----------
 
-export const suggestWords = (scene: string | undefined, prefix: string) =>
-  http.get<string[]>('search/suggest', { scene, prefix })
-
 export const understand = (body: Record<string, unknown>) =>
   http.post<UnderstandVO>('search/understand', body)
 
@@ -162,9 +171,6 @@ export const searchResults = (resultSetId: string) =>
 
 export const rerunSearchResults = (resultSetId: string) =>
   http.post<SearchResultVO>(`search/results/${resultSetId}/rerun`)
-
-export const adoptResults = (resultSetId: string, adopted: boolean) =>
-  http.post<void>(`search/results/${resultSetId}/${adopted ? 'adopt' : 'discard'}`)
 
 export const clickResult = (resultSetId: string, rank: number) =>
   http.post<void>(`search/results/${resultSetId}/click`, { rank })
@@ -216,6 +222,10 @@ export const evaluationDetail = (id: Id) => http.get<EvaluationDetailVO>(`evalua
 export const replayEvaluation = (id: Id, strategyId?: Id) =>
   http.post<SearchResultVO>(`evaluations/${id}/replay`, strategyId ? { strategyId } : {})
 
+/** P8 难例样本集（点踩任务），同时用于新建评测候选 */
+export const hardCases = (params: Record<string, unknown> = {}) =>
+  http.get<PageResult<HardCaseVO>>('evaluations/hard-cases', params)
+
 // ---------- 评测集（历史能力，逐步下线） ----------
 
 export const pageEvalSets = (params: Record<string, unknown> = {}) =>
@@ -261,14 +271,3 @@ export const createFeedback = (body: {
 
 export const handleFeedback = (id: Id, body: Record<string, unknown>) =>
   http.post<void>(`feedbacks/${id}/handle`, body)
-
-export const pageWords = (params: Record<string, unknown> = {}) =>
-  http.get<PageResult<WordVO>>('recommend-words', params)
-
-export const createWord = (body: Record<string, unknown>) =>
-  http.post<WordVO>('recommend-words', body)
-
-export const updateWord = (id: Id, body: Record<string, unknown>) =>
-  http.put<WordVO>(`recommend-words/${id}`, body)
-
-export const removeWord = (id: Id) => http.delete<void>(`recommend-words/${id}`)

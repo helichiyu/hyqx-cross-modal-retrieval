@@ -3,6 +3,7 @@ package com.hsmty.cmr.domain.strategy.entity;
 import com.hsmty.cmr.common.entity.BaseEntity;
 import com.hsmty.cmr.config.AuditListener;
 import com.mybatisflex.annotation.Table;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -24,6 +25,10 @@ public class CmrStrategyVersion extends BaseEntity {
     public static final String STATUS_ROLLBACK = "rollback";
 
     private Long strategyId;
+
+    /** 发布时的策略名快照（历史数据可能为空） */
+    @Schema(description = "发布时的策略名快照，历史数据可能为空")
+    private String name;
 
     private Integer versionNo;
 
