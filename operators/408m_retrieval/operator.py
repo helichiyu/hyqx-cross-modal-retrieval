@@ -132,19 +132,19 @@ class Operator(OperatorBase):
         if query_text:
             if set(targets) & {"text", "image", "video"}:
                 self._collect(index_dir, self._embed(unique_id, queryText=query_text),
-                              "clip", top_k, candidates)
+                              "clip", top_k, candidates, targets)
             if "audio" in targets:
                 self._collect(index_dir, self._embed(unique_id, queryText=query_text, channel="clap"),
-                              "clap", top_k, candidates)
+                              "clap", top_k, candidates, targets)
             query_modality = "text"
         else:
             p = str(self.resolve_input(str(query_file)))
             ext = Path(p).suffix.lower()
             if ext in (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".gif", ".mp4", ".mov", ".avi", ".mkv", ".webm"):
-                self._collect(index_dir, self._embed(unique_id, queryImagePath=p), "clip", top_k, candidates)
+                self._collect(index_dir, self._embed(unique_id, queryImagePath=p), "clip", top_k, candidates, targets)
                 query_modality = "video" if ext in (".mp4", ".mov", ".avi", ".mkv", ".webm") else "image"
             elif ext in (".wav", ".mp3", ".flac", ".m4a", ".ogg"):
-                self._collect(index_dir, self._embed(unique_id, queryAudioPath=p), "clap", top_k, candidates)
+                self._collect(index_dir, self._embed(unique_id, queryAudioPath=p), "clap", top_k, candidates, targets)
                 query_modality = "audio"
             else:
                 raise OperatorError(f"无法识别查询文件模态: {Path(p).name}")
@@ -194,15 +194,28 @@ class Operator(OperatorBase):
         return np.array(body["data"]["vector"], dtype=np.float32)
 
     def _collect(self, index_dir: Path, vec: np.ndarray, channel: str,
-                 top_k: int, candidates: dict[str, dict]) -> None:
-        top = index_store.search(index_dir, vec, channel, top_k * 5)
-        metas = index_store.get_items(index_dir, [rid for rid, _ in top])
-        scores = np.array([s for _, s in top], dtype=np.float32)
-        mean, std = float(scores.mean()), max(float(scores.std()), 1e-6)
-        for rid, s in top:
-            meta = metas.get(rid)
-            if not meta:
+                 top_k: int, candidates: dict[str, dict],
+                 targets: list[str] | None = None) -> None:
+        # 单通道内混存多模态向量（clip=text/image/video，clap=audio），只按通道召回会把
+        # 其它模态一起带出来；这里必须按目标模态裁剪，命中不足 top_k 时扩大取回窗口，
+        # 避免目标模态条目（如 20 条视频对上 1000 条图像）被淹没。
+        allowed = set(targets) if targets else None
+        fetch = max(top_k * 5, 50)
+        while True:
+            top = index_store.search(index_dir, vec, channel, fetch)
+            metas = index_store.get_items(index_dir, [rid for rid, _ in top])
+            pairs = [(rid, s, metas[rid]) for rid, s in top if rid in metas]
+            if allowed:
+                pairs = [p for p in pairs if p[2]["modality"] in allowed]
+            if allowed and len(pairs) < top_k and len(top) >= fetch:
+                fetch *= 4
                 continue
+            break
+        if not pairs:
+            return
+        scores = np.array([s for _, s, _ in pairs], dtype=np.float32)
+        mean, std = float(scores.mean()), max(float(scores.std()), 1e-6)
+        for _, s, meta in pairs:
             z = max((s - mean) / std, 0.0)
             item_id = meta["itemId"]
             if item_id not in candidates or z > candidates[item_id]["z"]:
