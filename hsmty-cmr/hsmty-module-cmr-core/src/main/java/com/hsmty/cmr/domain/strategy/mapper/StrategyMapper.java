@@ -1,0 +1,15 @@
+package com.hsmty.cmr.domain.strategy.mapper;
+
+import com.mybatisflex.core.BaseMapper;
+import com.hsmty.cmr.domain.strategy.entity.CmrStrategy;
+import org.apache.ibatis.annotations.Mapper;
+
+/**
+ * 策略 Mapper
+ *
+ * @author cmr
+ * @since 2026-11-03
+ */
+@Mapper
+public interface StrategyMapper extends BaseMapper<CmrStrategy> {
+}

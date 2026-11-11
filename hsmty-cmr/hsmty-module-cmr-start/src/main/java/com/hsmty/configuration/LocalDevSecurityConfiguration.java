@@ -1,5 +1,6 @@
 package com.hsmty.configuration;
 
+import com.hsmty.cmr.common.auth.Permissions;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,13 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Profile("local")
 public class LocalDevSecurityConfiguration {
 
-    private static final List<String> LOCAL_AUTHORITIES = List.of(
-            "cmr:file:upload",
-            "cmr:file:page",
-            "cmr:file:detail",
-            "cmr:file:remove",
-            "cmr:file:read",
-            "cmr:search:create");
+    private static final List<String> LOCAL_AUTHORITIES = Permissions.ALL;
 
     @Bean
     public FilterRegistrationBean<LocalDevAuthenticationFilter> localDevAuthenticationFilter() {

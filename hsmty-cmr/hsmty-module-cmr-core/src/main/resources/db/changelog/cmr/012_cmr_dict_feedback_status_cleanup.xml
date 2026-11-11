@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- v5 反馈状态收敛为 pending/handled：清掉 002 遗留的 processing/closed 字典项 -->
+    <changeSet id="cmr-dict-feedback-status-cleanup-20261110" author="cmr" context="mysql,postgresql">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="2">SELECT COUNT(*) FROM cmr_dict WHERE type = 'cmr_feedback_status' AND alias IN ('processing', 'closed')</sqlCheck>
+        </preConditions>
+        <sql>
+            DELETE FROM cmr_dict WHERE type = 'cmr_feedback_status' AND alias IN ('processing', 'closed');
+        </sql>
+    </changeSet>
+</databaseChangeLog>

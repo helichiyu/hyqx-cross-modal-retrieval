@@ -1,12 +1,14 @@
 import { createApp, type App as VueApp } from 'vue'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
+import * as Icons from '@element-plus/icons-vue'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import 'element-plus/dist/index.css'
 import { qiankunWindow, renderWithQiankun } from 'vite-plugin-qiankun/dist/helper'
 import App from './App.vue'
 import { createAppRouter } from './core/router'
 import './styles/index.css'
+import './styles/portal.css'
 
 /** qiankun 注入的 props 中最少需要容器节点 */
 interface QiankunProps {
@@ -22,6 +24,9 @@ function render(props: QiankunProps = {}) {
   app.use(createPinia())
   app.use(router)
   app.use(ElementPlus, { locale: zhCn })
+  for (const [name, component] of Object.entries(Icons)) {
+    app.component(name, component as never)
+  }
 
   const mountPoint = props.container?.querySelector('#app') ?? '#app'
   app.mount(mountPoint as Element | string)

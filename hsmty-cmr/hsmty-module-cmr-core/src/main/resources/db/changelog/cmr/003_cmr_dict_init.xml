@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 字典表：fallback 单表设计（hsmty sys_dict 体系不可用时的等价物），admin 可经接口维护 -->
+    <changeSet id="cmr-dict-table-20261103" author="cmr" context="mysql">
+        <sql>
+            CREATE TABLE IF NOT EXISTS cmr_dict (
+                id BIGINT PRIMARY KEY COMMENT '类型ID*1000+序号',
+                type VARCHAR(64) NOT NULL COMMENT '类型 alias',
+                alias VARCHAR(64) NOT NULL COMMENT '项值',
+                label VARCHAR(128) NOT NULL COMMENT '显示名',
+                sort INT DEFAULT 0,
+                enabled TINYINT(1) DEFAULT 1,
+                remark VARCHAR(256),
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                UNIQUE KEY uk_type_alias (type, alias)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 字典';
+        </sql>
+    </changeSet>
+
+    <!-- 14 个字典类型初始项（04 清单，来源号段 3100：类型ID=3100+n，项ID=类型ID*1000+序号） -->
+    <changeSet id="cmr-dict-seed-20261103" author="cmr" context="mysql">
+        <sql>
+            INSERT IGNORE INTO cmr_dict (id, type, alias, label, sort) VALUES
+            (3100001, 'cmr_scene', 'general',    '通用',   1),
+            (3100002, 'cmr_scene', 'security',   '安防',   2),
+            (3100003, 'cmr_scene', 'inspection', '巡检',   3),
+            (3101001, 'cmr_dataset_status', 'ingest',     '接入中',   1),
+            (3101002, 'cmr_dataset_status', 'scoring',    '评定中',   2),
+            (3101003, 'cmr_dataset_status', 'stored',     '已入库',   3),
+            (3101004, 'cmr_dataset_status', 'indexing',   '建索引中', 4),
+            (3101005, 'cmr_dataset_status', 'searchable', '可检索',   5),
+            (3101006, 'cmr_dataset_status', 'stuck',      '卡住',     6),
+            (3101007, 'cmr_dataset_status', 'rejected',   '已剔除',   7),
+            (3102001, 'cmr_decision', 'pass',    '通过',   1),
+            (3102002, 'cmr_decision', 'suspend', '挂起',   2),
+            (3102003, 'cmr_decision', 'reject',  '不通过', 3),
+            (3103001, 'cmr_task_status', 'ready',   '就绪',   1),
+            (3103002, 'cmr_task_status', 'running', '执行中', 2),
+            (3103003, 'cmr_task_status', 'done',    '完成',   3),
+            (3103004, 'cmr_task_status', 'failed',  '失败',   4),
+            (3104001, 'cmr_fail_disposal', 'retrying',  '重试中',   1),
+            (3104002, 'cmr_fail_disposal', 'recovered', '已恢复',   2),
+            (3104003, 'cmr_fail_disposal', 'isolated',  '已转隔离', 3),
+            (3105001, 'cmr_task_type', 'build',  '建库', 1),
+            (3105002, 'cmr_task_type', 'eval',   '评测', 2),
+            (3105003, 'cmr_task_type', 'search', '检索', 3),
+            (3106001, 'cmr_modality', 'text',  '文本', 1),
+            (3106002, 'cmr_modality', 'image', '图像', 2),
+            (3106003, 'cmr_modality', 'audio', '音频', 3),
+            (3106004, 'cmr_modality', 'video', '视频', 4),
+            (3107001, 'cmr_adopt_status', 'unadopted', '未采用', 1),
+            (3107002, 'cmr_adopt_status', 'adopted',   '已采用', 2),
+            (3107003, 'cmr_adopt_status', 'discarded', '已废弃', 3),
+            (3108001, 'cmr_strategy_status', 'draft',  '草稿',   1),
+            (3108002, 'cmr_strategy_status', 'active', '生效中', 2),
+            (3109001, 'cmr_eval_set_status', 'labeling', '标注中',   1),
+            (3109002, 'cmr_eval_set_status', 'done',     '已完成',   2),
+            (3110001, 'cmr_feedback_type', 'inaccurate',   '结果不准', 1),
+            (3110002, 'cmr_feedback_type', 'ranking',      '排序差',   2),
+            (3110003, 'cmr_feedback_type', 'wrong_source', '来源标错', 3),
+            (3110004, 'cmr_feedback_type', 'zero_result',  '零结果',   4),
+            (3111001, 'cmr_feedback_status', 'pending',    '待处理', 1),
+            (3111002, 'cmr_feedback_status', 'processing', '处理中', 2),
+            (3111003, 'cmr_feedback_status', 'closed',     '已闭环', 3),
+            (3112001, 'cmr_feedback_target', 'strategy',   '策略',       1),
+            (3112002, 'cmr_feedback_target', 'datasource', '数据源',     2),
+            (3112003, 'cmr_feedback_target', 'backfill',   '数据补充',   3),
+            (3113001, 'cmr_index_status', 'candidate', '候选',     1),
+            (3113002, 'cmr_index_status', 'active',    '激活',     2),
+            (3113003, 'cmr_index_status', 'retired',   '已回滚',   3);
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

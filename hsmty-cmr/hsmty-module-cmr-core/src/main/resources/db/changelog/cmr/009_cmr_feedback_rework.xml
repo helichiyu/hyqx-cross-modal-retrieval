@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 反馈单收敛：两个入口、两种状态、三种去向（数据流 3.7） -->
+    <changeSet id="cmr-feedback-entry-20261110" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="cmr_feedback" columnName="entry_type"/></not>
+        </preConditions>
+        <sql>
+            ALTER TABLE cmr_feedback
+                ADD COLUMN entry_type VARCHAR(16) COMMENT 'mismatch/zero' AFTER type,
+                ADD COLUMN source_task_no VARCHAR(32) COMMENT '来源任务号' AFTER search_id,
+                ADD COLUMN source_query VARCHAR(1024) COMMENT '来源搜索词',
+                ADD COLUMN mismatch_items_json JSON COMMENT '勾选的不匹配条目 [{itemId,name,score}]',
+                ADD COLUMN judgment VARCHAR(32) COMMENT '处理判断 data_bad/match_bad/need_data',
+                ADD COLUMN disposition VARCHAR(16) COMMENT 'block/strategy/supplement',
+                ADD COLUMN blocked TINYINT(1) DEFAULT 0 COMMENT '是否已写屏蔽';
+        </sql>
+    </changeSet>
+
+    <!-- 老数据归并：4 类反馈 → 2 个入口；processing → pending；closed → handled -->
+    <changeSet id="cmr-feedback-migrate-20261110" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <sqlCheck expectedResult="0">SELECT COUNT(*) FROM cmr_feedback WHERE entry_type IS NULL AND type IS NOT NULL</sqlCheck>
+            </not>
+        </preConditions>
+        <sql>
+            UPDATE cmr_feedback SET entry_type = CASE
+                WHEN type = 'zero_result' THEN 'zero'
+                ELSE 'mismatch' END
+            WHERE entry_type IS NULL;
+            UPDATE cmr_feedback SET status = 'pending' WHERE status = 'processing';
+            UPDATE cmr_feedback SET status = 'handled' WHERE status = 'closed';
+            UPDATE cmr_feedback SET disposition = CASE
+                WHEN target = 'datasource' THEN 'block'
+                WHEN target = 'strategy' THEN 'strategy'
+                WHEN target = 'backfill' THEN 'supplement'
+                ELSE disposition END
+            WHERE disposition IS NULL;
+            UPDATE cmr_feedback SET blocked = 1
+            WHERE disposition = 'block' AND status = 'handled';
+        </sql>
+    </changeSet>
+
+    <!-- 条目屏蔽：结果运营「屏蔽数据」写入，结果页渲染前排除 -->
+    <changeSet id="cmr-blocked-item-20261110" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="cmr_blocked_item"/></not>
+        </preConditions>
+        <sql>
+            CREATE TABLE cmr_blocked_item (
+                id BIGINT PRIMARY KEY COMMENT '雪花主键',
+                item_id VARCHAR(64) NOT NULL COMMENT '被屏蔽条目 ID',
+                item_name VARCHAR(512) COMMENT '条目名称',
+                source VARCHAR(256) COMMENT '来源名',
+                reason VARCHAR(512) COMMENT '屏蔽原因',
+                feedback_id BIGINT COMMENT '来源反馈单',
+                create_id BIGINT, create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                update_id BIGINT, update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                del_flag CHAR(1) NOT NULL DEFAULT 'F',
+                KEY idx_item (item_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='cmr 条目屏蔽';
+        </sql>
+    </changeSet>
+</databaseChangeLog>

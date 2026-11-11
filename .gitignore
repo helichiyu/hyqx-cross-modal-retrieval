@@ -43,5 +43,9 @@ dataset/eval/
 dataset/ds/
 dataset/v5_sample/
 
+# 检索页上传的临时查询文件（落盘于 dataset/query/，运行时生成）
+dataset/query/
+hsmty-cmr/data/
+
 # 本地数据库/密钥配置
 cmr-backend/src/main/resources/application-local.yml

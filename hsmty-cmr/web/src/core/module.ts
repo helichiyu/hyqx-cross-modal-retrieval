@@ -1,4 +1,4 @@
-import type { RouteRecordRaw } from 'vue-router'
+import type { NavigationGuard, RouteRecordRaw } from 'vue-router'
 
 /**
  * 业务模块定义。
@@ -11,8 +11,10 @@ export interface CmsModule {
   name: string
   /** 展示名称 */
   title: string
-  /** 路由基础路径，使用组件英文简写作为前缀 */
+  /** 模块默认落点，供根路径兜底跳转使用 */
   basePath: string
+  /** 可选的全局前置守卫（权限校验等），由 core/router 统一注册 */
+  guard?: NavigationGuard
   routes: RouteRecordRaw[]
 }
 

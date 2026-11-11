@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      零结果反馈允许不带来源任务号（FeedbackCreateDTO 中 sourceTaskNo 对 zero 入口为可选），
+      此时 search_id 只能为空；旧版建表脚本漏了这层约束，插入会因 NOT NULL 失败。
+    -->
+    <changeSet id="cmr-feedback-search-id-nullable-20261111" author="cmr" context="mysql">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cmr_feedback'
+                  AND COLUMN_NAME = 'search_id' AND IS_NULLABLE = 'YES'
+            </sqlCheck>
+        </preConditions>
+        <sql>
+            ALTER TABLE cmr_feedback MODIFY COLUMN search_id BIGINT NULL COMMENT '关联检索历史（零结果入口可为空）';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

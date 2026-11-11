@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 结果条目质量等级：继承 P4 数据集 402 评定分（A≥0.90 / B≥0.80 / C≥0.70 / D 其余），P2 质量区间筛选用 -->
+    <changeSet id="cmr-result-item-quality-grade-20261110" author="cmr" context="mysql,postgresql">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="cmr_result_item" columnName="quality_grade"/></not>
+        </preConditions>
+        <addColumn tableName="cmr_result_item">
+            <column name="quality_grade" type="char(1)" remarks="质量等级 A/B/C/D（继承 P4 评定分）"/>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

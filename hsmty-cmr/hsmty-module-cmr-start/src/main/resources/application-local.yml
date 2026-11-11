@@ -37,6 +37,10 @@ router:
 cmr:
   operator:
     base-url: 'http://127.0.0.1:6300'
+  # 共享卷指向仓库根的数据集与运行时目录（jar 在 hsmty-cmr 下启动）
+  volume:
+    dataset: '../dataset'
+    runtime: '../runtime'
   file:
     store: local
     local-root: ./data/files

@@ -1,0 +1,58 @@
+package com.hsmty.cmr.domain.dataset.vo;
+
+import com.hsmty.cmr.domain.dataset.entity.CmrDataset;
+import lombok.Builder;
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+/**
+ * 数据集视图（P4 列表）
+ *
+ * @author cmr
+ * @since 2026-11-03
+ */
+@Data
+@Builder
+public class DatasetVO {
+
+    private Long id;
+
+    private String bizNo;
+
+    private Long datasourceId;
+
+    private String name;
+
+    private String version;
+
+    private String scene;
+
+    private String status;
+
+    private String stuckReason;
+
+    private BigDecimal score;
+
+    private String decision;
+
+    private Integer itemCount;
+
+    private String modalityJson;
+
+    private Long currentIndexId;
+
+    private LocalDateTime createTime;
+
+    public static DatasetVO from(CmrDataset e) {
+        return DatasetVO.builder()
+                .id(e.getId()).bizNo(e.getBizNo()).datasourceId(e.getDatasourceId())
+                .name(e.getName()).version(e.getVersion()).scene(e.getScene())
+                .status(e.getStatus()).stuckReason(e.getStuckReason())
+                .score(e.getScore()).decision(e.getDecision())
+                .itemCount(e.getItemCount()).modalityJson(e.getModalityJson())
+                .currentIndexId(e.getCurrentIndexId()).createTime(e.getCreateTime())
+                .build();
+    }
+}

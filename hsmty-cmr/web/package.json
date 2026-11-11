@@ -16,6 +16,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@element-plus/icons-vue": "2.3.1",
     "element-plus": "2.14.8",
     "pinia": "3.0.4",
     "vue": "3.5.45",

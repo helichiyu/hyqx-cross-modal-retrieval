@@ -6,8 +6,20 @@
 
     <!-- 本模块变更入口：只增不删，新文件按三位序号追加 include -->
     <include file="db/changelog/cmr/001_cmr_file_object_init.xml" relativeToChangelogFile="false"/>
-    <include file="db/changelog/cmr/002_cmr_index_init.xml" relativeToChangelogFile="false"/>
-    <include file="db/changelog/cmr/003_cmr_search_history_init.xml" relativeToChangelogFile="false"/>
-    <include file="db/changelog/cmr/004_cmr_result_item_init.xml" relativeToChangelogFile="false"/>
+    <!-- 002 起为旧版 cmr-backend 的库表脚本（001–013）原样迁入，表结构以旧版为准 -->
+    <include file="db/changelog/cmr/002_cmr_schema.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/003_cmr_dict_init.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/004_cmr_search_target_modality.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/005_cmr_datasource_test_result.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/006_cmr_search_log_id_snapshot.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/007_cmr_datasource_sync.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/008_cmr_vote_favorite.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/009_cmr_feedback_rework.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/010_cmr_evaluation.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/011_cmr_dict_v5.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/012_cmr_dict_feedback_status_cleanup.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/013_cmr_result_item_quality_grade.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/014_cmr_reset_initial_password.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/015_cmr_feedback_search_id_nullable.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

@@ -63,6 +63,13 @@
             <groupId>com.mybatis-flex</groupId>
             <artifactId>mybatis-flex-spring</artifactId>
         </dependency>
+        <!-- 旧版业务代码使用生成的 TableDef，编译期需要注解处理器 -->
+        <dependency>
+            <groupId>com.mybatis-flex</groupId>
+            <artifactId>mybatis-flex-processor</artifactId>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>org.mybatis</groupId>
             <artifactId>mybatis</artifactId>
@@ -70,6 +77,11 @@
         <dependency>
             <groupId>org.mybatis</groupId>
             <artifactId>mybatis-spring</artifactId>
+        </dependency>
+        <!-- 结果条目元数据回查：读取索引目录下的 meta.db（旧版同款实现，版本由父工程 BOM 管理） -->
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
         </dependency>
 
         <!-- Web / 校验：core 不负责启动，按规范 provided + optional -->

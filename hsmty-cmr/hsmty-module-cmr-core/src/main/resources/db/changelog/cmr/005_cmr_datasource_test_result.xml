@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="cmr-datasource-test-result-20261109" author="cmr" context="mysql">
+        <sql>
+            ALTER TABLE cmr_datasource
+                ADD COLUMN last_test_connected TINYINT(1) COMMENT '最近测试是否连通:null=未测试/不适用' AFTER auth_config,
+                ADD COLUMN last_test_status_code INT COMMENT '最近测试 HTTP 状态',
+                ADD COLUMN last_test_latency_ms BIGINT COMMENT '最近测试耗时 ms',
+                ADD COLUMN last_test_message VARCHAR(512) COMMENT '最近测试结果说明',
+                ADD COLUMN last_test_time DATETIME COMMENT '最近测试时间' AFTER last_test_message;
+        </sql>
+    </changeSet>
+</databaseChangeLog>

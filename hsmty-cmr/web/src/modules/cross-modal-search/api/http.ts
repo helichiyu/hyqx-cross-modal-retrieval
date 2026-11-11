@@ -1,0 +1,121 @@
+import type { ApiEnvelope } from './types'
+
+/**
+ * 旧版 cmr-web 请求封装的迁移版。
+ *
+ * <p>与旧版的差异只在协议层：外层统一包结构由旧后端
+ * {@code {code: 0, msg, data}} 换成平台 {@code {code: '0000', message, data}}；
+ * 身份由主应用/网关的 SSO Cookie 维护，前端不再保存 Token。
+ * 业务路径、入参、分页结构（records/total/pageNum/pageSize）保持旧版原样。
+ */
+
+const BASE = '/hs-api/cmr/'
+
+const SUCCESS_CODE = '0000'
+
+const AUTH_FAILED_CODES = new Set(['C105', 'C106'])
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public code?: string,
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
+function queryString(params: Record<string, unknown>): string {
+  const usp = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== '') {
+      usp.set(k, String(v))
+    }
+  }
+  const s = usp.toString()
+  return s ? `?${s}` : ''
+}
+
+function notifyUnauthorized() {
+  window.dispatchEvent(new CustomEvent('cms:unauthorized'))
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  opts: { body?: unknown; form?: FormData; params?: Record<string, unknown> } = {},
+): Promise<T> {
+  const headers: Record<string, string> = {}
+  let body: BodyInit | undefined
+  if (opts.form) {
+    body = opts.form
+  } else if (opts.body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+    body = JSON.stringify(opts.body)
+  }
+  let resp: Response
+  try {
+    resp = await fetch(`${BASE}${path}${queryString(opts.params ?? {})}`, {
+      method,
+      headers,
+      body,
+      credentials: 'include',
+    })
+  } catch {
+    throw new ApiError('网络异常，请检查后端服务', 0)
+  }
+  const json = (await resp.json().catch(() => null)) as ApiEnvelope<T> | null
+  if (resp.status === 401 && (!json?.code || AUTH_FAILED_CODES.has(json.code))) {
+    notifyUnauthorized()
+    throw new ApiError(json?.message || '登录已过期，请重新登录', 401, json?.code)
+  }
+  if (!json) {
+    throw new ApiError(`响应解析失败(${resp.status})`, resp.status)
+  }
+  if (json.code !== SUCCESS_CODE) {
+    throw new ApiError(json.message || '请求失败', resp.status, json.code)
+  }
+  return json.data
+}
+
+export const http = {
+  get<T>(path: string, params?: Record<string, unknown>) {
+    return request<T>('GET', path, { params })
+  },
+  post<T>(path: string, body?: unknown, params?: Record<string, unknown>) {
+    return request<T>('POST', path, { body, params })
+  },
+  put<T>(path: string, body?: unknown) {
+    return request<T>('PUT', path, { body })
+  },
+  delete<T>(path: string) {
+    return request<T>('DELETE', path)
+  },
+  upload<T>(path: string, form: FormData) {
+    return request<T>('POST', path, { form })
+  },
+  /** 拉取文件流（媒体预览用，Cookie 会话随请求携带） */
+  async blob(path: string, params?: Record<string, unknown>): Promise<Blob> {
+    const resp = await fetch(`${BASE}${path}${queryString(params ?? {})}`, {
+      credentials: 'include',
+    })
+    if (!resp.ok) {
+      throw new ApiError(`文件获取失败(${resp.status})`, resp.status)
+    }
+    return resp.blob()
+  },
+  /** 携带 JSON 入参获取文件流（批量打包下载用） */
+  async postBlob(path: string, body: unknown): Promise<Blob> {
+    const resp = await fetch(`${BASE}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      credentials: 'include',
+    })
+    if (!resp.ok) {
+      throw new ApiError(`文件获取失败(${resp.status})`, resp.status)
+    }
+    return resp.blob()
+  },
+}

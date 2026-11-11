@@ -6,6 +6,7 @@ import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.cloud.client.discovery.simple.SimpleDiscoveryClientAutoConfiguration;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * 跨模态检索中心启动类。
@@ -20,6 +21,7 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 @SpringBootApplication(exclude = {SimpleDiscoveryClientAutoConfiguration.class, RefreshAutoConfiguration.class})
 @EnableAspectJAutoProxy
 @EnableFeignClients
+@EnableScheduling
 public class RunApplication {
 
     public static void main(String[] args) {

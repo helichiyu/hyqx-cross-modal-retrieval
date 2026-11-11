@@ -19,8 +19,10 @@ spring:
       enabled: true
   servlet:
     multipart:
-      max-file-size: 200MB
-      max-request-size: 210MB
+      # 数据集压缩包上传：与前端 nginx client_max_body_size 对齐
+      max-file-size: ${CMR_UPLOAD_MAX:2048MB}
+      max-request-size: ${CMR_UPLOAD_MAX:2048MB}
+      file-size-threshold: 2MB
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://192.168.1.102:13306/sd_data_engineering?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowMultiQueries=true&allowPublicKeyRetrieval=true
@@ -145,9 +147,35 @@ cmr:
   # 检索算子独立容器；本地/测试用 127.0.0.1，生产用 compose 内服务名或实际地址
   operator:
     base-url: '${CMR_OPERATOR_BASE_URL:http://127.0.0.1:6300}'
-    timeout:
-      search-ms: 60000
-      batch-ms: 1800000
+    # 在线链（407/408）与批量链（401–406/409）超时，单位 ms
+    timeout-search-ms: '${CMR_OPERATOR_TIMEOUT_SEARCH_MS:60000}'
+    timeout-batch-ms: '${CMR_OPERATOR_TIMEOUT_BATCH_MS:1800000}'
+  # 共享卷：数据集原始文件与运行时索引的逻辑根目录
+  volume:
+    dataset: '${CMR_DATASET_DIR:../dataset}'
+    runtime: '${CMR_RUNTIME_DIR:../runtime}'
+  # 数据源认证信息加密密钥，生产必须覆盖
+  crypto:
+    key: '${CMR_CRYPTO_KEY:change-me-crypto-32bytes-0123456789!}'
+  # 向量模型白名单：空表示不拦截建库
+  model:
+    whitelist: '${CMR_MODEL_WHITELIST:}'
+  # 检索日志保留策略
+  retention:
+    search-log-days: '${CMR_SEARCH_LOG_DAYS:30}'
+    search-log-batch-size: '${CMR_SEARCH_LOG_BATCH_SIZE:1000}'
+    search-log-cron: '${CMR_SEARCH_LOG_CLEANUP_CRON:0 30 2 * * *}'
+  # 406 投产校验默认评测文件与验收线
+  eval:
+    default-eval-file: 'dataset/eval/default.jsonl'
+    lines:
+      recall: 0.8
+      precision:
+      ndcg:
+  # 建库并发与引擎侧重试
+  build:
+    concurrency: 1
+    retry-max: 3
   # 检索默认参数；无激活索引（cmr_index.status=active）时使用 index-dir
   search:
     index-dir: '${CMR_SEARCH_INDEX_DIR:runtime/demo_index}'
