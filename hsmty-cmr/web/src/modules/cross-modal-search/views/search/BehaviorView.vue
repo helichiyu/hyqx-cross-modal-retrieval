@@ -271,8 +271,7 @@ function inputText(row: BehaviorVO) {
   if (text) {
     return text
   }
-  // 契约未返回 queryFile 时后端可能将文件名放入 queryText；两者都无则回退占位
-  const file = (row as BehaviorVO & { queryFile?: string | null }).queryFile
+  const file = row.queryFile
   if (file) {
     const name = file.split(/[\\/]/).pop() || file
     const prefix = row.queryModality === 'image' ? '图片：' : row.queryModality === 'video' ? '视频：' : row.queryModality === 'audio' ? '音频：' : ''

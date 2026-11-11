@@ -60,9 +60,10 @@
             <div class="row-acts">
               <el-button link type="primary" @click.stop="openEditor(row)">编辑</el-button>
               <el-button
-                v-if="row.status !== 'offline'"
                 link
                 type="primary"
+                :disabled="!row.hasDraft"
+                :title="row.hasDraft ? '发布当前草稿' : '没有待发布草稿，请先编辑保存'"
                 @click.stop="requestPublish(row)"
               >发布</el-button>
               <el-button link type="primary" @click.stop="openVersions(row)">版本历史</el-button>
@@ -326,7 +327,9 @@
           <span class="chk-k">{{ item.label }}</span>
           <span class="chk-v">{{ item.detail || '—' }}</span>
         </div>
-        <div v-if="!consistencyLoading && !consistencyChecks.length" class="muted-cell">未获取到检查结果</div>
+        <div v-if="!consistencyLoading && !consistencyChecks.length" class="muted-cell">
+          {{ consistencyError || '未获取到检查结果' }}
+        </div>
       </div>
       <template #footer>
         <div class="stg-foot">
@@ -459,18 +462,17 @@ import {
   pageStrategies,
   publishStrategy,
   rollbackStrategy,
+  strategyCompareOptions,
   strategyConsistency,
   strategyDetail,
   strategyDiff,
   strategyModelOptions,
-  strategyOptions,
   updateDraft,
 } from '../../api'
 import type {
   ConsistencyCheckVO,
   Id,
   StrategyDetailVO,
-  StrategyOptionVO,
   StrategyVersionVO,
   StrategyVO,
 } from '../../api/types'
@@ -576,7 +578,15 @@ const versionLoading = ref(false)
 
 const compareOpen = ref(false)
 const compareTarget = ref<StrategyVO | null>(null)
-const compareOptions = ref<StrategyOptionVO[]>([])
+type CompareOption = {
+  id: Id
+  bizNo: string
+  name: string
+  scene: string
+  status: string
+  versionNo: number | null
+}
+const compareOptions = ref<CompareOption[]>([])
 const compareRows = ref<CompareRow[]>([])
 const compareId = ref<Id | ''>('')
 const compareLoading = ref(false)
@@ -584,7 +594,8 @@ const compareLoading = ref(false)
 const consistencyOpen = ref(false)
 const consistencyLoading = ref(false)
 const consistencyChecks = ref<ConsistencyCheckVO[]>([])
-const consistencyPassed = ref(true)
+const consistencyPassed = ref(false)
+const consistencyError = ref('')
 const consistencyAt = ref('')
 
 const offlineOpen = ref(false)
@@ -647,11 +658,21 @@ const compareTitle = computed(() =>
 
 const consistencyBadCount = computed(() => consistencyChecks.value.filter((item) => !item.ok).length)
 
-const consistencyTitle = computed(() =>
-  consistencyPassed.value && !consistencyBadCount.value
+const consistencyTitle = computed(() => {
+  if (consistencyLoading.value) {
+    return '一致性检查中…'
+  }
+  if (consistencyError.value) {
+    return '✗ 一致性检查失败'
+  }
+  if (!consistencyChecks.value.length) {
+    return '一致性检查无结果'
+  }
+  // 只有后端明确 passed=true 且无坏项才显示通过，避免请求失败/空结果时误报“通过”
+  return consistencyPassed.value && !consistencyBadCount.value
     ? '✓ 一致性检查通过'
-    : `✗ 发现 ${consistencyBadCount.value} 项问题`,
-)
+    : `✗ 发现 ${consistencyBadCount.value} 项问题`
+})
 
 const versionRows = computed<VersionRow[]>(() => {
   const detail = versionDetail.value
@@ -938,6 +959,10 @@ async function discardEditorDraft() {
 // ---------- 发布 / 下线 / 上线 ----------
 
 async function requestPublish(row: StrategyVO) {
+  if (!row.hasDraft) {
+    ElMessage.warning('该策略没有待发布草稿，请先编辑保存后再发布')
+    return
+  }
   try {
     await ElMessageBox.confirm(
       `发布后「${row.name}」的下次检索即按新参数执行，确认发布当前草稿？`,
@@ -979,7 +1004,7 @@ async function confirmOffline() {
   }
   offlineSaving.value = true
   try {
-    await offlineStrategy(target.id, offlineReason.value)
+    await offlineStrategy(target.id, offlineReason.value, offlineRemark.value)
     offlineOpen.value = false
     ElMessage.success('已下线')
     await reload()
@@ -1058,7 +1083,8 @@ async function openCompare(row: StrategyVO) {
   compareId.value = ''
   compareOptions.value = []
   try {
-    const options = await strategyOptions()
+    // 对比对象不限于生效策略：草稿 / 已下线策略同样可选，后端按“生效 > 草稿 > 最近发布”取可用版本
+    const options = await strategyCompareOptions()
     compareOptions.value = options.filter((item) => item.id !== row.id)
     if (compareOptions.value.length) {
       compareId.value = compareOptions.value[0].id
@@ -1096,7 +1122,7 @@ function buildCompareRows(data: StrategyDiff): CompareRow[] {
     list.push({ name, left: other, right: self, diff: self !== other })
   }
   push('相似度阈值', thresholdText(data.threshold?.from), thresholdText(data.threshold?.to))
-  push('向量模型', data.vector?.from || '—', data.vector?.to || '—')
+  // 向量模型不属于策略参数（只读回显当前激活索引），双方永远相同，不在对比表中展示
   const weights = data.weights || {}
   for (const field of WEIGHT_FIELDS) {
     const pair = weights[field.key]
@@ -1125,7 +1151,8 @@ async function openConsistency() {
   consistencyOpen.value = true
   consistencyLoading.value = true
   consistencyChecks.value = []
-  consistencyPassed.value = true
+  consistencyPassed.value = false
+  consistencyError.value = ''
   consistencyAt.value = ''
   try {
     const data = (await strategyConsistency()) as {
@@ -1137,7 +1164,8 @@ async function openConsistency() {
       data.passed ?? consistencyChecks.value.every((item) => item.ok)
     consistencyAt.value = nowText()
   } catch (error) {
-    ElMessage.error((error as Error).message)
+    consistencyError.value = (error as Error).message
+    ElMessage.error(consistencyError.value)
   } finally {
     consistencyLoading.value = false
   }

@@ -404,6 +404,7 @@ import {
   executeSearch,
   pageHistory,
   strategyOptions,
+  suggestWords,
   understand,
   uploadFile,
 } from '../../api'
@@ -448,8 +449,6 @@ const matrix = modes.map(row => ({
   cells: modes.map((col, index) => ({ pair: `${pairShort[row]}搜${pairShort[col]}`, index })),
 }))
 
-/** 无任务记录时展示的示例联想 */
-const EXAMPLE_QUERIES = ['含发票代码的扫描件', '窗口办事人员操作特写', '产线设备运行画面']
 const CLARIFY_KEY = 'cmrClarify'
 const REFILL_KEY = 'cmRefill'
 const CLARIFY_MIN_CHARS = 4
@@ -481,6 +480,8 @@ const modeNudge = ref(false)
 const historySuggestions = ref<string[]>([])
 const recentSuggestions = ref<string[]>([])
 const exampleSuggestions = ref<string[]>([])
+/** 示例搜索词来自后端推荐词库（/search/suggest），不再前端写死 */
+const exampleWords = ref<string[]>([])
 const suggestVisible = ref(false)
 
 const clarify = reactive({
@@ -508,7 +509,7 @@ onMounted(async () => {
     return
   }
   await loadStrategyOptions()
-  await loadHistory()
+  await Promise.all([loadHistory(), loadExampleWords()])
   applyInitialParams()
   window.addEventListener('keydown', onKeydown)
 })
@@ -540,6 +541,15 @@ async function loadHistory() {
     historySuggestions.value = [...new Set(page.records.map(item => (item.queryText || '').trim()).filter(Boolean))].slice(0, 20)
   } catch {
     historySuggestions.value = []
+  }
+}
+
+/** 示例搜索词：运营维护的推荐词，场景取当前所选检索类型 */
+async function loadExampleWords() {
+  try {
+    exampleWords.value = await suggestWords()
+  } catch {
+    exampleWords.value = []
   }
 }
 
@@ -581,8 +591,9 @@ function applyInitialParams() {
     }
   }
 
-  if (qp.relax === '1') {
-    showToast('已放宽过滤，按原 query 重新检索')
+  if (qp.relax === '1' && fillQuery) {
+    showToast('已放宽相似度阈值，按原 query 重新检索')
+    void runSearch(undefined, true)
   }
 }
 
@@ -666,9 +677,9 @@ function renderSuggest() {
     return
   }
   const recent = historySuggestions.value.filter(item => item.includes(value)).slice(0, 3)
-  let examples = EXAMPLE_QUERIES.filter(item => item.includes(value)).slice(0, 3)
+  let examples = exampleWords.value.filter(item => item.includes(value)).slice(0, 3)
   if (!recent.length && !examples.length) {
-    examples = EXAMPLE_QUERIES.slice(0, 3)
+    examples = exampleWords.value.slice(0, 3)
   }
   recentSuggestions.value = recent
   exampleSuggestions.value = examples
@@ -759,14 +770,28 @@ async function handleFile(file: File) {
   uploadMessage.value = '正在识别模态…'
   uploadError.value = ''
   try {
-    const [uploaded] = await Promise.all([uploadFile(file), delay(900)])
-    const mode: Mode = image ? '图像' : video ? '视频' : '音频'
-    queryFile.value = uploaded.path
+    const uploaded = await uploadFile(file)
+    // 模态以 407 查询理解结果为准；407 不可用时回退扩展名判定
+    let mode: Mode = image ? '图像' : video ? '视频' : '音频'
+    let path = uploaded.path
+    try {
+      const understood = await understand({ queryFile: uploaded.path })
+      const detected = modeOfModality(understood.queryModality)
+      if (detected) {
+        mode = detected
+      }
+      if (understood.queryFile) {
+        path = understood.queryFile
+      }
+    } catch {
+      // 407 不可用时保留扩展名判定，不阻断上传
+    }
+    queryFile.value = path
     queryMode.value = mode
     uploadState.value = 'success'
     uploadMessage.value = `已识别为${mode}模态，请选择目标检索类型`
     applyFileFilter()
-    if (audio) {
+    if (mode === '音频') {
       selectPair('音搜音')
     }
   } catch (error) {
@@ -775,6 +800,11 @@ async function handleFile(file: File) {
     recognizing.value = false
     if (fileInput.value) fileInput.value.value = ''
   }
+}
+
+/** 后端 queryModality（text/image/audio/video）→ 检索台模态 */
+function modeOfModality(modality: string | null | undefined): Mode | null {
+  return ({ text: '文本', image: '图像', audio: '音频', video: '视频' } as Record<string, Mode>)[modality || ''] ?? null
 }
 
 /** 上传失败：清空文件与预览，避免用旧文件检索 */
@@ -840,7 +870,7 @@ async function submitSearch() {
   await runSearch()
 }
 
-async function runSearch(clarifiedQuery?: string) {
+async function runSearch(clarifiedQuery?: string, relaxed = false) {
   if (searching.value) return
   const text = (clarifiedQuery ?? query.value).trim()
   const clarified = Boolean(text) && (Boolean(clarifiedQuery) || (text.length < CLARIFY_MIN_CHARS && isClarified(text)))
@@ -858,6 +888,11 @@ async function runSearch(clarifiedQuery?: string) {
     if (clarified) {
       body.clarified = true
       body.clarifiedQuery = text
+    }
+    if (relaxed) {
+      // P2 空结果「放宽过滤」：在策略阈值基础上下调 0.20，最低 0.30
+      const base = Number(selectedStrategy.value?.threshold ?? 0.6)
+      body.threshold = Math.max(0.3, Math.round((base - 0.2) * 100) / 100)
     }
     const result = await executeSearch(body)
 
@@ -922,9 +957,7 @@ async function openClarify(value: string) {
   } catch {
     clarify.options = []
   }
-  if (!clarify.options.length) {
-    clarify.options = fallbackCandidates(value)
-  }
+  // 后端未返回候选时保留空态提示，不伪造候选
 }
 
 /** 407 候选可能是 {intent, query, hint} 序列化后的 JSON 串，取改写 query 作为候选文本 */
@@ -943,11 +976,6 @@ function normalizeClarifyOptions(options: string[]): string[] {
     })
     .filter((item): item is string => Boolean(item))
     .slice(0, 3)
-}
-
-/** 后端未返回候选时按 query 派生模板，避免浮层空转 */
-function fallbackCandidates(value: string) {
-  return [`含${value}的扫描件`, `${value} 高清扫描`, `${value} 内容示意`]
 }
 
 function pickClarify(value: string) {
@@ -1004,9 +1032,6 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
-function delay(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
 </script>
 
 <style scoped>

@@ -139,7 +139,7 @@
 
       <el-table
         v-loading="hardLoading"
-        :data="hardPageRows"
+        :data="hardRows"
         class="sample-table"
         size="small"
         empty-text="暂无被踩的数据"
@@ -179,7 +179,7 @@
         <el-pagination
           class="cm-pagination"
           layout="total, prev, pager, next"
-          :total="hardRows.length"
+          :total="hardTotal"
           :page-size="HARD_PAGE_SIZE"
           :current-page="hardPage"
           @current-change="onHardPageChange"
@@ -198,7 +198,7 @@
         @input="onPickKeyword"
         @clear="onPickKeyword"
       />
-      <div class="pick-list">
+      <div v-loading="pickLoading" class="pick-list">
         <div class="pick-head">
           <span aria-hidden="true"></span>
           <span>时间</span>
@@ -217,14 +217,14 @@
             type="radio"
             name="evalPick"
             :value="row.taskNo"
-            :disabled="isEvaluated(row.query)"
-            :aria-label="`选择 ${row.query || row.taskNo}`"
+            :disabled="isEvaluated(row.queryText)"
+            :aria-label="`选择 ${row.queryText || row.taskNo}`"
           />
           <span class="pk-time">{{ fmtTime(row.createTime) }}</span>
-          <span class="pk-q" :title="row.query || ''">
-            {{ row.query || '—' }}
+          <span class="pk-q" :title="row.queryText || ''">
+            {{ row.queryText || '—' }}
             <span class="pk-task">{{ row.taskNo }}</span>
-            <span v-if="isEvaluated(row.query)" class="pk-flag">已在评测中</span>
+            <span v-if="isEvaluated(row.queryText)" class="pk-flag">已在评测中</span>
           </span>
           <span class="pk-d">{{ row.downCount }}</span>
         </label>
@@ -232,7 +232,7 @@
       <el-pagination
         class="cm-pagination pick-pager"
         layout="total, prev, pager, next"
-        :total="filteredCandidates.length"
+        :total="pickTotal"
         :page-size="PICK_PAGE_SIZE"
         :current-page="pickPage"
         @current-change="onPickPageChange"
@@ -427,10 +427,11 @@ import {
   createEvaluation,
   evaluationDetail,
   hardCases,
+  pageBehaviors,
   pageEvaluations,
   replayEvaluation,
 } from '../../api'
-import type { EvaluationDetailVO, EvaluationRowVO, HardCaseVO } from '../../api/types'
+import type { BehaviorVO, EvaluationDetailVO, EvaluationRowVO, HardCaseVO } from '../../api/types'
 import DevNotesDrawer from '../../components/DevNotesDrawer.vue'
 import { fmtTime } from '../../utils/format'
 
@@ -468,8 +469,7 @@ interface MetricRow {
 const PAGE_SIZE = 10
 const HARD_PAGE_SIZE = 10
 const PICK_PAGE_SIZE = 8
-const FETCH_SIZE = 100
-const MAX_PAGES = 10
+const FETCH_SIZE = 200
 
 const devOpen = ref(false)
 
@@ -554,7 +554,8 @@ async function fetchEvaluations(): Promise<EvaluationRowVO[]> {
   const kw = keyword.value.trim()
   const first = await pageEvaluations({ pageNum: 1, pageSize: FETCH_SIZE, keyword: kw })
   const records = [...first.records]
-  const pages = Math.min(Math.ceil(first.total / FETCH_SIZE), MAX_PAGES)
+  // 不截断：结论/“已在评测”判断需要完整集合
+  const pages = Math.ceil(first.total / FETCH_SIZE)
   for (let page = 2; page <= pages; page += 1) {
     const next = await pageEvaluations({ pageNum: page, pageSize: FETCH_SIZE, keyword: kw })
     records.push(...next.records)
@@ -606,39 +607,17 @@ function onPageChange(page: number) {
 // ---------- 难例样本集 & 新建评测候选 ----------
 const hardLoading = ref(false)
 const hardRows = ref<HardCaseVO[]>([])
+const hardTotal = ref(0)
 const hardPage = ref(1)
 const creatingTaskNo = ref('')
-
-const hardPageRows = computed(() => {
-  const start = (hardPage.value - 1) * HARD_PAGE_SIZE
-  return hardRows.value.slice(start, start + HARD_PAGE_SIZE)
-})
-
-async function fetchHardCases(): Promise<HardCaseVO[]> {
-  const first = await hardCases({ pageNum: 1, pageSize: FETCH_SIZE })
-  const records = [...first.records]
-  const pages = Math.min(Math.ceil(first.total / FETCH_SIZE), MAX_PAGES)
-  for (let page = 2; page <= pages; page += 1) {
-    const next = await hardCases({ pageNum: page, pageSize: FETCH_SIZE })
-    records.push(...next.records)
-  }
-  return records.sort((a, b) => {
-    const byDown = (b.downCount ?? 0) - (a.downCount ?? 0)
-    if (byDown !== 0) {
-      return byDown
-    }
-    return String(b.createTime ?? '').localeCompare(String(a.createTime ?? ''))
-  })
-}
 
 async function loadHardCases() {
   hardLoading.value = true
   try {
-    hardRows.value = await fetchHardCases()
-    const pages = Math.max(1, Math.ceil(hardRows.value.length / HARD_PAGE_SIZE))
-    if (hardPage.value > pages) {
-      hardPage.value = pages
-    }
+    // 后端已按「被踩条目数倒序、同数量按时间倒序」排序，直接服务端分页，避免截断
+    const page = await hardCases({ pageNum: hardPage.value, pageSize: HARD_PAGE_SIZE })
+    hardRows.value = page.records
+    hardTotal.value = page.total
   } catch (error) {
     ElMessage.error((error as Error).message)
   } finally {
@@ -648,6 +627,7 @@ async function loadHardCases() {
 
 function onHardPageChange(page: number) {
   hardPage.value = page
+  void loadHardCases()
 }
 
 function isEvaluated(query?: string | null): boolean {
@@ -665,50 +645,59 @@ const pickedTaskNo = ref('')
 const pickKeyword = ref('')
 const pickPage = ref(1)
 
-const filteredCandidates = computed(() => {
-  const kw = pickKeyword.value.trim().toLowerCase()
-  if (!kw) {
-    return hardRows.value
-  }
-  return hardRows.value.filter((row) => {
-    return (
-      (row.query ?? '').toLowerCase().includes(kw) ||
-      (row.taskNo ?? '').toLowerCase().includes(kw) ||
-      (row.createTime ?? '').toLowerCase().includes(kw)
-    )
-  })
-})
+// 候选 = 全部搜索行为记录（后端分页 + 关键词），不限“有点踩”的难例
+const candidates = ref<BehaviorVO[]>([])
+const pickTotal = ref(0)
+const pickLoading = ref(false)
+let pickTimer: ReturnType<typeof setTimeout> | null = null
 
-const pickRows = computed(() => {
-  const start = (pickPage.value - 1) * PICK_PAGE_SIZE
-  return filteredCandidates.value.slice(start, start + PICK_PAGE_SIZE)
-})
+const pickRows = computed(() => candidates.value)
+
+async function loadCandidates() {
+  pickLoading.value = true
+  try {
+    const page = await pageBehaviors({
+      pageNum: pickPage.value,
+      pageSize: PICK_PAGE_SIZE,
+      keyword: pickKeyword.value.trim() || undefined,
+    })
+    candidates.value = page.records
+    pickTotal.value = page.total
+  } catch (error) {
+    ElMessage.error((error as Error).message)
+  } finally {
+    pickLoading.value = false
+  }
+}
 
 function openCreate() {
   pickedTaskNo.value = ''
   pickKeyword.value = ''
   pickPage.value = 1
   createOpen.value = true
-  if (!hardRows.value.length && !hardLoading.value) {
-    void loadHardCases()
-  }
+  void loadCandidates()
 }
 
 function onPickKeyword() {
   pickPage.value = 1
+  if (pickTimer) {
+    clearTimeout(pickTimer)
+  }
+  pickTimer = setTimeout(() => void loadCandidates(), 300)
 }
 
 function onPickPageChange(page: number) {
   pickPage.value = page
+  void loadCandidates()
 }
 
 async function submitCreate() {
-  const target = hardRows.value.find((row) => row.taskNo === pickedTaskNo.value)
+  const target = candidates.value.find((row) => row.taskNo === pickedTaskNo.value)
   if (!target) {
     ElMessage.warning('请先选择一条搜索记录')
     return
   }
-  if (isEvaluated(target.query)) {
+  if (isEvaluated(target.queryText)) {
     ElMessage.error('该搜索已在评测中')
     return
   }

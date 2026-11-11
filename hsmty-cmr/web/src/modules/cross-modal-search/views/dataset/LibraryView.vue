@@ -58,7 +58,7 @@
             <span class="cell-time">{{ row.lastSyncTime ? fmtTime(row.lastSyncTime) : '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="172" fixed="right">
+        <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
             <div class="row-ops">
               <el-button class="op-btn" :disabled="testingId === row.id" @click="testConnection(row)">
@@ -71,6 +71,14 @@
                 @click="sync(row)"
               >
                 {{ syncingId === row.id ? '同步中…' : '同步' }}
+              </el-button>
+              <el-button
+                v-if="row.connectStatus === 'connected'"
+                class="op-btn"
+                :disabled="ingestingId === row.id"
+                @click="openIngest(row)"
+              >
+                接入
               </el-button>
             </div>
           </template>
@@ -221,6 +229,56 @@
       </template>
     </el-dialog>
 
+    <!-- 接入上游数据集：拉取到共享卷并触发建库链 -->
+    <el-dialog v-model="ingestOpen" :title="ingestTitle" width="720px">
+      <div v-loading="ingestLoading" class="ingest-body">
+        <div v-if="ingestError" class="probe-concl bad">
+          <b>拉取失败</b> —— {{ ingestError }}
+        </div>
+        <template v-else>
+          <p class="field-tip">
+            选择上游数据集后，系统拉取条目与原始文件到共享卷，并自动触发 401→406 建库链，完成后该数据集可检索。
+          </p>
+          <el-table :data="ingestDatasets" size="small" empty-text="上游未返回数据集">
+            <el-table-column label="dataset_id" min-width="140">
+              <template #default="{ row }">
+                <span class="mono">{{ row.datasetId || '—' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="名称" min-width="140">
+              <template #default="{ row }">{{ row.name || '—' }}</template>
+            </el-table-column>
+            <el-table-column label="条目数" width="90">
+              <template #default="{ row }">{{ row.itemCount ?? '—' }}</template>
+            </el-table-column>
+            <el-table-column label="必填完备" width="92">
+              <template #default="{ row }">
+                <span class="badge" :class="row.requiredOk ? 'ok' : 'bad'">
+                  {{ row.requiredOk ? '齐全' : '缺项' }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="92" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  link
+                  type="primary"
+                  :disabled="!row.datasetId || !row.requiredOk || ingestingId === ingestSource?.id"
+                  :title="row.requiredOk ? '接入并建库' : '上游缺少必填字段，无法接入'"
+                  @click="doIngest(row)"
+                >
+                  {{ ingestingId === ingestSource?.id ? '接入中…' : '接入' }}
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </template>
+      </div>
+      <template #footer>
+        <el-button @click="ingestOpen = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 对接数据源 -->
     <el-dialog v-model="createOpen" title="对接数据源" width="460px">
       <el-form :model="createForm" label-width="84px">
@@ -237,8 +295,8 @@
         </el-form-item>
         <el-form-item label="协议">
           <el-select v-model="createForm.protocol" style="width: 100%">
+            <!-- 后端契约不支持推送接收 push（见「接口对接定义」），故不提供该选项 -->
             <el-option label="接口拉取" value="pull" />
-            <el-option label="推送接收" value="push" />
           </el-select>
         </el-form-item>
         <el-form-item label="认证方式">
@@ -310,14 +368,14 @@
         <el-form-item label="数据集 ID" required :error="blIdError">
           <el-input v-model="blForm.datasetId" maxlength="40" placeholder="PKG261025F9K2VB" />
         </el-form-item>
-        <el-form-item label="名称" required>
-          <el-input v-model="blForm.name" maxlength="40" placeholder="四模态产物" />
+        <el-form-item label="名称">
+          <el-input v-model="blForm.name" maxlength="40" placeholder="四模态产物（选填）" />
         </el-form-item>
-        <el-form-item label="来源名" required>
-          <el-input v-model="blForm.sourceName" maxlength="60" placeholder="产线作业语料包v2.3" />
-          <div class="field-tip">与结果页「来源」一致才生效</div>
+        <el-form-item label="来源名">
+          <el-input v-model="blForm.sourceName" maxlength="60" placeholder="产线作业语料包v2.3（选填）" />
+          <div class="field-tip">与结果页「来源」一致时整源排除；留空则仅按数据集 ID 排除</div>
         </el-form-item>
-        <el-form-item label="地址" required :error="blAddrError">
+        <el-form-item label="地址" :error="blAddrError">
           <el-input
             v-model="blForm.endpoint"
             maxlength="120"
@@ -328,7 +386,7 @@
       </el-form>
       <template #footer>
         <el-button @click="addBlOpen = false">取消</el-button>
-        <el-button type="primary" :loading="adding" @click="submitAddBlacklist">添加</el-button>
+        <el-button type="primary" :loading="adding" @click="submitAddBlacklist">保存</el-button>
       </template>
     </el-dialog>
 
@@ -435,6 +493,8 @@ import {
   addBlacklist,
   createDatasource,
   datasourceContract,
+  datasourceDatasets,
+  ingestDatasource,
   listBlacklist,
   listDatasources,
   removeBlacklist,
@@ -446,6 +506,7 @@ import type {
   DatasourceCheckVO,
   DatasourceTestVO,
   DatasourceVO,
+  RemoteDatasetVO,
 } from '../../api/types'
 import { fmtTime } from '../../utils/format'
 import DevNotesDrawer from '../../components/DevNotesDrawer.vue'
@@ -492,6 +553,7 @@ const sources = ref<DatasourceVO[]>([])
 const blacklist = ref<DatasourceBlacklistVO[]>([])
 const testingId = ref('')
 const syncingId = ref('')
+const ingestingId = ref('')
 
 const devOpen = ref(false)
 
@@ -517,6 +579,12 @@ const probeSource = ref<DatasourceVO | null>(null)
 const probeResult = ref<DatasourceTestVO | null>(null)
 const probeError = ref('')
 
+const ingestOpen = ref(false)
+const ingestLoading = ref(false)
+const ingestError = ref('')
+const ingestSource = ref<DatasourceVO | null>(null)
+const ingestDatasets = ref<RemoteDatasetVO[]>([])
+
 const contractOpen = ref(false)
 const contractLoading = ref(false)
 const contractLoaded = ref(false)
@@ -525,6 +593,10 @@ const contract = ref<ContractBody>({})
 
 const probeTitle = computed(() =>
   probeSource.value ? `测试连接 · ${probeSource.value.name}` : '测试连接',
+)
+
+const ingestTitle = computed(() =>
+  ingestSource.value ? `接入数据集 · ${ingestSource.value.name}` : '接入数据集',
 )
 
 const probeChecks = computed<DatasourceCheckVO[]>(() => probeResult.value?.checks ?? [])
@@ -577,7 +649,7 @@ const probeConclusion = computed(() => {
     return ''
   }
   if (r.connected) {
-    return '4 项必填齐全，已开始向量化。'
+    return '4 项必填齐全，契约校验通过；可点击「接入」选择上游数据集并触发建库。'
   }
   if (r.connected == null) {
     return `${r.message}。`
@@ -865,7 +937,7 @@ async function testConnection(row: DatasourceVO) {
     const result = await testDatasource(row.id)
     probeResult.value = result
     if (result.connected) {
-      ElMessage.success('连接成功，已开始向量化')
+      ElMessage.success('连接成功，契约校验通过')
     } else if (result.connected == null) {
       ElMessage.warning(result.message)
     } else {
@@ -881,6 +953,46 @@ async function testConnection(row: DatasourceVO) {
     probeLoading.value = false
     testingId.value = ''
     await loadSources()
+  }
+}
+
+async function openIngest(row: DatasourceVO) {
+  ingestSource.value = row
+  ingestOpen.value = true
+  ingestLoading.value = true
+  ingestError.value = ''
+  ingestDatasets.value = []
+  try {
+    const result = await datasourceDatasets(row.id)
+    ingestDatasets.value = result.datasets || []
+    if (!ingestDatasets.value.length) {
+      ingestError.value = '上游未返回可接入的数据集'
+    }
+  } catch (error) {
+    ingestError.value = (error as Error).message
+  } finally {
+    ingestLoading.value = false
+  }
+}
+
+async function doIngest(dataset: RemoteDatasetVO) {
+  const source = ingestSource.value
+  if (!source || !dataset.datasetId) {
+    return
+  }
+  ingestingId.value = source.id
+  try {
+    const created = await ingestDatasource(source.id, {
+      datasetId: dataset.datasetId,
+      name: dataset.name || undefined,
+    })
+    ElMessage.success(`已接入「${created.name || dataset.datasetId}」，建库任务已提交`)
+    ingestOpen.value = false
+    await loadSources()
+  } catch (error) {
+    ElMessage.error((error as Error).message)
+  } finally {
+    ingestingId.value = ''
   }
 }
 
@@ -921,31 +1033,24 @@ async function submitAddBlacklist() {
     ElMessage.error('请填写数据集 ID')
     return
   }
-  if (blacklist.value.some((row) => row.datasetId === datasetId)) {
-    ElMessage.error('该数据集已在黑名单')
-    return
-  }
-  if (!name) {
-    ElMessage.error('请填写名称')
-    return
-  }
-  if (!sourceName) {
-    ElMessage.error('请填写来源名')
-    return
-  }
-  if (!endpoint) {
-    ElMessage.error('请填写地址')
-    return
-  }
-  const addrError = addressError(endpoint, true)
-  if (addrError) {
-    ElMessage.error(addrError)
-    return
+  // 后端按 datasetId 去重：已存在时更新名称/来源名/地址，不再前端拦截
+  const existing = blacklist.value.some((row) => row.datasetId === datasetId)
+  if (endpoint) {
+    const addrError = addressError(endpoint, true)
+    if (addrError) {
+      ElMessage.error(addrError)
+      return
+    }
   }
   adding.value = true
   try {
-    await addBlacklist({ datasetId, name, sourceName, endpoint })
-    ElMessage.success('已加入黑名单')
+    await addBlacklist({
+      datasetId,
+      name: name || undefined,
+      sourceName: sourceName || undefined,
+      endpoint: endpoint || undefined,
+    })
+    ElMessage.success(existing ? '已更新黑名单' : '已加入黑名单')
     addBlOpen.value = false
     await loadBlacklistRows()
   } catch (error) {

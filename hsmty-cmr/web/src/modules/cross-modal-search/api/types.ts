@@ -253,7 +253,11 @@ export interface StrategyVO {
   preset: boolean
   offlineReason: string | null
   offlineTime: string | null
+  /** 下线备注（下线弹窗填写，后端留痕） */
+  offlineRemark?: string | null
   currentVersion: number | null
+  /** 是否存在待发布草稿（「发布」按钮据此启用） */
+  hasDraft?: boolean
   /** 参数摘要，如 “阈值 0.60 · 重排开” */
   paramSummary: string | null
   remark: string | null
@@ -402,6 +406,8 @@ export interface BehaviorVO {
   taskBizNo: string | null
   taskStatus: string | null
   queryText: string | null
+  /** 查询文件路径（文件检索时用于展示文件名） */
+  queryFile?: string | null
   queryModality: string | null
   targetModality: string | null
   operatorName: string | null

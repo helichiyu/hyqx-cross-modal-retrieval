@@ -13,6 +13,9 @@ const BASE = '/hs-api/cmr/'
 
 const SUCCESS_CODE = '0000'
 
+/** 单请求超时：检索/重放为同步执行，超时后提示查看任务中心，避免按钮永久转圈 */
+const REQUEST_TIMEOUT_MS = 120_000
+
 const AUTH_FAILED_CODES = new Set(['C105', 'C106'])
 
 export class ApiError extends Error {
@@ -61,8 +64,12 @@ async function request<T>(
       headers,
       body,
       credentials: 'include',
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
-  } catch {
+  } catch (error) {
+    if ((error as Error).name === 'TimeoutError' || (error as Error).name === 'AbortError') {
+      throw new ApiError('请求超时，后端可能仍在执行，可稍后到任务中心查看进展', 0)
+    }
     throw new ApiError('网络异常，请检查后端服务', 0)
   }
   const json = (await resp.json().catch(() => null)) as ApiEnvelope<T> | null

@@ -89,6 +89,10 @@ export const datasourceDatasets = (id: Id) => http.get<RemoteDatasetsVO>(`dataso
 
 export const datasourceContract = () => http.get<Record<string, unknown>>('datasources/contract')
 
+/** 接入上游数据集：拉取条目/文件到共享卷并触发 401→406 建库 */
+export const ingestDatasource = (id: Id, body: { datasetId: string; name?: string; version?: string; scene?: string }) =>
+  http.post<{ bizNo: string; name: string; status: string }>(`datasources/${id}/ingest`, body)
+
 export const listBlacklist = () => http.get<DatasourceBlacklistVO[]>('datasource-blacklist')
 
 /** 黑名单按来源名汇总条数（P4 抽屉） */
@@ -153,8 +157,14 @@ export const rollbackStrategy = (id: Id, versionNo: number) =>
 
 export const strategyOptions = () => http.get<StrategyOptionVO[]>('strategies/options')
 
-export const offlineStrategy = (id: Id, reason: string) =>
-  http.post<void>(`strategies/${id}/offline`, { reason })
+/** 对比策略下拉：全部状态（草稿 / 生效 / 已下线），用于 P5 版本对比 */
+export const strategyCompareOptions = () =>
+  http.get<{ id: Id; bizNo: string; name: string; scene: string; status: string; versionNo: number | null }[]>(
+    'strategies/compare-options',
+  )
+
+export const offlineStrategy = (id: Id, reason: string, remark?: string) =>
+  http.post<void>(`strategies/${id}/offline`, { reason, remark: remark || undefined })
 
 export const onlineStrategy = (id: Id) => http.post<void>(`strategies/${id}/online`)
 
@@ -165,6 +175,10 @@ export const understand = (body: Record<string, unknown>) =>
 
 export const executeSearch = (body: Record<string, unknown>) =>
   http.post<SearchResultVO>('search', body)
+
+/** 推荐词联想（P1 输入建议 / P2 相似 query） */
+export const suggestWords = (scene?: string) =>
+  http.get<string[]>('search/suggest', scene ? { scene } : {})
 
 export const searchResults = (resultSetId: string) =>
   http.get<HistoryDetailVO>(`search/results/${resultSetId}`)

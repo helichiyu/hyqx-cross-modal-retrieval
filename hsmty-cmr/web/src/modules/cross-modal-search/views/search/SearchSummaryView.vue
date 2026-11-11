@@ -86,7 +86,7 @@
           </el-table-column>
           <el-table-column label="相似度" width="82">
             <template #default="{ row }">
-              <b class="sim">{{ simText(row.score) }}</b>
+              <b class="sim">{{ simText(scoreOf(row)) }}</b>
             </template>
           </el-table-column>
           <el-table-column label="勾选" width="56" align="center" header-align="center">
@@ -300,7 +300,17 @@ const resultTitle = computed(() => {
   }
 })
 
+/**
+ * 相似度口径：alignScore 是 408 的原始余弦相似度（0~1），score 是融合分（z-score 加权，可为 0）。
+ * 展示与排序统一用 alignScore，历史数据缺失时才回退 score。
+ */
 function scoreOf(item: ResultItemVO): number {
+  if (item.alignScore !== null && item.alignScore !== undefined) {
+    const align = Number(item.alignScore)
+    if (Number.isFinite(align)) {
+      return align
+    }
+  }
   const score = Number(item.score)
   return Number.isFinite(score) ? score : 0
 }
@@ -402,16 +412,20 @@ async function markMismatch(): Promise<void> {
         source: item.source,
       })),
     })
-    // 数据流：提交即自动封存
+    // 数据流：提交即自动封存；只有封存成功才把本地状态锁为已封存，避免误显示
+    let sealedOk = false
     try {
       await sealTask(taskNo)
+      sealedOk = true
     } catch (error) {
       const message = (error as Error).message || ''
-      if (!message.includes('已封存')) {
-        ElMessage.warning(`反馈已提交，封存同步失败：${message}`)
+      // 已封存视为幂等成功（并发/重复提交场景）
+      sealedOk = message.includes('已封存')
+      if (!sealedOk) {
+        ElMessage.warning(`反馈已提交，封存同步失败：${message}，可稍后重试封存`)
       }
     }
-    current.sealed = true
+    current.sealed = sealedOk
     selected.value = []
     ElMessage.success(`已提交 ${count} 条不匹配记录`)
   } catch (error) {

@@ -40,7 +40,7 @@
 
     <!-- Z4 结果集概要 -->
     <section class="rs-bar">
-      <span class="rs-line">结果集 <span class="mono">{{ resultSetId || '—' }}</span> · {{ totalCount }} 条</span>
+      <span class="rs-line">结果集 <span class="mono">{{ resultSetId || '—' }}</span> · 召回 {{ totalCount }} 条 · 下发 {{ items.length }} 条</span>
     </section>
 
     <!-- 评价封存提示 -->
@@ -127,7 +127,7 @@
 
         <div class="result-area">
           <!-- 结果态 -->
-          <div v-if="displayView === 'result'">
+          <div v-if="actualView === 'result'">
             <div class="list-head">
               <span>结果条目（Top <b>{{ filteredItems.length }}</b> / 共 <b>{{ groupTotal }}</b> 条）</span>
               <span></span>
@@ -166,7 +166,7 @@
                   </div>
                 </div>
                 <div class="rc-right">
-                  <div class="rc-sim">{{ item.score.toFixed(2) }}<small>相似度</small></div>
+                  <div class="rc-sim">{{ alignScoreOf(item).toFixed(2) }}<small>相似度</small></div>
                   <div class="rc-ops" @click.stop>
                     <button
                       type="button"
@@ -220,7 +220,7 @@
           </div>
 
           <!-- 加载态 -->
-          <div v-if="displayView === 'loading'">
+          <div v-if="actualView === 'loading'">
             <div class="skel-grid">
               <div v-for="n in 6" :key="n" class="skel-card">
                 <div class="skel-block sk-thumb"></div>
@@ -234,7 +234,7 @@
           </div>
 
           <!-- 空结果态 -->
-          <div v-if="displayView === 'empty'">
+          <div v-if="actualView === 'empty'">
             <div class="empty-wrap">
               <div class="state-ico">🔍</div>
               <h3>本次检索未召回结果</h3>
@@ -274,37 +274,10 @@
                 </article>
               </div>
               <div class="zero-tools">
-                <div class="cm-acts">
-                  <button class="cm-btn pri" type="button" @click="openCause">发起原因分析</button>
-                  <button class="cm-btn" type="button" @click="planOpen = true">登记处置方案</button>
-                  <button class="cm-btn" type="button" @click="trackVisible = !trackVisible">处置跟踪</button>
-                </div>
-                <div v-if="trackVisible" class="cm-list" style="margin-top: 9px">
-                  <div v-for="plan in zeroPlans" :key="plan.id" class="cm-item">
-                    <span class="cm-tag" :class="planStatusClass(plan)">{{ plan.status }}</span>
-                    <span class="k">{{ plan.way }}</span>
-                    <span class="cm-plan-meta">责任人 {{ plan.owner }} · 期望 {{ plan.due }}</span>
-                    <span class="sp">
-                      <button
-                        v-if="plan.status !== '已闭环'"
-                        class="cm-btn"
-                        type="button"
-                        @click="advancePlan(plan)"
-                      >
-                        {{ plan.status === '待处置' ? '开始处置' : '标记闭环' }}
-                      </button>
-                      <span v-else class="cm-plan-done">已闭环</span>
-                    </span>
-                    <div class="cm-plan-note">{{ plan.note }} · 登记 {{ plan.time }}</div>
-                  </div>
-                  <div v-if="!zeroPlans.length" class="cm-item cm-plan-empty">暂无处置方案</div>
-                </div>
                 <div class="cm-log">
-                  <div v-if="!zeroLogs.length" class="zero-log-empty">暂无空结果处置留痕</div>
-                  <div v-for="log in zeroLogs" :key="log.id" class="cm-log-row">
-                    <span v-if="log.tag" class="cm-tag" :class="log.cls">{{ log.tag }}</span>
-                    <span>{{ log.text }}</span>
-                    <time>{{ log.time }}</time>
+                  <div class="zero-log-empty">
+                    归因依据：本次下发 {{ totalCount }} 条，下发前被过滤 {{ excludedTotal }} 条，当前阈值
+                    {{ threshold.toFixed(2) }}。处置需求请在结果运营登记，由运营侧跟进补数 / 调整策略。
                   </div>
                 </div>
               </div>
@@ -312,7 +285,7 @@
           </div>
 
           <!-- 错误态 -->
-          <div v-if="displayView === 'error'">
+          <div v-if="actualView === 'error'">
             <div class="state-wrap">
               <div class="state-ico" style="background: #fdecec">⚠️</div>
               <h3>本次检索失败</h3>
@@ -327,20 +300,6 @@
             </div>
           </div>
 
-          <!-- 边界态（原型演示） -->
-          <div v-if="displayView === 'edge'">
-            <div class="state-wrap">
-              <div class="state-ico" style="background: #eef4ff">📐</div>
-              <h3>系统边界</h3>
-              <p class="st-desc">
-                ① 展示上限：结果区按 <b>Top50</b> 分页口径展示。<br>
-                ② 跨模态边界：音搜图 / 图搜音等无共享空间组合不提供检索（模态矩阵不渲染）。
-              </p>
-              <div class="state-actions">
-                <button class="btn-primary" type="button" @click="setDemo('result')">返回结果态</button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -348,8 +307,11 @@
     <!-- 查看弹窗（只读：占位大图 + 元数据） -->
     <el-dialog v-model="viewOpen" title="查看" width="520px">
       <div class="view-media">
-        <div class="vm-ico" aria-hidden="true">{{ viewIcon }}</div>
-        <div class="vm-cap">{{ viewCaption }}</div>
+        <MediaPreview v-if="viewTarget?.sourceFile" :path="viewTarget.sourceFile" class="vm-media" />
+        <template v-else>
+          <div class="vm-ico" aria-hidden="true">{{ viewIcon }}</div>
+          <div class="vm-cap">{{ viewCaption }}</div>
+        </template>
       </div>
       <div class="view-meta">
         <div class="vm-row"><span class="vm-k">名称</span><span class="vm-v">{{ viewTarget?.name || '—' }}</span></div>
@@ -413,88 +375,13 @@
       </template>
     </el-dialog>
 
-    <!-- 空结果 · 发起原因分析 -->
-    <el-dialog v-model="causeOpen" title="🔎 发起原因分析" width="560px">
-      <div class="mb-tip">对本次零结果做归因复核：选择分析维度 → 执行分析 → 输出结论与置信度。</div>
-      <label v-for="option in causeOptions" :key="option" class="cm-ck">
-        <input v-model="causeSelected" type="checkbox" :value="option">
-        {{ option }}
-      </label>
-      <div v-if="causeResult" class="cm-panel">
-        <div class="cm-panel-t">
-          分析结论
-          <span class="cm-tag red">主因：{{ causeResult.main }}</span>
-          <span class="cm-tag gray">置信度 {{ causeResult.conf.toFixed(2) }}</span>
-        </div>
-        <div class="cm-panel-body">
-          ① 过滤过严（0.82）：当前「相似度 ≥ {{ threshold.toFixed(2) }} + 来源限定」排除候选，放宽阈值预计可召回；<br>
-          ② 语义偏离（0.55）：query 与库内高频向量距离偏大，建议用相似 query 复检；<br>
-          ③ 覆盖缺失（0.31）：「{{ contextQuery }}」在已接入检索库无直接覆盖，需补数。
-        </div>
-      </div>
-      <template #footer>
-        <span class="mf-note">分析结论仅用于处置决策，不改变结果集</span>
-        <el-button @click="causeOpen = false">关闭</el-button>
-        <el-button type="primary" @click="runCause">{{ causeResult ? '重新分析' : '执行分析' }}</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 空结果 · 登记处置方案 -->
-    <el-dialog v-model="planOpen" title="🧾 登记处置方案" width="720px">
-      <div class="mb-tip">处置方案登记后进入「处置跟踪」，并同步零结果专项台账。</div>
-      <div class="cm-row">
-        <label>处置方式</label>
-        <select v-model="zeroPlan.way">
-          <option>放宽过滤后重检</option>
-          <option>替换为相似 query 重检</option>
-          <option>需求登记（补数 / 扩库）</option>
-          <option>调整策略阈值</option>
-          <option>无处置（可接受零结果）</option>
-        </select>
-      </div>
-      <div class="cm-row">
-        <label>责任人</label>
-        <select v-model="zeroPlan.owner">
-          <option>张工（数据组）</option>
-          <option>李工</option>
-          <option>王工</option>
-        </select>
-      </div>
-      <div class="cm-row">
-        <label>期望完成</label>
-        <input v-model="zeroPlan.due" type="date">
-      </div>
-      <div class="cm-row textarea">
-        <label>方案说明</label>
-        <textarea v-model="zeroPlan.note" placeholder="如：先放宽相似度至 0.70 重检，仍为零结果则登记补数需求"></textarea>
-      </div>
-      <template #footer>
-        <el-button @click="planOpen = false">取消</el-button>
-        <el-button type="primary" @click="saveZeroPlan">保存方案</el-button>
-      </template>
-    </el-dialog>
-
     <div class="toast" :class="{ show: toastVisible, ok: toastType === 'ok', err: toastType === 'err' }">
       {{ toastMessage }}
     </div>
 
-    <div class="demo-float">
-      <span class="df-tag">原型演示</span>
-      <button
-        v-for="state in demoStates"
-        :key="state.key"
-        class="demo-btn"
-        :class="{ active: demoView === state.key }"
-        type="button"
-        @click="setDemo(state.key)"
-      >
-        {{ state.label }}
-      </button>
-    </div>
-
     <DevNotesDrawer v-model="devOpen" title="研发需求说明">
       <p class="help-lead">
-        本页定位【设计】：查看本次搜索结果——卡片浏览、单条查看、单条赞踩、收藏、筛选与排除清单核对。演示结果集 12 条、8 个来源。
+        本页定位【设计】：查看本次搜索结果——卡片浏览、单条查看、单条赞踩、收藏、筛选与排除清单核对。结果、来源与分数均来自后端结果集（408 算子输出）。
       </p>
 
       <div>
@@ -537,15 +424,15 @@
       <div>
         <div class="hb-t">F5 空结果归因与处置</div>
         <p class="help-note">
-          空结果时给归因三分类（过滤过严 / 语义偏离 / 覆盖缺失）+ 三动作：放宽过滤（回检索台 ?relax=1）、相似 query（回填检索台）、需求登记（进结果运营 ?zero=1&task=&back=P2）。
-          处置工具：发起原因分析（勾选过滤条件回放 / 语义向量距离 / 覆盖缺口 / 索引新鲜度，输出主因与置信度）、登记处置方案（处置方式 / 责任人 / 期望完成 / 方案说明）、处置跟踪（待处置→处置中→已闭环，留痕只存内存）。
+          空结果时给归因三分类（过滤过严 / 语义偏离 / 覆盖缺失）+ 三动作：放宽过滤（回检索台 ?relax=1）、相似 query（取自后端推荐词并回填检索台）、需求登记（进结果运营 ?zero=1&task=&back=P2，由结果运营登记反馈单并跟进处置）。
+          归因依据取本次结果集真实数据（下发条数、下发前过滤条数、策略阈值），不在本页伪造分析结论或本地处置台账。
         </p>
       </div>
 
       <div>
         <div class="hb-t">F6 视图状态与系统边界</div>
         <p class="help-note">
-          可呈现结果 / 加载 / 空结果 / 引擎错误 / 边界五态，同一时刻只显示一个；左下角「原型演示」浮条仅用于评审覆盖，正式由接口状态驱动。边界列两条硬约束：结果区按 Top50 分页口径；音搜图 / 图搜音等无共享空间组合不提供检索。
+          可呈现结果 / 加载 / 空结果 / 引擎错误四态，同一时刻只显示一个，全部由接口状态驱动。两条硬约束：结果区按分页口径展示；音搜图 / 图搜音等无共享空间组合不提供检索。
         </p>
       </div>
 
@@ -557,26 +444,29 @@
       </div>
 
       <p class="help-note">
-        <b>编号规范与演示性质【研发】：</b>业务编号按《平台相关ID生成规范-1026》32.1：任务 TASK / 策略 STG / 结果集 RST / 条目 ITM（等宽可复制）。本页为页内模拟，不请求真实引擎；召回 / 相似度均为示例数据，不构成交付承诺。
+        <b>编号规范【研发】：</b>业务编号按《平台相关ID生成规范-1026》32.1：任务 TASK / 策略 STG / 结果集 RST / 条目 ITM（等宽可复制）。本页结果、来源、相似度与对齐分均来自后端检索结果集。
       </p>
     </DevNotesDrawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  clickResult,
   myFavorites,
   rerunSearchResults,
   searchResults,
   searchSummary,
   sealTask,
+  suggestWords,
   toggleFavorite,
   voteItem,
 } from '../../api'
 import { ApiError } from '../../api/http'
 import DevNotesDrawer from '../../components/DevNotesDrawer.vue'
+import MediaPreview from '../../components/MediaPreview.vue'
 import { fmtTime } from '../../utils/format'
 import type { HistoryDetailVO, ResultItemVO } from '../../api/types'
 
@@ -590,7 +480,6 @@ const resultSetId = computed(() => String(route.params.resultSetId || ''))
 const detail = ref<HistoryDetailVO | null>(null)
 const items = ref<ResultItemVO[]>([])
 const actualView = ref<'loading' | 'result' | 'empty' | 'error'>('loading')
-const demoView = ref<'result' | 'loading' | 'empty' | 'error' | 'edge' | ''>('')
 const errorMessage = ref('结果集加载失败')
 const errorCode = ref('')
 const rerunning = ref(false)
@@ -611,26 +500,11 @@ const viewTarget = ref<ViewTarget | null>(null)
 const excludedOpen = ref(false)
 const replayWas = ref<number | null>(null)
 
-const causeOpen = ref(false)
-const causeSelected = ref<string[]>([
-  '过滤条件回放（相似度阈值 / 来源）',
-  '语义向量距离分布',
-  '覆盖缺口（库内是否有对应内容）',
-])
-const causeResult = ref<{ main: string; conf: number } | null>(null)
-const planOpen = ref(false)
-const trackVisible = ref(false)
-const zeroPlans = ref<ZeroPlan[]>([])
-const zeroLogs = ref<ZeroLog[]>([])
-const zeroPlan = reactive({ way: '放宽过滤后重检', owner: '张工（数据组）', due: '', note: '' })
-
 const devOpen = ref(false)
 const toastVisible = ref(false)
 const toastMessage = ref('')
 const toastType = ref<'info' | 'ok' | 'err'>('info')
 let toastTimer: ReturnType<typeof setTimeout> | undefined
-let planSeq = 0
-let logSeq = 0
 
 interface FavoriteEntry {
   id: string
@@ -647,32 +521,8 @@ interface ViewTarget {
   source: string | null
   score: number | null
   modality: string | null
+  sourceFile: string | null
 }
-
-interface ZeroPlan {
-  id: number
-  way: string
-  owner: string
-  due: string
-  note: string
-  status: '待处置' | '处置中' | '已闭环'
-  time: string
-}
-
-interface ZeroLog {
-  id: number
-  text: string
-  tag: string
-  cls: string
-  time: string
-}
-
-const causeOptions = [
-  '过滤条件回放（相似度阈值 / 来源）',
-  '语义向量距离分布',
-  '覆盖缺口（库内是否有对应内容）',
-  '索引新鲜度 / 同步延迟',
-]
 
 const groups = [
   { key: 'all', label: '全部' },
@@ -682,15 +532,6 @@ const groups = [
   { key: 'audio', label: '音频' },
 ]
 
-const demoStates = [
-  { key: 'result', label: '结果态' },
-  { key: 'loading', label: '加载态' },
-  { key: 'empty', label: '空结果' },
-  { key: 'error', label: '引擎错误' },
-  { key: 'edge', label: '边界态' },
-] as const
-
-const displayView = computed(() => demoView.value || actualView.value)
 const history = computed(() => detail.value?.history ?? null)
 /** 结果集总条数（召回口径，含下发前被剔除条目）；缺失时回落到已下发条目数 */
 const totalCount = computed(() => {
@@ -698,7 +539,7 @@ const totalCount = computed(() => {
   return typeof count === 'number' ? count : items.value.length
 })
 const contextQuery = computed(() => history.value?.queryText?.trim() || '（以文件语义检索）')
-const contextTask = computed(() => history.value?.bizNo || '—')
+const contextTask = computed(() => history.value?.taskBizNo || history.value?.bizNo || '—')
 const contextPair = computed(() => {
   const h = history.value
   if (!h?.queryModality) {
@@ -742,15 +583,17 @@ const relaxRoute = computed(() => ({
 }))
 const zeroRoute = computed(() => ({
   path: '/operation',
-  query: { zero: '1', task: history.value?.bizNo || '', back: 'P2' },
+  query: {
+    zero: '1',
+    task: history.value?.taskBizNo || history.value?.bizNo || '',
+    back: 'P2',
+  },
 }))
 
+const relatedWords = ref<string[]>([])
 const similarQueries = computed(() => {
   const q = history.value?.queryText?.trim()
-  if (!q) {
-    return ['高清扫描件', '内容示意', '同类素材']
-  }
-  return [`${q} 高清`, `${q} 位置示意`, q]
+  return relatedWords.value.filter(word => word && word !== q).slice(0, 3)
 })
 
 const sliderMin = computed(() => String(Math.min(0.5, threshold.value)))
@@ -771,9 +614,10 @@ const sourceOptions = computed(() => {
 const filteredItems = computed(() =>
   items.value
     .filter(item => activeGroup.value === 'all' || item.modality === activeGroup.value)
-    .filter(item => Number(item.score) >= threshold.value)
+    // 相似度阈值比较的是真实余弦对齐分；score 是融合分（含词面加成），不是 0~1 相似度
+    .filter(item => alignScoreOf(item) >= threshold.value)
     .filter(item => sourceFilter.value === '全部来源' || itemSource(item) === sourceFilter.value)
-    .sort((a, b) => Number(b.score) - Number(a.score)),
+    .sort((a, b) => alignScoreOf(b) - alignScoreOf(a)),
 )
 const pageItems = computed(() =>
   filteredItems.value.slice((pageNum.value - 1) * PAGE_SIZE, pageNum.value * PAGE_SIZE),
@@ -801,7 +645,7 @@ const viewIcon = computed(() => {
 })
 const viewCaption = computed(() => {
   const modality = modalityText(viewTarget.value?.modality)
-  return `${modality || '条目'} · 缩略图 / 占位大图`
+  return `${modality || '条目'} · 该条目未下发源文件路径，无法预览`
 })
 const viewScoreText = computed(() => {
   const score = viewTarget.value?.score
@@ -839,6 +683,7 @@ async function load(id = resultSetId.value) {
     actualView.value = items.value.length || excludedOnLoad > 0 ? 'result' : 'empty'
     void loadFavorites()
     void loadReplayWas(data)
+    void loadRelatedWords(data.history.scene)
   } catch (error) {
     errorMessage.value = errorText(error)
     errorCode.value = error instanceof ApiError ? error.code || String(error.status) : ''
@@ -859,6 +704,15 @@ async function loadFavorites() {
     }))
   } catch {
     favorites.value = []
+  }
+}
+
+/** 相似 query 取自后端推荐词（场景词库），不再前端拼接示例词 */
+async function loadRelatedWords(scene: string | null | undefined) {
+  try {
+    relatedWords.value = await suggestWords(scene ?? undefined)
+  } catch {
+    relatedWords.value = []
   }
 }
 
@@ -918,7 +772,8 @@ function resetFilters() {
 }
 
 function groupCount(key: string) {
-  return key === 'all' ? totalCount.value : items.value.filter(item => item.modality === key).length
+  // 分组计数与结果区可浏览条数一致，统一用实际下发条目数
+  return key === 'all' ? items.value.length : items.value.filter(item => item.modality === key).length
 }
 
 function toggleHeat() {
@@ -972,15 +827,20 @@ function alignLabelOf(item: ResultItemVO) {
   return `${shortModalityLabel(item.modality).slice(0, 1)} ${alignScoreOf(item).toFixed(2)}`
 }
 
-function openItemView(item: ResultItemVO) {
+function openItemView(item: ResultItemVO, reportClick = true) {
   viewTarget.value = {
     name: item.name || item.itemId,
     itemId: item.itemId,
     source: itemSource(item),
-    score: Number(item.score),
+    score: alignScoreOf(item),
     modality: item.modality,
+    sourceFile: item.sourceFile ?? null,
   }
   viewOpen.value = true
+  // 点击埋点：后端按 resultSetId + rank 记录，供 P6 搜索行为与 P8 评测的点击统计
+  if (reportClick) {
+    void clickResult(resultSetId.value, item.rank).catch(() => undefined)
+  }
 }
 
 function openFavorites() {
@@ -991,7 +851,7 @@ function openFavorites() {
 function openFavoriteView(fav: FavoriteEntry) {
   const item = items.value.find(row => row.itemId === fav.itemId)
   if (item) {
-    openItemView(item)
+    openItemView(item, false)
     return
   }
   viewTarget.value = {
@@ -1000,6 +860,7 @@ function openFavoriteView(fav: FavoriteEntry) {
     source: fav.source,
     score: null,
     modality: null,
+    sourceFile: null,
   }
   viewOpen.value = true
 }
@@ -1099,67 +960,6 @@ function excludedReasonClass(reason: string | null | undefined) {
   return 'st'
 }
 
-function openCause() {
-  causeResult.value = null
-  causeOpen.value = true
-}
-
-function runCause() {
-  if (!causeSelected.value.length) {
-    showToast('请至少选择 1 个分析维度', 'err')
-    return
-  }
-  causeResult.value = { main: '过滤过严', conf: 0.82 }
-  addZeroLog(
-    `原因分析完成：主因「过滤过严」（置信度 0.82），维度 ${causeSelected.value.join('、')}`,
-    '分析',
-    '',
-  )
-  showToast('原因分析完成：主因「过滤过严」，可据此登记处置方案', 'ok')
-}
-
-function saveZeroPlan() {
-  const note = zeroPlan.note.trim()
-  if (!note) {
-    showToast('请填写方案说明', 'err')
-    return
-  }
-  zeroPlans.value.unshift({
-    id: ++planSeq,
-    way: zeroPlan.way,
-    owner: zeroPlan.owner,
-    due: zeroPlan.due || '待定',
-    note,
-    status: '待处置',
-    time: nowText(),
-  })
-  planOpen.value = false
-  trackVisible.value = true
-  addZeroLog(`处置方案已登记：${zeroPlan.way} · 责任人 ${zeroPlan.owner}（待处置）`, '登记', '')
-  showToast(`处置方案已登记：${zeroPlan.way}`, 'ok')
-  zeroPlan.note = ''
-}
-
-function advancePlan(plan: ZeroPlan) {
-  plan.status = plan.status === '待处置' ? '处置中' : '已闭环'
-  addZeroLog(`处置状态更新：${plan.way} → ${plan.status}`, '跟踪', plan.status === '已闭环' ? 'green' : 'warn')
-  showToast(`处置状态已更新：${plan.status}`, 'ok')
-}
-
-function planStatusClass(plan: ZeroPlan) {
-  return plan.status === '已闭环' ? 'green' : plan.status === '处置中' ? 'warn' : 'red'
-}
-
-function addZeroLog(text: string, tag: string, cls: string) {
-  zeroLogs.value.push({ id: ++logSeq, text, tag, cls, time: nowText() })
-}
-
-function nowText() {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
 function goSearch(query: string) {
   void router.push({ path: '/search', query: { q: query } })
 }
@@ -1185,18 +985,6 @@ async function rerun() {
     showToast(errorText(error), 'err')
   } finally {
     rerunning.value = false
-  }
-}
-
-function setDemo(state: 'result' | 'loading' | 'empty' | 'error' | 'edge') {
-  demoView.value = state
-  if (state === 'loading') {
-    setTimeout(() => {
-      if (demoView.value === 'loading') {
-        demoView.value = ''
-        showToast('加载完成（模拟）', 'ok')
-      }
-    }, 1600)
   }
 }
 
@@ -2608,52 +2396,6 @@ function showToast(message: string, type: 'info' | 'ok' | 'err' = 'info') {
 }
 .toast.ok {
   background: #1e8e4a;
-}
-
-/* 原型演示浮条 */
-.demo-float {
-  position: fixed;
-  left: 24px;
-  bottom: 24px;
-  z-index: 90;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: #fff;
-  border: 1px solid #d5dfef;
-  border-radius: 8px;
-  padding: 6px 10px;
-  box-shadow: 0 2px 8px rgba(31, 41, 55, 0.08);
-  flex-wrap: wrap;
-}
-.demo-float .df-tag {
-  font-size: 10px;
-  font-weight: 700;
-  color: #8c98ad;
-  border-radius: 3px;
-  padding: 2px 6px;
-  letter-spacing: 1px;
-  background: #f2f4f8;
-}
-.demo-float .demo-btn {
-  height: 24px;
-  padding: 0 10px;
-  border: 1px solid #d7e0f0;
-  border-radius: 12px;
-  background: #fff;
-  color: var(--muted);
-  font-size: 11px;
-  cursor: pointer;
-}
-.demo-float .demo-btn:hover {
-  border-color: var(--system-blue);
-  color: var(--system-blue);
-}
-.demo-float .demo-btn.active {
-  background: var(--system-blue);
-  border-color: var(--system-blue);
-  color: #fff;
-  font-weight: 600;
 }
 
 @media (max-width: 1100px) {

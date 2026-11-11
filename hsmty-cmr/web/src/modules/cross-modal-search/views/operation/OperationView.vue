@@ -432,6 +432,8 @@ async function load() {
     const page = await pageFeedbacks({ pageNum: pageNum.value, pageSize })
     rows.value = page.records
     total.value = page.total
+  } catch (error) {
+    ElMessage.error((error as Error).message)
   } finally {
     loading.value = false
   }
@@ -460,6 +462,8 @@ async function loadPick() {
     })
     pickRows.value = page.records
     pickTotal.value = page.total
+  } catch (error) {
+    ElMessage.error((error as Error).message)
   } finally {
     pickLoading.value = false
   }
@@ -490,7 +494,10 @@ function choosePick(row: BehaviorVO) {
 async function preselectSource(taskNo: string) {
   try {
     const page = await pageBehaviors({ pageNum: 1, pageSize: 10, taskNo })
-    const hit = page.records.find((item) => item.taskNo === taskNo)
+    // 结果页传来的是 TASK 号，历史记录对外是 taskNo、对内是 srhNo，两种都兼容
+    const hit = page.records.find(
+      (item) => item.taskNo === taskNo || item.srhNo === taskNo,
+    )
     if (hit) {
       picked.value = hit
       if (!registerNote.value.trim()) {
