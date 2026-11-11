@@ -23,8 +23,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import tools.jackson.core.type.TypeReference;
+
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.hsmty.cmr.domain.operation.entity.table.CmrFeedbackTableDef.CMR_FEEDBACK;
 
@@ -72,7 +77,14 @@ public class FeedbackService {
                     .orderBy(CMR_FEEDBACK.ID.desc())
                     .limit(1));
             if (pending != null) {
-                log.info("反馈重复提交，返回待处理单: {} task={}", pending.getBizNo(), sourceTaskNo);
+                // 同一任务重复标记：把本次新勾选的条目合并进待处理单，避免用户选择被静默丢弃
+                List<FeedbackCreateDTO.MismatchItem> merged = mergeItems(
+                        pending.getMismatchItemsJson(), dto.getItems());
+                pending.setMismatchItemsJson(merged.isEmpty() ? null : JsonUtils.write(merged));
+                pending.setUpdateTime(LocalDateTime.now());
+                feedbackMapper.update(pending);
+                log.info("反馈重复提交，已合并条目到待处理单: {} task={} items={}",
+                        pending.getBizNo(), sourceTaskNo, merged.size());
                 return FeedbackVO.from(pending);
             }
         }
@@ -107,6 +119,29 @@ public class FeedbackService {
                 .strategy(countDisposition(CmrFeedback.DISPOSITION_STRATEGY))
                 .supplement(countDisposition(CmrFeedback.DISPOSITION_SUPPLEMENT))
                 .build();
+    }
+
+    /** 合并待处理单已有条目与本次新勾选条目（按 itemId 去重，保持原顺序） */
+    private List<FeedbackCreateDTO.MismatchItem> mergeItems(
+            String existingJson, List<FeedbackCreateDTO.MismatchItem> incoming) {
+        Map<String, FeedbackCreateDTO.MismatchItem> merged = new LinkedHashMap<>();
+        if (existingJson != null && !existingJson.isBlank()) {
+            List<FeedbackCreateDTO.MismatchItem> existing = JsonUtils.read(existingJson,
+                    new TypeReference<List<FeedbackCreateDTO.MismatchItem>>() {
+                    });
+            if (existing != null) {
+                existing.forEach(item -> {
+                    if (item != null && item.getItemId() != null) {
+                        merged.put(item.getItemId(), item);
+                    }
+                });
+            }
+        }
+        if (incoming != null) {
+            incoming.stream().filter(item -> item != null && item.getItemId() != null)
+                    .forEach(item -> merged.put(item.getItemId(), item));
+        }
+        return new ArrayList<>(merged.values());
     }
 
     private Long count(String status) {

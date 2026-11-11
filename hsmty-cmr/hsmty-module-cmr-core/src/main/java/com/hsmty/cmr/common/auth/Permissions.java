@@ -25,7 +25,7 @@ public final class Permissions {
             "cmr:eval:page", "cmr:eval:detail", "cmr:eval:create", "cmr:eval:update", "cmr:eval:run",
             "cmr:feedback:create", "cmr:feedback:page", "cmr:feedback:update",
             "cmr:word:page", "cmr:word:create", "cmr:word:update", "cmr:word:remove",
-            "cmr:file:read");
+            "cmr:file:read", "cmr:file:upload", "cmr:file:page", "cmr:file:detail", "cmr:file:remove");
 
     private static final Set<String> OPERATOR = Set.of(
             "cmr:search:create", "cmr:search:page", "cmr:search:adopt",
@@ -39,6 +39,8 @@ public final class Permissions {
     private static final Set<String> USER = Set.of(
             "cmr:search:create", "cmr:search:page", "cmr:search:adopt",
             "cmr:task:page", "cmr:task:detail",
+            // P3 结果摘要「标记不匹配」由检索用户发起，需可登记反馈
+            "cmr:feedback:create",
             "cmr:file:read");
 
     private Permissions() {

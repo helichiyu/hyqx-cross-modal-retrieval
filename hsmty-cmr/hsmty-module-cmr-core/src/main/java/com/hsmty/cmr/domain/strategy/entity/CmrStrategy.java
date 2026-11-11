@@ -38,6 +38,9 @@ public class CmrStrategy extends BaseEntity {
 
     private java.time.LocalDateTime offlineTime;
 
+    /** 下线备注（选填，随下线动作留痕） */
+    private String offlineRemark;
+
     private Integer currentVersion;
 
     private String remark;

@@ -842,8 +842,10 @@ private String datasetGrade(Long datasetId) {
         if (Boolean.TRUE.equals(zeroResult)) {
             qw.where(CMR_SEARCH_HISTORY.ITEM_COUNT.eq(0));
         }
-        if (Boolean.TRUE.equals(downCount)) {
-            qw.where("EXISTS (SELECT 1 FROM cmr_item_vote v WHERE v.search_id = cmr_search_history.id"
+        if (downCount != null) {
+            // true 只看有踩；false 只看无踩（与“全部”区分）
+            qw.where((downCount ? "" : "NOT ") + "EXISTS (SELECT 1 FROM cmr_item_vote v"
+                    + " WHERE v.search_id = cmr_search_history.id"
                     + " AND v.vote = 'down' AND v.del_flag = 'F')");
         }
         if (!blank(taskNo)) {
@@ -875,6 +877,7 @@ private String datasetGrade(Long datasetId) {
                 .taskBizNo(taskService.bizNoOf(h.getTaskId()))
                 .taskStatus(taskService.statusOf(h.getTaskId()))
                 .queryText(h.getQueryText())
+                .queryFile(h.getQueryFile())
                 .queryModality(h.getQueryModality())
                 .targetModality(h.getTargetModality())
                 .operatorName(h.getOperatorName())

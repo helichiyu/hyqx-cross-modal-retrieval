@@ -32,10 +32,16 @@ public class StrategyVO {
 
     private LocalDateTime offlineTime;
 
+    /** 下线备注 */
+    private String offlineRemark;
+
     private Integer currentVersion;
 
     /** 参数摘要，如 “阈值 0.60 · 重排开” */
     private String paramSummary;
+
+    /** 是否存在待发布草稿（列表「发布」按钮据此启用；无草稿时后端必报错） */
+    private Boolean hasDraft;
 
     private String remark;
 

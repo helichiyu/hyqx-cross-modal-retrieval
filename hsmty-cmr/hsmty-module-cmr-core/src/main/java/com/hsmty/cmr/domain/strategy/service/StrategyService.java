@@ -418,16 +418,18 @@ public class StrategyService {
 
     /** 下线：不再参与日常检索；系统预置策略不可下线 */
     @Transactional(rollbackFor = Exception.class)
-    public void offline(Long id, String reason) {
+    public void offline(Long id, String reason, String remark) {
         CmrStrategy strategy = requireStrategy(id);
         BizException.assertTrue(Boolean.TRUE.equals(strategy.getPreset()), "系统预置策略不可下线");
         BizException.assertTrue(CmrStrategy.STATUS_OFFLINE.equals(strategy.getStatus()), "策略已下线");
         BizException.assertTrue(!notBlank(reason), "下线原因不能为空");
         strategy.setStatus(CmrStrategy.STATUS_OFFLINE);
         strategy.setOfflineReason(reason);
+        strategy.setOfflineRemark(notBlank(remark) ? remark.trim() : null);
         strategy.setOfflineTime(LocalDateTime.now());
-        strategyMapper.update(strategy);
-        log.info("策略下线: {} reason={}", strategy.getBizNo(), reason);
+        // 全字段更新：备注留空时需清掉上一次下线备注
+        strategyMapper.update(strategy, false);
+        log.info("策略下线: {} reason={} remark={}", strategy.getBizNo(), reason, remark);
     }
 
     /**
@@ -447,9 +449,34 @@ public class StrategyService {
                 "策略尚无生效版本，请编辑并发布后再上线");
         strategy.setStatus(CmrStrategy.STATUS_ACTIVE);
         strategy.setOfflineReason(null);
+        strategy.setOfflineRemark(null);
         strategy.setOfflineTime(null);
-        strategyMapper.update(strategy);
+        // 全字段更新：上线时需真正清空下线原因/备注/时间
+        strategyMapper.update(strategy, false);
         log.info("策略重新上线（直接生效）: {} v{}", strategy.getBizNo(), strategy.getCurrentVersion());
+    }
+
+    /**
+     * 对比策略下拉：包含全部状态（草稿 / 生效 / 已下线）的策略，供 P5 版本对比选择任意对象。
+     *
+     * @return 策略选项列表（id / 名称 / 状态 / 可用版本号）
+     * @author cmr
+     * @since 2026-11-11
+     */
+    public List<Map<String, Object>> compareOptions() {
+        List<CmrStrategy> strategies = strategyMapper.selectListByQuery(QueryWrapper.create()
+                .orderBy(CMR_STRATEGY.ID.asc()));
+        return strategies.stream().map(s -> {
+            CmrStrategyVersion v = effectiveVersionOf(s);
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", s.getId());
+            item.put("bizNo", s.getBizNo());
+            item.put("name", s.getName());
+            item.put("scene", s.getScene());
+            item.put("status", s.getStatus());
+            item.put("versionNo", v == null ? null : v.getVersionNo());
+            return item;
+        }).toList();
     }
 
     /** 检索台策略下拉：生效策略 + 可预览参数的选项 */
@@ -581,8 +608,11 @@ public class StrategyService {
         CmrStrategyVersion v2;
         if (!id.equals(targetId)) {
             CmrStrategy other = requireStrategy(targetId);
-            v1 = requireCurrent(base);
-            v2 = requireCurrent(other);
+            // 跨策略对比取“可用版本”：生效版本 > 草稿 > 最近已发布版本，草稿/未发布策略同样可比
+            v1 = effectiveVersionOf(base);
+            v2 = effectiveVersionOf(other);
+            BizException.assertNull(v1, "策略「" + base.getName() + "」尚无任何版本，无法对比");
+            BizException.assertNull(v2, "策略「" + other.getName() + "」尚无任何版本，无法对比");
             from = v1.getVersionNo();
             to = v2.getVersionNo();
         } else {
@@ -721,6 +751,23 @@ public class StrategyService {
         }
     }
 
+    /** 对比用可用版本：生效版本 > 草稿 > 最近已发布版本 */
+    private CmrStrategyVersion effectiveVersionOf(CmrStrategy strategy) {
+        CmrStrategyVersion current = currentOf(strategy);
+        if (current != null) {
+            return current;
+        }
+        CmrStrategyVersion draft = draftOf(strategy.getId());
+        if (draft != null) {
+            return draft;
+        }
+        return versionMapper.selectOneByQuery(QueryWrapper.create()
+                .where(CMR_STRATEGY_VERSION.STRATEGY_ID.eq(strategy.getId())
+                        .and(CMR_STRATEGY_VERSION.STATUS.ne(CmrStrategyVersion.STATUS_DRAFT)))
+                .orderBy(CMR_STRATEGY_VERSION.VERSION_NO.desc())
+                .limit(1));
+    }
+
     private CmrStrategyVersion currentOf(CmrStrategy strategy) {
         if (strategy == null || strategy.getCurrentVersion() == null || strategy.getCurrentVersion() <= 0) {
             return null;
@@ -857,8 +904,10 @@ public class StrategyService {
                 .id(e.getId()).bizNo(e.getBizNo()).name(e.getName()).scene(e.getScene())
                 .status(e.getStatus()).preset(Boolean.TRUE.equals(e.getPreset()))
                 .offlineReason(e.getOfflineReason()).offlineTime(e.getOfflineTime())
+                .offlineRemark(e.getOfflineRemark())
                 .currentVersion(e.getCurrentVersion())
                 .paramSummary(current == null ? null : paramSummary(current))
+                .hasDraft(draftOf(e.getId()) != null)
                 .remark(e.getRemark())
                 .createTime(e.getCreateTime()).updateTime(e.getUpdateTime())
                 .build();

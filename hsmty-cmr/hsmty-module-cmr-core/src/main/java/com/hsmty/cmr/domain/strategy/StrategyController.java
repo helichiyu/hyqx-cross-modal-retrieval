@@ -160,11 +160,18 @@ public class StrategyController {
         return ApiResult.success(strategyService.options());
     }
 
+    @Operation(summary = "对比策略下拉（全部状态，含草稿/已下线）")
+    @PreAuthorize("hasAnyAuthority('cmr:strategy:page')")
+    @GetMapping("compare-options")
+    public ApiResult<List<Map<String, Object>>> compareOptions() {
+        return ApiResult.success(strategyService.compareOptions());
+    }
+
     @Operation(summary = "策略下线（系统预置不可下线）")
     @PreAuthorize("hasAnyAuthority('cmr:strategy:update')")
     @PostMapping("{id}/offline")
     public ApiResult<Void> offline(@PathVariable Long id, @Valid @RequestBody StrategyOfflineDTO dto) {
-        strategyService.offline(id, dto.getReason());
+        strategyService.offline(id, dto.getReason(), dto.getRemark());
         return ApiResult.success();
     }
 

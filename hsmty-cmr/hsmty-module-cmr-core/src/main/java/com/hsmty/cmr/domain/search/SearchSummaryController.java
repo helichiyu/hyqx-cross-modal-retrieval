@@ -36,7 +36,7 @@ public class SearchSummaryController {
     }
 
     @Operation(summary = "封存任务（锁定赞/踩）")
-    @PreAuthorize("hasAnyAuthority('cmr:search:update')")
+    @PreAuthorize("hasAnyAuthority('cmr:search:create')")
     @PostMapping("{taskNo}/seal")
     public ApiResult<Void> seal(@PathVariable String taskNo) {
         searchService.seal(taskNo);

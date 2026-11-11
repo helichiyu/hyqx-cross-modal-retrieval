@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 策略下线备注：P5 下线弹窗的「备注」过去被静默丢弃，补列留痕 -->
+    <changeSet id="cmr-strategy-offline-remark-20261111" author="cmr" context="mysql,postgresql">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="cmr_strategy" columnName="offline_remark"/></not>
+        </preConditions>
+        <addColumn tableName="cmr_strategy">
+            <column name="offline_remark" type="varchar(200)" remarks="下线备注（选填，随下线动作留痕）"/>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

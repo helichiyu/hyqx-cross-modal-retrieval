@@ -42,6 +42,9 @@ public class BehaviorVO {
     @Schema(description = "输入内容")
     private String queryText;
 
+    @Schema(description = "查询文件路径；文件检索时用于展示文件名")
+    private String queryFile;
+
     @Schema(description = "查询模态")
     private String queryModality;
 

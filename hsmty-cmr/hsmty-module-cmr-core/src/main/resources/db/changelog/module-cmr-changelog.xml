@@ -24,5 +24,6 @@
     <include file="db/changelog/cmr/016_cmr_strategy_version_name.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/cmr/017_cmr_datasource_blacklist_dataset_id.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/cmr/018_cmr_datasource_missing_fields.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/019_cmr_strategy_offline_remark.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>
