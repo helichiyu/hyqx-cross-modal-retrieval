@@ -148,13 +148,23 @@
 {"query": "a pig grunting", "answers": ["1-260640-C-2.wav"]}
 {"query": "a rooster crowing", "answers": ["2-81270-A-1.wav"]}
 {"query": "a sheep bleating", "answers": ["2-119161-B-8.wav"]}
-{"query": "一个手里拿着一根棍子的人在微笑，棍子插在油漆罐里面。", "answers": ["video_01.mp4"]}
-{"query": "一个警察用他的警犬去搜索汽车。", "answers": ["video_02.mp4"]}
-{"query": "一辆装满了白色箱子的超载货车向后倒，把拉车的骡子拽的四脚离地。", "answers": ["video_03.mp4"]}
-{"query": "一个穿着红衬衫的女人用一把铲子把烤炉的顶盖刮了出来，而男人把顶盖抓在手里。", "answers": ["video_04.mp4"]}
-{"query": "一个白人小男孩正在面对着翻倒的玩具大哭。", "answers": ["video_05.mp4"]}
-{"query": "两名建筑工人正在致力于修理鹅卵石小路。", "answers": ["video_06.mp4"]}
-{"query": "在一座体育场的人群中，一个人正站起来挥舞着手臂，就像他在表演波浪一样。", "answers": ["video_07.mp4"]}
-{"query": "一个穿着红衬衫的男人坐在草地上，而一个球正向他飞来。", "answers": ["video_08.mp4"]}
-{"query": "一群人坐在一座乡村风格的建筑外面的草坪上。", "answers": ["video_09.mp4"]}
-{"query": "一个身穿黑色T恤的年轻男人用充气锤玩槌球。", "answers": ["video_10.mp4"]}
+{"query": "一群人在篮球场上打篮球，有人投篮", "answers": ["video_01.mp4"]}
+{"query": "一个人骑着自行车在道路上骑行", "answers": ["video_02.mp4"]}
+{"query": "一个人从悬崖上跳入水中的悬崖跳水", "answers": ["video_03.mp4"]}
+{"query": "两名运动员戴着护具进行击剑比赛", "answers": ["video_05.mp4"]}
+{"query": "骑师们骑着马在赛道上飞奔竞速", "answers": ["video_07.mp4"]}
+{"query": "一个人弹奏吉他", "answers": ["video_12.mp4"]}
+{"query": "几个人乘皮划艇在急流中漂流", "answers": ["video_15.mp4"]}
+{"query": "滑雪者在雪坡上滑行", "answers": ["video_17.mp4"]}
+{"query": "一群人在户外练习太极拳", "answers": ["video_19.mp4"]}
+{"query": "一个人在蹦床上弹跳翻腾", "answers": ["video_20.mp4"]}
+{"query": "移民澳大利亚的打分系统中工作经验怎么计分", "answers": ["txt_001.txt"]}
+{"query": "呢子面料韩国服饰大衣的流行款式", "answers": ["txt_012.txt"]}
+{"query": "保险 公司以不属于意外伤害为由拒赔的诉讼案件", "answers": ["txt_024.txt"]}
+{"query": "爱国者T60数码相机的评测", "answers": ["txt_036.txt"]}
+{"query": "香港铜锣湾街头初夏的穿衣搭配", "answers": ["txt_048.txt"]}
+{"query": "工人讨要工钱时被持棍男子打伤", "answers": ["txt_060.txt"]}
+{"query": "磁星伽马射线暴轰击地球大气", "answers": ["txt_072.txt"]}
+{"query": "冬季皮草怎么穿不显庸俗的明星示范", "answers": ["txt_084.txt"]}
+{"query": "郑州黄河大堤轿车扎进河沟四脚朝天", "answers": ["txt_096.txt"]}
+{"query": "留学保证金存款证明如何办理", "answers": ["txt_100.txt"]}

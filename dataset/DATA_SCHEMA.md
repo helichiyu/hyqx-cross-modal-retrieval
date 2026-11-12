@@ -57,19 +57,20 @@ dataset/sample/
 ## 5. 四模态回归测试集 `cmr_testset/`
 
 `sample/` 只用于链路冒烟；需要真实语义和指标回归时使用 `dataset/cmr_testset/`：
-100 张原图 + 30 张比例变体 + 50 条音频 + 20 条混合音频 + 20 段合成视频 + 9 篇文本（约 21MB，可入库）。
+100 张原图 + 30 张比例变体 + 50 条音频 + 20 条混合音频 + 20 段真实视频 + 100 篇真实新闻文本（可入库）。
 
 | 路径 | 内容 |
 | --- | --- |
 | `cmr_testset/images/` | 100 张 jpg（Flickr30K-CN）+ 30 张方形/竖屏/横屏比例变体 |
 | `cmr_testset/audio/` | 50 条 5s、16kHz 单声道 wav（ESC-50 动物类）+ 20 条混合音频 |
-| `cmr_testset/videos/` | 20 段 6s/12fps mp4，横屏/方形/竖屏轮换，带推近、平移或拉远运镜 |
-| `cmr_testset/text/` | 说明、动物、风景、美食、运动、交通、声音、视频、检索指南共 9 篇 |
+| `cmr_testset/videos/` | 20 段真实动作视频（UCF101，20 个动作类各 1 条，h264 mp4） |
+| `cmr_testset/text/` | 100 篇真实新闻正文（THUCNews，9 个类别，≤480 字简体） |
 | `cmr_testset/metadata.json` | 401 声明的 count/modalities（count 为实际文件数） |
 | `cmr_testset_eval/eval_image.jsonl` | 100 条中文查询 → 图像 |
 | `cmr_testset_eval/eval_audio.jsonl` | 50 条英文查询 → 音频 |
-| `cmr_testset_eval/eval_video.jsonl` | 10 条中文查询 → 视频 |
-| `cmr_testset_eval/eval_all.jsonl` | 合并 160 条，供 409 使用 |
+| `cmr_testset_eval/eval_video.jsonl` | 10 条中文查询 → 真实视频 |
+| `cmr_testset_eval/eval_text.jsonl` | 10 条中文查询 → 新闻文本 |
+| `cmr_testset_eval/eval_all.jsonl` | 合并 170 条，供 409 使用 |
 
 - 评测集放在数据集目录**之外**，避免 403 把 `*.jsonl` 当文本解析。
 - 完整版（1000 图 / 200 音频）与本地重建：
@@ -80,5 +81,11 @@ dataset/sample/
 - 已有数据目录做增量补素材（视频运镜、比例变体、混合音频、多篇文本）：
   ```bash
   .venv/Scripts/python scripts/enrich_cmr_testset.py --dataset dataset/cmr_testset
+  ```
+- 真实文本/真实视频（v2，2026-11-12）拉取与重跑：
+  ```bash
+  .venv/Scripts/python scripts/fetch_real_media.py --only text   # THUCNews → text/txt_*.txt
+  .venv/Scripts/python scripts/fetch_ucf101_zip_range.py         # UCF101 整包 zip Range 抽取
+  .venv/Scripts/python scripts/fetch_real_media.py --only video  # 转码 → videos/video_*.mp4
   ```
 - 来源与许可见 [cmr_testset_ATTRIBUTION.md](cmr_testset_ATTRIBUTION.md)；仅限内部测试，对外交付前需确认授权。
