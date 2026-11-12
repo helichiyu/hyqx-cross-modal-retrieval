@@ -14,10 +14,6 @@
   <div v-else class="page-card console-page">
     <!-- Hero：检索大入口 -->
     <section class="hero" aria-labelledby="heroTitle">
-      <button class="dev-entry" type="button" title="研发说明" @click="devOpen = true">
-        <span class="de-q" aria-hidden="true">?</span>研发说明
-      </button>
-
       <div class="hero-inner">
         <h1 id="heroTitle">跨模态<span>检索</span></h1>
         <p class="hero-sub">用一句话、一张图、一段音频，检索图文音视频资产</p>
@@ -114,14 +110,6 @@
             <span v-else class="stg-diff">{{ strategySummary }}</span>
           </div>
         </div>
-
-        <div class="search-aux">
-          <span class="pa">当前模态对 <b>{{ target === '全部' ? '全部' : selectedPair }}</b></span>
-          <span class="aux-right">
-            <span class="ca"><b>{{ query.length }}</b>/512</span>
-            <button class="link-btn" type="button" @click="resetAll">清空</button>
-          </span>
-        </div>
       </div>
     </section>
 
@@ -137,11 +125,6 @@
             </div>
 
             <div class="matrix-wrap">
-              <div class="matrix-legend">
-                <span class="lg">
-                  <span class="mk" aria-hidden="true"><el-icon :size="12"><component :is="'Check'" /></el-icon></span>支持
-                </span>
-              </div>
               <div class="modal-matrix" role="grid" aria-label="模态矩阵">
                 <div class="mm-corner"></div>
                 <div v-for="col in modes" :key="`c-${col}`" class="mm-colh">{{ col }}</div>
@@ -180,8 +163,7 @@
                 <el-icon :size="20"><component :is="'Upload'" /></el-icon>
               </div>
               <strong>拖拽或点击上传图片 / 音频 / 视频</strong>
-              <span>自动识别查询模态 · JPG/PNG/MP4/WAV/MP3 · 单文件 ≤ 100MB</span>
-              <div class="dz-types"><em>JPG/PNG</em><em>MP4</em><em>WAV/MP3</em></div>
+              <div class="dz-types"><em>JPG/PNG</em><em>MP4</em><em>WAV/MP3</em><em>≤ 100MB</em></div>
             </div>
 
             <div v-else class="dz-file">
@@ -241,159 +223,6 @@
     </div>
 
     <div class="toast" :class="{ show: toast.visible, err: toast.type === 'err' }">{{ toast.message }}</div>
-
-    <DevNotesDrawer v-model="devOpen" title="研发需求说明">
-      <div class="dev-card">
-        <div class="dc-head">
-          <span class="dc-id" :style="{ background: 'var(--system-blue)' }">总览</span>
-          <span class="dc-name">页面定位 / 闭环 / 功能清单 / 设计出处</span>
-        </div>
-        <div class="dc-body">
-          <div class="ov-grid">
-            <div class="dev-ov">
-              <h4>本页定位【设计】</h4>
-              <p>全系统唯一查询入口：输入文本描述或图/音频/视频文件，选择「查询模态 × 目标模态」发起检索；结果进入 <span class="dev-xref">P2</span> 结果页确认与查看。</p>
-            </div>
-            <div class="dev-ov">
-              <h4>平台全景闭环【研发】</h4>
-              <p>检索台发起检索 → <span class="dev-xref">P6</span> 搜索行为调度运行 → <span class="dev-xref">P2</span> 结果页确认/查看 → <span class="dev-xref">P7</span> 结果运营（反馈处理）→ 反馈归因到 <span class="dev-xref">P5</span> 策略调整（<span class="dev-xref">P8</span> 评测验证）→ 策略发布后下次检索生效；<span class="dev-xref">P4</span> 数据源库管理持续供给检索库。八页即此闭环的八个切面。</p>
-            </div>
-            <div class="dev-ov">
-              <h4>功能清单【设计】</h4>
-              <p>本页主功能：发起检索并携参跳转结果页（F7）、输入联想（F6）、意图澄清（F5）；全局件：多模态输入（F1/F2）、模态矩阵（F3）、检索策略（F4）、权限态（F8）。完整历史在 <span class="dev-xref">P6</span> 搜索行为。</p>
-            </div>
-            <div class="dev-ov">
-              <h4>检索类型口径【设计】</h4>
-              <p>检索类型用于收窄目标模态：默认「全部」不限定目标模态，按统一向量空间跨模态混排返回，结果按相似度排序；选择具体模态（图像/文本/音频/视频）时，按当前查询模态自动选对应模态对（如文本→图像=「文搜图」），无对应组合时 toast「{查询模态}输入暂不支持检索「{目标模态}」结果」并保持原选择。</p>
-            </div>
-            <div class="dev-ov">
-              <h4>设计出处与演示性质【设计】</h4>
-              <p>依据 L2 设计_13 页面架构地图 / L3 设计_15 模板 / L4 设计_16 基础件生成；模态能力：4×4 全矩阵 16 种模态对全部可检索（4 模态统一共享空间对齐，2026-10-27 确认）。示例数据不构成交付承诺。</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="dev-card">
-        <div class="dc-head"><span class="dc-id">F1</span><span class="dc-name">文本检索输入</span></div>
-        <div class="dc-body">
-          <div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">输入查询文本，作为文本检索（文搜X）的查询语义；与文件同时存在时以文本 q 发起检索，文件只作上下文。</div></div>
-          <div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">常驻可用；文本与文件二选一即可，不强制二者都有。</div></div>
-          <div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>用户手输文本</li><li>单行大输入框（Hero 搜索框），最多 512 字</li><li>占位文案「输入一句话描述，或拖入图片 / 音频 / 视频…」；示例词由输入联想提供。</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">处理规则</div><div class="dc-v">实时字数统计（0/512，硬截断不允许超长）；输入去首尾空格后参与判定；去空格 ≥4 字触发 F6 联想下拉。</div></div>
-          <div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>作为 Query 参数进入 F7 检索</li></ul></div></div>
-          <div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>仅空格等同未输入</li><li>达到 512 字后无法继续输入</li><li>无文本也无文件时点检索，红字提示「请输入查询描述，或上传图片 / 视频 / 音频文件」，3.5 秒自动消失。</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">默认空；聚焦输入态；错误态=输入框红框+行内红字。</div></div>
-          <div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">下游 F6 联想 / F7 检索。</div></div>
-          <div class="dc-row"><div class="dc-k">验收点</div><div class="dc-v">512 字截断生效；计数实时；空输入拦截并提示。</div></div>
-        </div>
-      </div>
-
-      <div class="dev-card">
-        <div class="dc-head"><span class="dc-id">F2</span><span class="dc-name">文件输入与查询模态自动识别</span></div>
-        <div class="dc-body">
-          <div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">上传图/视频/音频文件，系统自动识别查询模态并点亮对应矩阵行。</div></div>
-          <div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">拖拽区常驻；未上传时点击或拖入；已上传后该区显示文件卡片。Hero 搜索框也接受拖入文件，与拖拽区走同一 handleFile 流程。</div></div>
-          <div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>单文件</li><li>支持 JPG/JPEG/PNG/MP4/WAV/MP3</li><li>页面文案承诺单文件 ≤100MB。</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">处理规则</div><div class="dc-v">按扩展名判定模态：jpg/jpeg/png→图像、mp4→视频、wav/mp3→音频；识别约 0.9 秒加载态；成功后写入 queryMode，矩阵仅保留该查询模态所在行可选（其余行置淡约 32%），非该行已选自动清除；音频额外默认选中「音搜音」。</div></div>
-          <div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>文件模态=矩阵查询模态（行）</li><li>文件名与模态留在本页 state，不入 URL</li><li>成功后可点 × 移除并复位。</li></ul></div></div>
-          <div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>类型不符→红字「不支持的文件类型…」并清空文件</li><li>识别中重复点检索→「文件识别中，请稍候」</li><li>上传失败清空文件与预览，避免用旧文件检索</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">默认态（虚线上传区）/拖拽高亮/识别中（spinner）/成功（文件卡+识别结果）。</div></div>
-          <div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">识别结果驱动 F3 矩阵行；文件名只留在本页 state，不入 URL。原始文件在正式系统留源系统，本中心只存检索要素。</div></div>
-          <div class="dc-row"><div class="dc-k">验收点</div><div class="dc-v">JPG/JPEG/PNG/MP4/WAV/MP3 识别为正确模态；非法类型被拦截并给明确文案；成功后矩阵仅该行可选、音频自动选音搜音；×移除后完全复位。</div></div>
-        </div>
-      </div>
-
-      <div class="dev-card">
-        <div class="dc-head"><span class="dc-id">F3</span><span class="dc-name">模态矩阵选择（查询模态 × 目标模态）</span></div>
-        <div class="dc-body">
-          <div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">选择「查询模态 × 目标模态」组合，确定本次检索的模态对。</div></div>
-          <div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">与上传同处模态矩阵卡片内（一屏布局：矩阵在左、上传区在右）；4×4 全矩阵 16 种模态对全部可检索（4 模态统一共享空间对齐）；未开通库权限的账号不做置淡/锁定，点格时直接拦截。</div></div>
-          <div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>4×4 矩阵</li><li>行=查询模态（文本/图像/音频/视频），列=目标模态（文本/图像/音频/视频）</li><li>上传文件后按 F2 自动锁定查询模态行。</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">处理规则</div><div class="dc-v">16 格均显示对勾、可点，点击置 selected（同时只允许一个，再点同一格不取消）；检索类型=全部时 pair=全部，不阻断检索。</div></div>
-          <div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>选中模态对（如「文搜图」）进入 F7</li><li>页面「当前模态对」与 <span class="dev-xref">P2</span> 均显示该模态对。</li></ul></div></div>
-          <div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>检索类型≠全部且无对应模态对时→红字「请先选择检索类型（全部 / 图像 / 文本 / 音频 / 视频）」并抖动检索类型组</li><li>切换文件致查询模态行变化时，非该行已选自动清除</li><li>无权限账号不可选。</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">可选/选中（蓝底）/置淡约 32%（文件锁定其他行）。</div></div>
-          <div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">能力清单：4×4 全矩阵 16 种模态对全部可检索（4 模态统一共享空间对齐，2026-10-27 确认）；入参供 F7、<span class="dev-xref">P2</span>。</div></div>
-          <div class="dc-row"><div class="dc-k">验收点</div><div class="dc-v">可选格恰好 16 个（4×4 全亮）；单选互斥；文件上传后非查询行置淡且跨行已选被清除。</div></div>
-        </div>
-      </div>
-
-      <div class="dev-card">
-        <div class="dc-head"><span class="dc-id">F4</span><span class="dc-name">检索策略选择（<span class="dev-xref">P5</span> 反推）</span></div>
-        <div class="dc-body">
-          <div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">选择本次检索所用的检索策略：检索时直接选一条策略，策略决定本次检索的相似度阈值与重排参数。</div></div>
-          <div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">常驻下拉，默认系统默认策略（兜底）；右侧小字显示该策略的参数摘要「阈值 x.xx · 重排开/关」。</div></div>
-          <div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>选项来自 <span class="dev-xref">P5</span> 已生效策略（GET strategies/options，仅返回生效中策略）</li><li>下拉展示策略名 + 参数摘要</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">处理规则</div><div class="dc-v">选择即写入本次检索策略；右侧摘要随选项动态输出。若接口未返回任何生效策略，显示「暂无生效策略，将按默认参数检索」并保留系统默认兜底，检索仍可发起。</div></div>
-          <div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>策略号作为入参进入 F7 → <span class="dev-xref">P2</span>（跳转参数 stg + thr）</li><li>本次检索使用该策略的阈值与重排参数</li></ul></div></div>
-          <div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>未知 / 已下线的策略号按系统默认策略处理</li><li>无生效策略时不禁用检索</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">下拉默认系统默认策略；切换即时生效，无加载态。</div></div>
-          <div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=<span class="dev-xref">P5</span> 策略管理（唯一来源）；下游=F7、<span class="dev-xref">P2</span>。</div></div>
-          <div class="dc-row"><div class="dc-k">验收点</div><div class="dc-v">选项与 P5 生效策略一致；默认选中兜底策略；右侧摘要与 P5 参数一致；跳转带 stg 与 thr 参数。</div></div>
-        </div>
-      </div>
-
-      <div class="dev-card">
-        <div class="dc-head"><span class="dc-id">F5</span><span class="dc-name">意图澄清（短词检索前的改写建议）</span></div>
-        <div class="dc-body">
-          <div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">去空格后 &lt;4 字的短 query 在检索前给一次改写建议，帮助用户把过短输入补成可检索的描述；每个 query 只给一轮建议，不打断正常检索主流程。</div></div>
-          <div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">点「检索」时触发；前置=有 query 且去空格长度 &lt; 4 且本轮未澄清过该 query。</div></div>
-          <div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>用户输入的短 query（长度去空格后 &lt; 4）</li><li>本轮已澄清的 query 记录（会话存储 cmrClarify，最多 60 条，仅本页使用，刷新后仍在）</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">处理规则</div><div class="dc-v">弹出居中浮层（遮罩 + 约 520px 卡片）：标题「意图澄清」，正文「「{q}」较短或存在歧义，你是不是想找：」；候选取后端查询理解（407）返回的改写 query，接口无返回时按 query 拼模板兜底。</div></div>
-          <div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>选候选 → 候选文本作为 query 进入 F7 检索流程（URL 的 q 即候选文本）</li><li>仍按原词 → 原 query 进入 F7 检索流程</li><li>关闭 → 不检索</li></ul></div></div>
-          <div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>≥4 字不触发</li><li>同一 query 已澄清不再触发</li><li>纯文件检索（无 query）不触发</li><li>× / Esc 仅关闭，不检索、不标记</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">隐藏 / 显示两态；显示时遮罩 + 卡片，点击遮罩或 × 或 Esc 均关闭。</div></div>
-          <div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=F1 检索输入、407 查询理解；下游=F7 发起检索并携参跳 <span class="dev-xref">P2</span>。</div></div>
-          <div class="dc-row"><div class="dc-k">验收点</div><div class="dc-v">短词首次检索必弹且仅 1 轮；点候选后 URL 的 q 为候选文本；同一 query 第二次点检索不再弹；≥4 字与纯文件检索不弹；刷新后澄清记录仍在。</div></div>
-        </div>
-      </div>
-
-      <div class="dev-card">
-        <div class="dc-head"><span class="dc-id">F6</span><span class="dc-name">相似查询复用（输入联想）</span></div>
-        <div class="dc-body">
-          <div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">输入时给最近搜索与示例搜索，减少重复输入。</div></div>
-          <div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">输入框聚焦且去空格文本 ≥4 字时下拉显示（纯文件检索不触发）；失焦 150ms 后收起（保留点击时间）。</div></div>
-          <div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>最近搜索=检索历史接口的 query 去重取前 3</li><li>示例搜索=本地示例词</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">处理规则</div><div class="dc-v">输入 ≥4 字即按包含匹配展示两组；无任何匹配时展示 3 条示例；mousedown 点选项（避免 blur 先收起）即回填到输入框、更新字数、收起下拉并聚焦。</div></div>
-          <div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>回填文本进入 F1，等同手输</li><li>完整历史在 <span class="dev-xref">P6</span> 搜索行为。</li></ul></div></div>
-          <div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>输入为空或 &lt;4 字不显示</li><li>Esc 收起</li><li>点击弹层外失焦收起</li><li>下拉项点击不被 blur 提前吞掉。</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">隐藏/显示两态；分组标题「最近搜索」/「示例搜索」。</div></div>
-          <div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=检索历史接口；下游回填 F1。</div></div>
-          <div class="dc-row"><div class="dc-k">验收点</div><div class="dc-v">≥4 字出现分组、&lt;4 字消失；无匹配时出现示例；点选项正确回填并聚焦；失焦/Esc 正常收起。</div></div>
-        </div>
-      </div>
-
-      <div class="dev-card">
-        <div class="dc-head"><span class="dc-id">F7</span><span class="dc-name">发起检索并携参跳转结果页</span></div>
-        <div class="dc-body">
-          <div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">校验必填后组装检索上下文，执行检索并携参跳 <span class="dev-xref">P2</span> 结果页。</div></div>
-          <div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">「检索」主按钮；另有「清空」复位搜索词与文件，保留策略选择。</div></div>
-          <div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>Query（文本；纯文件检索时为空）、文件（可无）、模态对（可选；检索类型=全部时为空）、检索策略（默认系统默认策略）</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">检索流程</div><div class="dc-v">校验顺序：文件识别中拦截→文本与文件均空拦截→检索类型≠全部但无对应模态对拦截；通过后先判 F5：短 query 弹意图澄清，澄清出口再进入检索。检索中按钮禁用防重复提交；文件存在而无文本时不传 query。</div></div>
-          <div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>携参跳 <span class="dev-xref">P2</span>：?from=P1&amp;back=P1&amp;task=&amp;q=&amp;pair=&amp;stg=&amp;thr=（q 为空时省略；文件不入 URL）</li><li>pair 未选时为「全部」，stg 为策略业务编号，thr 为该策略阈值（两位小数）</li></ul></div></div>
-          <div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>三类前置校验各自给明确红字/toast</li><li>检索中按钮防重复提交</li><li>清空复位：文本、模态对、文件、错误提示、联想（策略保留）</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">默认「检索」/「检索中」禁用；错误为行内红字 3.5 秒。</div></div>
-          <div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=F1-F6 全部入参；下游=<span class="dev-xref">P2</span> 结果页、<span class="dev-xref">P6</span> 搜索行为。</div></div>
-          <div class="dc-row"><div class="dc-k">验收点</div><div class="dc-v">三种缺参分别被拦截且文案准确；通过后 q/pair/stg 与界面选择一致；检索中防连点；清空后搜索词与文件复位且策略不变。</div></div>
-        </div>
-      </div>
-
-      <div class="dev-card">
-        <div class="dc-head"><span class="dc-id">F8</span><span class="dc-name">权限态</span></div>
-        <div class="dc-body">
-          <div class="dc-row"><div class="dc-k">职责</div><div class="dc-v">声明本页可见范围与可操作项的权限来源：由登录态与权限配置决定。</div></div>
-          <div class="dc-row"><div class="dc-k">入口/前置</div><div class="dc-v">进入页面时读取当前用户权限码；正式由登录态决定。</div></div>
-          <div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>登录态身份（账号）</li><li>权限码 cmr:search:create</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">处理规则</div><div class="dc-v">拥有 cmr:search:create 按可写渲染；缺少该权限时整页权限拦截空态，不发起检索。</div></div>
-          <div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>可写 / 权限拦截态</li></ul></div></div>
-          <div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>无权限时不渲染检索台、不请求检索</li><li>权限变更后下次进入生效</li></ul></div></div>
-          <div class="dc-row"><div class="dc-k">状态</div><div class="dc-v">已授权 / 权限拦截。</div></div>
-          <div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=平台登录态与权限配置；本页无权限配置入口。</div></div>
-          <div class="dc-row"><div class="dc-k">验收点</div><div class="dc-v">无权限整页拦截且不发起检索；有权限全部功能可用。</div></div>
-        </div>
-      </div>
-    </DevNotesDrawer>
   </div>
 </template>
 
@@ -410,7 +239,6 @@ import {
 } from '../../api'
 import type { StrategyOptionVO } from '../../api/types'
 import { useAuthStore } from '../../stores/auth'
-import DevNotesDrawer from '../../components/DevNotesDrawer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -491,7 +319,6 @@ const clarify = reactive({
   options: [] as string[],
 })
 
-const devOpen = ref(false)
 const toast = reactive({ visible: false, message: '', type: 'info' as 'info' | 'err' })
 const fileInput = ref<HTMLInputElement>()
 
@@ -831,20 +658,6 @@ function clearFile() {
   applyFileFilter()
 }
 
-/** 清空搜索词与文件，保留策略选择 */
-function resetAll() {
-  query.value = ''
-  clearFile()
-  selectedPair.value = ''
-  target.value = '全部'
-  actionError.value = ''
-  suggestVisible.value = false
-  recentSuggestions.value = []
-  exampleSuggestions.value = []
-  closeClarify()
-  showToast('已清空检索条件')
-}
-
 async function submitSearch() {
   if (recognizing.value) {
     showToast('文件识别中，请稍候', 'err')
@@ -1059,7 +872,12 @@ function onKeydown(event: KeyboardEvent) {
 
 .hero {
   position: relative;
-  flex: 0 0 auto;
+  /* 与下方 .setup 各占一半，1:1 等高 */
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   overflow: hidden;
   padding: 26px 28px;
   border: 1px solid #e7effb;
@@ -1112,12 +930,6 @@ function onKeydown(event: KeyboardEvent) {
   font-size: 14.5px;
   line-height: 1.55;
   color: #5b6b85;
-}
-.hero .dev-entry {
-  position: absolute;
-  top: 20px;
-  right: 22px;
-  z-index: 3;
 }
 
 /* ---- 大搜索框 ---- */
@@ -1367,31 +1179,6 @@ function onKeydown(event: KeyboardEvent) {
   white-space: nowrap;
 }
 
-/* ---- 辅助信息 ---- */
-.search-aux {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 8px auto 0;
-  max-width: 1000px;
-  font-size: 12px;
-  color: #93a1b7;
-}
-.search-aux .pa b { color: var(--system-blue); font-weight: 600; }
-.search-aux .ca b { color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
-.search-aux .aux-right { display: inline-flex; align-items: center; gap: 12px; }
-.link-btn {
-  padding: 2px 4px;
-  border: 0;
-  background: transparent;
-  font-size: 12px;
-  color: #93a1b7;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.link-btn:hover { color: var(--system-blue); }
-
 /* ---- 矩阵 + 上传 ---- */
 .setup { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .mt-and-upload {
@@ -1421,27 +1208,6 @@ function onKeydown(event: KeyboardEvent) {
 .ph-ico { width: 22px; height: 22px; display: grid; place-items: center; color: #8fa2c0; }
 .setup-head h3 { font-size: 14px; font-weight: 700; color: #1b2a44; letter-spacing: 0.01em; }
 .setup-hint { margin-left: 2px; font-size: 11px; color: #a2aec2; }
-
-.matrix-legend {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.matrix-legend .lg { display: flex; align-items: center; gap: 5px; }
-.matrix-legend .mk {
-  width: 18px;
-  height: 18px;
-  display: grid;
-  place-items: center;
-  border: 1px solid #d7e3f8;
-  border-radius: 6px;
-  background: #f3f7ff;
-  color: var(--system-blue);
-}
 
 .modal-matrix {
   display: grid;
@@ -1514,7 +1280,6 @@ function onKeydown(event: KeyboardEvent) {
   color: var(--system-blue);
 }
 .dropzone strong { font-size: 14px; font-weight: 600; color: #273244; }
-.dropzone span { font-size: 12.5px; line-height: 1.55; color: #8b9ab2; }
 .dz-types { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
 .dz-types em {
   padding: 1px 5px;
@@ -1682,62 +1447,6 @@ function onKeydown(event: KeyboardEvent) {
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast.err { background: #b42318; }
 
-/* ---- 研发说明抽屉内容 ---- */
-.dev-card {
-  margin-bottom: 14px;
-  border: 1px solid #e4eaf3;
-  border-radius: 10px;
-  background: #fff;
-  overflow: hidden;
-}
-.dc-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 11px 16px;
-  border-bottom: 1px solid #eef2f8;
-  background: #fbfcfe;
-}
-.dc-id {
-  flex: 0 0 auto;
-  padding: 1px 7px;
-  border-radius: 4px;
-  background: #b54708;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-}
-.dc-name { font-size: 13.5px; font-weight: 700; color: #1f2937; }
-.dc-body { padding: 6px 16px 12px; }
-.dc-row {
-  display: flex;
-  gap: 10px;
-  padding: 7px 0;
-  border-bottom: 1px dashed #f0f3f8;
-  font-size: 12.5px;
-  line-height: 1.7;
-}
-.dc-row:last-child { border-bottom: none; }
-.dc-k { flex: 0 0 78px; font-weight: 700; color: var(--ink-body); }
-.dc-v { flex: 1; color: #475467; }
-.dc-v ul { margin: 0; padding-left: 17px; }
-.dc-v li { margin: 2px 0; }
-.k-in .dc-k { color: #027a48; }
-.k-out .dc-k { color: #1f5fd4; }
-.k-err .dc-k { color: #c0362c; }
-.k-dep .dc-k { color: #7a5af8; }
-.ov-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
-.dev-ov { padding: 8px 4px; }
-.dev-ov h4 { margin: 0 0 6px; font-size: 13px; color: var(--system-blue); }
-.dev-ov p { margin: 0; font-size: 12.5px; line-height: 1.75; color: #475467; }
-.dev-xref {
-  padding: 0 1px;
-  color: #1f5fd4;
-  font-weight: 700;
-  border-bottom: 1px dashed #9dbcf5;
-  white-space: nowrap;
-}
-
 /* ---- 响应式 ---- */
 @media (max-width: 1000px), (max-height: 680px) {
   .page-card.console-page {
@@ -1746,6 +1455,7 @@ function onKeydown(event: KeyboardEvent) {
     padding-bottom: 28px;
     overflow: visible;
   }
+  .hero { flex: none; }
   .setup { flex: none; }
   .mt-and-upload { grid-template-columns: 1fr; }
   .dropzone { min-height: 140px; }
@@ -1755,15 +1465,12 @@ function onKeydown(event: KeyboardEvent) {
   .page-card.console-page { padding: 18px 16px 48px; gap: 18px; }
   .hero { padding: 26px 20px; border-radius: 20px; }
   .hero h1 { font-size: 28px; }
-  .hero .dev-entry { top: 14px; right: 14px; }
   .searchbox { height: 54px; margin-top: 18px; padding-left: 14px; }
   .search-field input { font-size: 14.5px; }
   .btn-search { width: 92px; height: 54px; font-size: 14px; border-radius: 13px; }
   .search-meta { flex-direction: column; align-items: stretch; gap: 10px; }
   .stg-pick { width: 100%; flex-wrap: wrap; row-gap: 2px; }
   .stg-select { flex: 1; min-width: 0; max-width: none; }
-  .search-aux { flex-direction: column; align-items: flex-start; gap: 6px; }
-  .search-aux .aux-right { width: 100%; justify-content: space-between; }
   .modal-matrix { grid-template-columns: 48px repeat(4, minmax(0, 1fr)); gap: 5px; }
   .mm-cell { height: 38px; }
   .clarify-modal { border-radius: 16px; }

@@ -5,9 +5,6 @@
         <h1 class="cm-page-title">搜索行为</h1>
         <p class="cm-page-subtitle">谁在什么时候搜了什么、结果多少、赞 / 踩多少。</p>
       </div>
-      <button class="dev-entry" type="button" title="研发说明" @click="devOpen = true">
-        <span class="de-q" aria-hidden="true">?</span>研发说明
-      </button>
     </header>
 
     <section ref="listSection" class="cm-panel panel-pad" aria-label="搜索行为">
@@ -171,48 +168,6 @@
         @current-change="changeFailPage"
       />
     </section>
-
-    <DevNotesDrawer v-model="devOpen" title="研发需求说明">
-      <p class="help-lead">
-        本页是<b>用户搜索行为流水</b>：一条搜索一条记录，<b>不做跨记录的统计与聚合</b>；每条记录只留两个结果：<b>结果数</b>与<b>赞 / 踩</b>。更深的运营与评测在结果运营、效果评测。
-      </p>
-
-      <div>
-        <div class="hb-t">表格 8 列（赞 / 踩 同格）</div>
-        <table class="help-table">
-          <thead>
-            <tr><th>列</th><th>取值与说明</th></tr>
-          </thead>
-          <tbody>
-            <tr><td class="fld">时间</td><td>搜索发起时间，YYYY-MM-DD HH:mm；第一列只放时间，固定按时间倒序（最新在上），不提供排序切换。</td></tr>
-            <tr><td class="fld">任务号</td><td>本次搜索的任务编号（TASK…），紧接时间列独立一列；等宽字体、单行、可整体选中复制，不可点；查看详情走操作列「详情」。</td></tr>
-            <tr><td class="fld">操作人</td><td>登录账户的昵称，<b>只显示昵称（张三）</b>；没有昵称时回退显示账户名；用于按账户追溯是谁搜的。</td></tr>
-            <tr><td class="fld">模态对</td><td>文搜图 / 图搜图 / 文搜视频 / 图搜文 / 视频搜视频；真实搜索记录缺省按「文搜图」。</td></tr>
-            <tr><td class="fld">输入内容</td><td>文搜类＝query 原文；图搜 / 视频搜＝所上传文件名（图片：发票扫描页_01.jpg）；单行省略，悬停看全量。</td></tr>
-            <tr><td class="fld">结果数</td><td>该次搜索返回条数（130 / 87 / 42）；未搜到为「—」。</td></tr>
-            <tr><td class="fld">赞 / 踩</td><td>同一格显示「赞数 / 踩数」（如 3 / 5），按任务号汇总该次结果中被点过赞 / 踩的<b>条目数</b>；两者都为 0 时灰色显示「0 / 0」，无结果数为「—」。</td></tr>
-            <tr><td class="fld">操作</td><td>「详情」跳任务详情页；「重新执行」生成一条新任务记录并跳结果页；表格行本身不承接点击。</td></tr>
-          </tbody>
-        </table>
-        <p class="help-note"><b>重放来源不是独立列：</b>有重放来源时，任务号下方追加一行小灰字「⟳ 重放自 TASK…」，纯文本标注原任务号，不可点。</p>
-      </div>
-
-      <p class="help-note"><b>记录边界：</b>本页只记用户搜索行为，一条行为一条记录；编辑策略、屏蔽数据等其他操作不记在本页。赞 / 踩落在数据条目上，本页只按任务号汇总条目数，不记单条明细。</p>
-
-      <p class="help-note"><b>不设状态：</b>搜索记录不设成功 / 失败状态：结果数有值即搜到了，为「—」即未搜到。失败任务单独在页面「失败任务」表展示，其处置状态独立保留。</p>
-
-      <p class="help-note"><b>赞 / 踩口径：</b>结果页按「任务号 + 条目号」写入评价；本页按行任务号统计 up / down 的<b>条目数</b>（同一条多次只算 1 条），不统计点击次数。新任务号默认 0 / 0。</p>
-
-      <p class="help-note"><b>重新执行：</b>点「重新执行」按原记录的条件重跑，生成新任务号与新记录，并携带「⟳ 重放自 原任务号」标记跳转结果页；同一 query 重放几次就有几条记录，可据此看出被重放过几次、结果数与赞 / 踩如何变化。</p>
-
-      <p class="help-note"><b>详情与快照：</b>「详情」→ 任务详情页（任务号带入）。详情只存 Top-20 摘要（ID + 名称 + 分数），不存图片本体，保留 30 天；本页不存结果快照，「重新执行」只存条件与新结果数，在结果页看「当时 → 现在」的对比。</p>
-
-      <p class="help-note"><b>排序与筛选：</b>固定按时间倒序（最新在上）；「全部 / 有踩 / 无踩」chip（有踩＝踩数 &gt; 0；无踩＝踩数 = 0 或「—」）+ 搜索框（按操作人昵称 / 账户名、输入内容、任务号、重放来源，包含匹配、不区分大小写）叠加过滤；每页 10 条；无结果时给「清除筛选」。</p>
-
-      <p class="help-note"><b>失败任务（只读）：</b>表格 6 列：任务号 / 输入内容 / 失败原因 / 失败类型 / 系统处理 / 状态；失败由系统自动处置——引擎侧失败自动重试（最多 3 次），数据侧失败自动转隔离区；状态取「重试中 / 已恢复 / 已转隔离」，本页不提供人工处置；每页 10 条。</p>
-
-      <p class="help-note"><b>入口与跳转：</b>支持 <code>?task=</code> 定位一条搜索记录（自动把任务号填入搜索框并滚动到列表）、<code>?tab=fail</code> 定位失败任务表；上游来自结果页（写任务元数据与赞踩），下游去任务详情、结果页重放、结果运营与效果评测。图搜类输入取文件名；无结果数（「—」）时原结果数按 0 计。</p>
-    </DevNotesDrawer>
   </div>
 </template>
 
@@ -223,14 +178,12 @@ import { ElMessage } from 'element-plus'
 import { failedTasks, pageBehaviors, rerunSearchResults } from '../../api'
 import type { BehaviorVO, FailedTaskVO } from '../../api/types'
 import { fmtTime } from '../../utils/format'
-import DevNotesDrawer from '../../components/DevNotesDrawer.vue'
 
 const PAGE_SIZE = 10
 
 const route = useRoute()
 const router = useRouter()
 
-const devOpen = ref(false)
 const loading = ref(false)
 const rows = ref<BehaviorVO[]>([])
 const total = ref(0)

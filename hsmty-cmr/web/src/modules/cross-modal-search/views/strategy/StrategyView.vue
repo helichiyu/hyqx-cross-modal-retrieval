@@ -5,9 +5,6 @@
         <h1 class="cm-page-title">策略管理</h1>
         <p class="cm-page-subtitle">管理检索策略的参数（向量 / 召回与融合 / 重排），以及发布、变更评估与版本回滚。</p>
       </div>
-      <button class="dev-entry" type="button" title="研发说明" @click="devOpen = true">
-        <span class="de-q" aria-hidden="true">?</span>研发说明
-      </button>
     </header>
 
     <section class="cm-panel panel-pad" aria-label="策略列表">
@@ -32,7 +29,7 @@
             <span class="mono">{{ row.bizNo }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="名称" min-width="200">
+        <el-table-column label="名称" width="200">
           <template #default="{ row }">
             <div class="name-cell">
               <span class="name-text" :title="row.name">{{ row.name }}</span>
@@ -50,7 +47,7 @@
             <span class="badge" :class="statusMeta(row.status).cls">{{ statusMeta(row.status).label }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="更新时间" width="160">
+        <el-table-column label="更新时间" min-width="160">
           <template #default="{ row }">
             <span class="time-cell">{{ fmtTime(row.updateTime || row.createTime) }}</span>
           </template>
@@ -397,56 +394,6 @@
       </template>
     </el-dialog>
 
-    <DevNotesDrawer v-model="devOpen" title="研发需求说明">
-      <p class="help-lead">
-        本页是检索中心的「大脑」：三段式管理检索策略——①向量（只读回显）②召回与融合（相似度阈值 + 四模态权重）③重排（启用开关）。
-        策略经评测（P8）验证后保存并发布，对检索台（P1）下次检索即生效。
-      </p>
-
-      <div>
-        <div class="hb-t">策略列表 6 列</div>
-        <table class="help-table">
-          <thead>
-            <tr><th>列</th><th>口径</th></tr>
-          </thead>
-          <tbody>
-            <tr><td class="fld">策略 ID</td><td>业务编号 STG+yyMMdd+6 位安全码，等宽字体展示；内部雪花主键不外暴。</td></tr>
-            <tr><td class="fld">名称</td><td>策略名；系统默认（兜底）策略在名称后标「系统预置」。</td></tr>
-            <tr><td class="fld">版本</td><td>当前生效版本号 v1 / v2 / v3；从未发布显示「—」。</td></tr>
-            <tr><td class="fld">状态</td><td>生效中（绿）/ 草稿（灰）/ 已下线（灰，整行文字变浅）；「编辑中」是保存过程中的过渡态，不落库。</td></tr>
-            <tr><td class="fld">更新时间</td><td>最近一次保存 / 发布 / 下线上线时间。</td></tr>
-            <tr><td class="fld">操作</td><td>编辑、发布、版本历史、对比、下线或上线；草稿行不出现下线 / 上线。</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p class="help-note">
-        <b>编辑弹窗：</b>名称必填；向量模型只读（产线白名单，统一检索固定一套向量空间）；相似度阈值必填且限定 0.30–0.99（新建默认 0.60，编辑取当前版本值）；
-        四模态权重（文本 / 图像 / 视频 / 音频）合计必须 100%，默认 50/30/10/10；重排开关默认开。三段参数在弹窗底部一次性写入。
-      </p>
-
-      <p class="help-note">
-        <b>保存草稿 vs 保存并发布：</b>保存草稿只写待发布参数，检索仍用当前生效版本（新建策略落「草稿」，不进检索台下拉）；
-        保存并发布把参数写成生效版本、写版本历史，该策略下次检索即生效，回执显示新版本号并可跳转检索台验证。
-      </p>
-
-      <p class="help-note">
-        <b>下线 / 上线：</b>下线圈定四种原因（策略调整中 / 效果不佳 / 已被替代 / 其他），确认后转已下线，检索台下拉不再出现该策略，已用该策略的历史任务不受影响；
-        <b>系统预置（兜底）策略不可下线</b>。已下线行点「上线」直接回生效中，不弹二次确认。
-      </p>
-
-      <p class="help-note">
-        <b>版本历史：</b>草稿置顶且不可回滚；其余按版本倒序，当前生效版本不可回滚；回滚会回写版本 / 状态 / 配置并出回滚回执。仅保留最近 10 个版本，更早版本由后端物理清理。
-      </p>
-
-      <p class="help-note">
-        <b>对比：</b>选择另一条策略，按「相似度阈值 / 向量模型 / 文本·图像·视频·音频权重 / 重排 / 返回条数」逐行对比，差异行以主色高亮。
-      </p>
-
-      <p class="help-note">
-        <b>一致性检查（页面级只读）：</b>固定 5 项——阈值区间 0.30–0.99、权重合计 100%、权重非负、重排开关有值、默认策略存在且生效；只展示结果，不改任何数据。
-      </p>
-    </DevNotesDrawer>
   </div>
 </template>
 
@@ -477,7 +424,6 @@ import type {
   StrategyVO,
 } from '../../api/types'
 import { fmtTime, parseJson } from '../../utils/format'
-import DevNotesDrawer from '../../components/DevNotesDrawer.vue'
 
 const PAGE_SIZE = 10
 
@@ -545,7 +491,6 @@ interface CompareRow {
 
 const router = useRouter()
 
-const devOpen = ref(false)
 
 const rows = ref<StrategyVO[]>([])
 const total = ref(0)

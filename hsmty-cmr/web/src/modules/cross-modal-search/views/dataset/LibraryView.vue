@@ -4,9 +4,6 @@
       <div class="ph-main">
         <h1 class="cm-page-title">数据源库管理</h1>
       </div>
-      <button class="dev-entry" type="button" title="研发说明" @click="devOpen = true">
-        <span class="de-q" aria-hidden="true">?</span>研发说明
-      </button>
     </header>
 
     <section class="cm-panel lib-panel" aria-label="数据源">
@@ -29,9 +26,9 @@
             <span class="ds-nm">{{ row.name }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="地址" min-width="200">
+        <el-table-column label="地址" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">
-            <span class="mono src-addr">{{ row.endpoint }}</span>
+            <span class="mono">{{ row.endpoint }}</span>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="96">
@@ -46,7 +43,7 @@
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column label="向量化" width="124">
+        <el-table-column label="向量化" width="132">
           <template #default="{ row }">
             <el-tooltip :content="vecHint(row)" placement="top">
               <span class="vec-num" :class="vecClass(row)">{{ vecText(row) }}</span>
@@ -346,9 +343,9 @@
         <el-table-column label="来源名" min-width="116">
           <template #default="{ row }">{{ row.sourceName || '—' }}</template>
         </el-table-column>
-        <el-table-column label="地址" min-width="116">
+        <el-table-column label="地址" min-width="116" show-overflow-tooltip>
           <template #default="{ row }">
-            <span class="mono src-addr">{{ row.endpoint || '—' }}</span>
+            <span class="mono">{{ row.endpoint || '—' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="58" fixed="right">
@@ -390,99 +387,6 @@
       </template>
     </el-dialog>
 
-    <DevNotesDrawer v-model="devOpen" title="研发需求说明">
-      <div>
-        <div class="hb-t">一、定位</div>
-        <ul class="help-list">
-          <li>把上游的<b>数据集平台</b>对接进来，作为检索的数据来源。</li>
-          <li>不需要被检索的数据集放进<b>黑名单</b>排除掉。</li>
-          <li>本页只有两块：数据源列表 + 黑名单抽屉；接口对接定义、测试连接、对接数据源都是数据源块内的弹窗。</li>
-        </ul>
-      </div>
-
-      <div>
-        <div class="hb-t">二、数据源</div>
-        <table class="help-table">
-          <thead>
-            <tr><th>项</th><th>说明</th></tr>
-          </thead>
-          <tbody>
-            <tr><td class="mk">名称</td><td>数据源名称，必填</td></tr>
-            <tr><td class="mk">来源地址</td><td>以 <b>http://</b> 或 <b>https://</b> 开头，必填且不能含空格</td></tr>
-            <tr><td class="mk">状态</td><td>已连接 / 未连接 / 连接失败</td></tr>
-            <tr><td class="mk">上次同步</td><td>最近一次同步时间，格式 yyyy-MM-dd HH:mm</td></tr>
-            <tr>
-              <td class="mk">测试连接</td>
-              <td>每行都可发起；弹窗逐项检测 4 个必填字段（dataset_id / name / item_count / modals）；4 项齐全才置为已连接，缺项则接入失败、状态不变并展示原因</td>
-            </tr>
-            <tr><td class="mk">字段完备</td><td>4 个必填字段的提供比例；全提供为绿色 4/4，缺项为红色如 3/4，悬浮显示缺失字段；未测试过显示「—」</td></tr>
-            <tr>
-              <td class="mk">向量化</td>
-              <td>已连接的数据源显示「已完成 / 总数」（千分位，如 27,930 / 27,930），全部完成为绿色，未完成橙色并悬浮显示百分比；未连接显示「—」</td>
-            </tr>
-            <tr><td class="mk">操作</td><td>每行「测试连接」；已连接的数据源额外显示「同步」，点击刷新上次同步时间</td></tr>
-            <tr><td class="mk">对接</td><td>「＋ 对接数据源」在数据源块头右侧，填名称与来源地址等，加入列表末尾，初始为未连接</td></tr>
-            <tr><td class="mk">列表列</td><td>名称 / 地址 / 状态 / 字段完备 / 向量化 / 上次同步 / 操作，共 7 列</td></tr>
-          </tbody>
-        </table>
-        <p class="help-note">对接记录由后端 <b>datasources</b> 保存，刷新保持；来源地址属于部署配置。</p>
-      </div>
-
-      <div>
-        <div class="hb-t">三、黑名单</div>
-        <table class="help-table">
-          <thead>
-            <tr><th>字段</th><th>说明</th></tr>
-          </thead>
-          <tbody>
-            <tr><td class="mk">数据集 ID</td><td>必填，且不与已有记录重复</td></tr>
-            <tr><td class="mk">名称</td><td>必填</td></tr>
-            <tr><td class="mk">来源名</td><td>必填，与结果页结果条目的「来源」同名，如 <b>产线作业语料包v2.3</b>；P2 按它做数据源级排除</td></tr>
-            <tr><td class="mk">地址</td><td>必填，以 http:// 或 https:// 开头且不能含空格</td></tr>
-          </tbody>
-        </table>
-        <ul class="help-list">
-          <li><b>入口</b>：数据源块头「黑名单 (N)」，点开为右侧 560px 抽屉，N 为黑名单条数；列表为 数据集 ID / 名称 / 来源名 / 地址 / 操作（移出）。</li>
-          <li><b>添加</b>：「＋ 添加黑名单」填数据集 ID / 名称 / 来源名 / 地址，提交后置顶。</li>
-          <li><b>生效</b>：结果页按「来源名」匹配结果条目的来源并排除其条目；可随时移出，刷新后按最新黑名单重算。</li>
-          <li><b>存储</b>：后端 <b>datasource-blacklist</b>，按 datasetId 去重，刷新保持。</li>
-          <li><b>空态</b>：黑名单为空。</li>
-        </ul>
-      </div>
-
-      <div>
-        <div class="hb-t">四、接口对接定义</div>
-        <p class="help-lead">上游只提供<b>原始文件与元数据</b>，<b>不提供向量</b>。下面是拉取原始数据集所需的字段与接口。</p>
-        <table class="help-table">
-          <thead>
-            <tr><th>项</th><th>说明</th></tr>
-          </thead>
-          <tbody>
-            <tr><td class="mk">上游提供</td><td><b>原始文件与元数据</b>；向量由平台自己抽，上游不需要提供</td></tr>
-            <tr><td class="mk">数据集级</td><td>3 个必填：<b>dataset_id</b>、<b>name</b>、<b>item_count</b>；1 个可选：<b>modal_types</b>（仅用于展示）</td></tr>
-            <tr><td class="mk">条目级</td><td>2 个必填：<b>item_id</b>、<b>modals</b>（1~4 个模态，每条自己声明）</td></tr>
-            <tr><td class="mk">modals</td><td>每项 <b>{ type:"image", url }</b> / <b>{ type:"text", content 或 url }</b> / <b>{ type:"audio", url }</b> / <b>{ type:"video", url }</b></td></tr>
-            <tr><td class="mk">对齐</td><td>同一条目下的多个模态即<b>天然对齐</b>，<b>不需要</b>额外字段</td></tr>
-            <tr><td class="mk">接口</td><td><b>GET {base}/datasets</b> 列出数据集；<b>GET {base}/datasets/{id}</b> 数据集详情；<b>GET {base}/datasets/{id}/items</b> 条目列表（分页）</td></tr>
-            <tr><td class="mk">入口</td><td>数据源块头「接口对接定义」按钮，弹窗只读展示字段表、示例请求/响应与关键约束</td></tr>
-          </tbody>
-        </table>
-        <ul class="help-list">
-          <li>每个数据集的<b>模态构成可以不同</b>，由条目级 <b>modals</b> 逐条声明。</li>
-          <li>同一条目下的多个模态即对齐关系，<b>无需额外字段</b>。</li>
-          <li>缺 <b>modals</b> → 无法确定模态，<b>不可接入</b>。</li>
-        </ul>
-      </div>
-
-      <div>
-        <div class="hb-t">五、平台侧处理</div>
-        <p class="help-lead"><b>接入 → 检测契约 → 拉取原始数据集 → 自动向量化（图文对齐 · CLIP双塔 v3）→ 写入向量库 → 可检索</b></p>
-        <ul class="help-list">
-          <li>向量由平台抽取，上游不需要提供向量。</li>
-          <li>统一向量空间固定为「图文对齐 · CLIP双塔 v3」，不可切换（见 P5 策略管理的向量参数）。</li>
-        </ul>
-      </div>
-    </DevNotesDrawer>
   </div>
 </template>
 
@@ -509,7 +413,6 @@ import type {
   RemoteDatasetVO,
 } from '../../api/types'
 import { fmtTime } from '../../utils/format'
-import DevNotesDrawer from '../../components/DevNotesDrawer.vue'
 
 /** 上游 4 项必填的固定数量（与契约 dataset_id/name/item_count/modals 一致） */
 const REQUIRED_TOTAL = 4
@@ -555,7 +458,6 @@ const testingId = ref('')
 const syncingId = ref('')
 const ingestingId = ref('')
 
-const devOpen = ref(false)
 
 const createOpen = ref(false)
 const createTouched = ref(false)
@@ -1141,7 +1043,6 @@ onMounted(() => {
 /* 表格单元 */
 .ds-nm { font-size: 12.5px; color: #273244; }
 .ds-id { font-size: 11.5px; font-weight: 600; color: #273244; }
-.src-addr { word-break: break-all; }
 .cell-time { color: #475467; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* 向量化列 */
@@ -1191,7 +1092,7 @@ onMounted(() => {
   color: var(--muted);
 }
 
-/* 小标题（弹窗与研发说明共用） */
+/* 弹窗小标题 */
 .hb-t {
   display: flex;
   align-items: center;
@@ -1404,17 +1305,6 @@ onMounted(() => {
 .bh-sub { margin: 2px 0 0; color: #9aa6bd; font-size: 11.5px; line-height: 1.5; }
 .bl-hint { flex: 0 0 auto; margin-right: 4px; }
 
-/* 研发说明抽屉内的列表（标题栏样式由 DevNotesDrawer 提供） */
-.help-list {
-  margin: 0;
-  padding-left: 18px;
-  color: #475467;
-  font-size: 11.5px;
-  line-height: 1.75;
-}
-.help-list li { margin: 2px 0; }
-.help-list b { color: #1f2a44; font-weight: 700; }
-
 /* 弹窗体高度上限（原型 72vh） */
 :global(.contract-dialog .el-dialog__body),
 :global(.probe-dialog .el-dialog__body) {
@@ -1444,12 +1334,12 @@ onMounted(() => {
   font-size: 12px;
 }
 :global(.bl-drawer .el-table th.el-table__cell) {
-  padding: 7px 8px;
+  padding: 7px 0;
   color: #7a8493;
   font-size: 11px;
   font-weight: 600;
 }
-:global(.bl-drawer .el-table td.el-table__cell) { padding: 6px 8px; }
+:global(.bl-drawer .el-table td.el-table__cell) { padding: 6px 0; }
 :global(.bl-drawer .el-table .cell) { line-height: 1.5; }
 
 @media (max-width: 1000px) {

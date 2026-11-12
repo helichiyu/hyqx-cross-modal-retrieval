@@ -5,9 +5,6 @@
         <h1 class="cm-page-title">结果运营</h1>
         <p class="cm-page-subtitle">检索结果的反馈登记与处理。</p>
       </div>
-      <button class="dev-entry" type="button" title="研发说明" @click="devOpen = true">
-        <span class="de-q" aria-hidden="true">?</span>研发说明
-      </button>
     </header>
 
     <div v-if="showBack" class="back-row">
@@ -70,6 +67,42 @@
         :page-size="pageSize"
         @current-change="changePage"
       />
+    </el-card>
+
+    <!-- 屏蔽清单：处置为「屏蔽数据」的条目，检索结果不再下发 -->
+    <el-card shadow="never">
+      <template #header>
+        <div class="cm-flex">
+          <span>屏蔽清单</span>
+          <span class="fb-src">共 {{ blockedRows.length }} 条 · 被屏蔽条目不再出现在检索结果中，移除后恢复</span>
+        </div>
+      </template>
+      <el-table v-loading="blockedLoading" :data="blockedRows" empty-text="暂无屏蔽条目">
+        <el-table-column label="条目 ID" min-width="150">
+          <template #default="{ row }">
+            <span class="mono">{{ row.itemId }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="名称" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.itemName || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="来源" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.source || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="原因" min-width="150" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.reason || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="屏蔽时间" width="150">
+          <template #default="{ row }">
+            <span class="fb-time">{{ row.createTime ? fmtTime(row.createTime) : '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="110" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="danger" :loading="unblockingId === row.id" @click="removeBlocked(row)">移除屏蔽</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
     </el-card>
 
     <!-- 登记反馈：唯一入口为结果页「空结果处置 · 需求登记」带 ?zero= 进来 -->
@@ -208,99 +241,22 @@
       </template>
     </el-dialog>
 
-    <DevNotesDrawer v-model="devOpen" title="研发需求说明">
-      <div class="dev-stack">
-        <p class="dev-lead">
-          页面正文只保留<b>反馈</b>一个业务块：常规只在列表里处理已有反馈单；唯一的登记入口是结果页「空结果处置 · 需求登记」带
-          <code>?zero=</code> 进来（自动弹登记窗，类型固定「零结果」），本页不提供常驻的「登记反馈」按钮。反馈单的<b>类型</b>由入口决定（标记不匹配 /
-          零结果）；<b>去向</b>由处理时的<b>处理判断</b>决定，且必须是平台能执行的动作。平台是检索层：<b>不修改上游数据，也不改写上游库内容</b>。
-        </p>
-
-        <section class="dev-sec">
-          <h4>三条去向，都是平台能落地的</h4>
-          <ul>
-            <li><b>数据本身有问题 → 屏蔽数据</b>：进屏蔽列表，检索时自动排除，立即生效。</li>
-            <li><b>数据没问题、是匹配/排序问题 → 调整策略</b>：数据保留，不写屏蔽列表，只记状态，作为策略管理调参与效果评测的输入。</li>
-            <li><b>零结果 → 补充数据</b>：记录数据需求给上游，平台不自己补数据。</li>
-          </ul>
-        </section>
-
-        <section class="dev-sec">
-          <h4>入口 · 类型 · 处理判断 · 去向</h4>
-          <table class="dev-table">
-            <thead>
-              <tr><th>入口</th><th>类型</th><th>处理判断</th><th>去向</th></tr>
-            </thead>
-            <tbody>
-              <tr><td>结果摘要 · 标记不匹配</td><td>标记不匹配</td><td>数据本身有问题（默认）</td><td>屏蔽数据</td></tr>
-              <tr><td>结果摘要 · 标记不匹配</td><td>标记不匹配</td><td>数据没问题，是匹配/排序问题</td><td>调整策略</td></tr>
-              <tr><td>空结果处置 · 需求登记</td><td>零结果</td><td>库里缺这类数据（固定，不可选）</td><td>补充数据</td></tr>
-            </tbody>
-          </table>
-        </section>
-
-        <section class="dev-sec">
-          <h4>处理弹窗：判断单选，去向只读</h4>
-          <ul>
-            <li><b>弹窗字段</b>：反馈单（单号 · query）/ 来源（结果摘要 / 空结果处置 · 来源任务号）/ 类型，均只读；标记不匹配且带标记条目时多一行「标记条目」（ID + 名称）。</li>
-            <li><b>处理判断</b>：标记不匹配给两个选项（数据本身有问题 / 数据没问题，是匹配/排序问题），默认「数据本身有问题」；零结果不给单选，固定一行「库里缺这类数据 → 补充数据」。</li>
-            <li><b>去向</b>：只读，跟着判断变 —— 数据本身有问题 → 屏蔽数据；匹配/排序问题 → 调整策略；零结果 → 补充数据。</li>
-            <li><b>提交</b>：底部按钮「标记已处理」；保存后状态转「已处理」、去向落定、按去向给 toast；列表里已处理行的操作按钮变为禁用的「已处理」。</li>
-            <li><b>点踩</b>：结果页单条点踩只用于统计，不生成反馈单，本页不读点踩数据。</li>
-          </ul>
-        </section>
-
-        <section class="dev-sec">
-          <h4>反馈 · 记录字段（8 列）</h4>
-          <ul>
-            <li><b>时间</b>：反馈生成时间，第一列，列表按时间倒序（最新在上）。</li>
-            <li><b>反馈单</b>：反馈单号，单行显示。</li>
-            <li><b>搜索词</b>：该反馈单的 query，单行，超出省略，悬停显示全量。</li>
-            <li><b>类型</b>：由入口决定，只读（标记不匹配 / 零结果）。</li>
-            <li><b>条数</b>：该反馈单涉及的标记条目数，显示「N 条」；零结果没有标记条目，显示「0 条」。</li>
-            <li><b>去向</b>：处理完成后才显示，由处理判断决定，只读；屏蔽数据显示「屏蔽数据 · 已生效」；未处理一律显示「—」，不预填。</li>
-            <li><b>状态</b>：待处理（橙）/ 已处理（绿），只有这两态。</li>
-            <li><b>操作</b>：处理（选处理判断 → 标记已处理；零结果无需选择，直接标记已处理）。</li>
-          </ul>
-        </section>
-
-        <section class="dev-sec">
-          <h4>来源带入与回写</h4>
-          <ul>
-            <li><b>零结果</b>：以 ?zero= 任务号带入，本页自动打开登记弹窗（类型固定「零结果」、说明预填「检索无结果，疑似语料缺失」），登记窗内可按 query 搜索历史搜索记录（每页 10 条）选一条作为关联搜索，提交后生成反馈单。</li>
-            <li><b>标记不匹配</b>：结果摘要提交后由后端入库，本页按时间倒序列出。</li>
-            <li><b>屏蔽列表只在一种情况写</b>：处理判断为「数据本身有问题」且该反馈单带标记条目时，才把条目 ID 写入屏蔽列表（去重）；「调整策略」「补充数据」不写屏蔽列表。</li>
-          </ul>
-        </section>
-
-        <section class="dev-sec">
-          <h4>屏蔽的作用范围</h4>
-          <ul>
-            <li><b>屏蔽</b>：该条目进入屏蔽列表，结果页渲染前读取并过滤，立即生效；上游数据本身不变。</li>
-            <li><b>数据集级黑名单</b>：由数据源库管理的「黑名单」按来源名整库屏蔽，与本页的单条条目屏蔽是两件事、独立生效。</li>
-          </ul>
-        </section>
-
-        <section class="dev-sec">
-          <h4>页面入口与上下游</h4>
-          <ul>
-            <li><b>入口</b>：结果页「标记不匹配」提交后进入；空结果处置带 ?zero= 任务号进来并自动弹登记窗。</li>
-            <li><b>返回</b>：带 ?back=P2 时顶部显示「← 返回结果页」。</li>
-            <li><b>上游</b>：结果页（标记不匹配 / 零结果）。<b>下游</b>：屏蔽数据 → 结果页过滤；调整策略 → 策略管理调参与效果评测验证；补充数据 → 记录需求给上游。</li>
-          </ul>
-        </section>
-      </div>
-    </DevNotesDrawer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { createFeedback, handleFeedback, pageBehaviors, pageFeedbacks } from '../../api'
-import type { BehaviorVO, FeedbackVO } from '../../api/types'
-import DevNotesDrawer from '../../components/DevNotesDrawer.vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  createFeedback,
+  handleFeedback,
+  listBlockedItems,
+  pageBehaviors,
+  pageFeedbacks,
+  unblockItem,
+} from '../../api'
+import type { BehaviorVO, BlockedItemVO, FeedbackVO, Id } from '../../api/types'
 import { fmtTime } from '../../utils/format'
 
 const route = useRoute()
@@ -352,7 +308,6 @@ const rows = ref<FeedbackVO[]>([])
 const total = ref(0)
 const pageNum = ref(1)
 const pageSize = PAGE_SIZE
-const devOpen = ref(false)
 
 const registerVisible = ref(false)
 const registerSubmitting = ref(false)
@@ -369,6 +324,10 @@ const handleVisible = ref(false)
 const handling = ref(false)
 const current = ref<FeedbackVO | null>(null)
 const judge = ref('data_bad')
+
+const blockedRows = ref<BlockedItemVO[]>([])
+const blockedLoading = ref(false)
+const unblockingId = ref<Id | null>(null)
 
 const isZero = computed(() => current.value?.entryType === 'zero')
 const targetDisposition = computed(() => {
@@ -442,6 +401,39 @@ async function load() {
 function changePage(page: number) {
   pageNum.value = page
   load()
+}
+
+async function loadBlocked() {
+  blockedLoading.value = true
+  try {
+    blockedRows.value = await listBlockedItems()
+  } catch (error) {
+    ElMessage.error((error as Error).message)
+  } finally {
+    blockedLoading.value = false
+  }
+}
+
+async function removeBlocked(row: BlockedItemVO) {
+  try {
+    await ElMessageBox.confirm(
+      `移除屏蔽后，条目 ${row.itemId} 将恢复出现在检索结果中。`,
+      '移除屏蔽',
+      { confirmButtonText: '移除屏蔽', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  unblockingId.value = row.id
+  try {
+    await unblockItem(row.id)
+    ElMessage.success(`已移除屏蔽 · ${row.itemId}`)
+    await loadBlocked()
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    unblockingId.value = null
+  }
 }
 
 function backToResult() {
@@ -576,6 +568,9 @@ async function submitHandle() {
     ElMessage.success(HANDLE_TOAST[disposition] ?? '已处理')
     handleVisible.value = false
     await load()
+    if (disposition === 'block') {
+      await loadBlocked()
+    }
   } catch (e) {
     ElMessage.error((e as Error).message)
   } finally {
@@ -585,6 +580,7 @@ async function submitHandle() {
 
 onMounted(async () => {
   await load()
+  await loadBlocked()
   if (enterRegister) {
     await openRegister()
   }

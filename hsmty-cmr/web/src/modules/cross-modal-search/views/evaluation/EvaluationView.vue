@@ -3,9 +3,6 @@
     <header class="cm-page-header">
       <h1 class="cm-page-title">效果评测</h1>
       <div class="cm-flex">
-        <button class="dev-entry" type="button" title="研发说明" @click="devOpen = true">
-          <span class="de-q" aria-hidden="true">?</span>研发说明
-        </button>
         <el-button type="primary" @click="openCreate">＋ 发起评测</el-button>
       </div>
     </header>
@@ -332,91 +329,6 @@
         <el-button @click="compareOpen = false">关闭</el-button>
       </template>
     </el-dialog>
-
-    <!-- 研发需求说明（入口在页头右上角 · 右侧抽屉） -->
-    <DevNotesDrawer v-model="devOpen" title="研发需求说明">
-      <p class="dev-lead">以一条历史搜索记录为基准，追踪后续每次重新执行的效果变化。</p>
-
-      <div class="dev-block">
-        <h4>1 定位</h4>
-        <p>
-          一条评测 = 一条历史搜索记录（基准）+ 之后每次重新执行的结果（重放）。只回答一个问题：这条搜索现在比当时好，还是差。
-        </p>
-        <p>
-          列表每行一个评测：评测编号 / 搜索词 / 基准任务 / 基准时间 / 基准结果数 / 踩数 / 重放次数 / 结论 / 最近重放 / 操作。
-          上方按 Query 搜索（不区分大小写、包含匹配）+ 结论筛选（全部 / 已劣化 / 正常 / 未评测，带数量），每页 10 条。
-        </p>
-        <p>
-          <b>结论：</b>已劣化（红字 + 整行浅红底）/ 正常（绿）/ 未评测（灰，无重放）；鼠标悬停显示判定原因。
-        </p>
-      </div>
-
-      <div class="dev-block">
-        <h4>2 数据来源</h4>
-        <ul>
-          <li><b>基准：</b>搜索行为里的一条记录 —— 时间、query、结果数、该次结果的踩数；发起评测时从候选记录里选一条设为基准。</li>
-          <li><b>重放：</b>对同一评测点「发起重放」生成的新任务记录；每执行一次，重放次数 +1。</li>
-          <li><b>踩数：</b>结果页单条结果的踩，按任务号归到对应搜索记录后求和（取 <code>cm_item_votes</code> 的 down 条目数）。</li>
-        </ul>
-      </div>
-
-      <div class="dev-block">
-        <h4>3 指标与来源</h4>
-        <table class="dev-tbl">
-          <thead>
-            <tr><th scope="col">指标</th><th scope="col">来源</th></tr>
-          </thead>
-          <tbody>
-            <tr><td class="k">结果数</td><td>该次摘要的 items 条数</td></tr>
-            <tr><td class="k">踩数</td><td>该次搜索结果里被点踩的条目数</td></tr>
-            <tr><td class="k">踩率</td><td>踩数 ÷ 结果数；没有评价记录时显示「—」</td></tr>
-            <tr><td class="k">Top-20 平均相似度</td><td>摘要 items 的相似度均值</td></tr>
-            <tr><td class="k">Top-1 相似度</td><td>摘要 items 的相似度最大值</td></tr>
-            <tr><td class="k">Top-20 重叠</td><td>本次与基准 items 的条目 ID 交集 ÷ 基准条数</td></tr>
-            <tr><td class="k">平均相似度</td><td>后端按摘要给出的整体平均相似度</td></tr>
-            <tr><td class="k">耗时</td><td>该次检索的执行耗时</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="dev-block">
-        <h4>4 对比与着色</h4>
-        <ul>
-          <li>对比视图是<b>指标对比表</b>：行 = 指标，列 = 基准 + 最近 3 次重放 + 变化（最新 vs 基准）。</li>
-          <li>固定显示「基准 + 最近 3 次重放」，历史重放不逐列铺开；完整重放次数以列表「重放次数」为准。</li>
-          <li><b>踩数、踩率</b>下降为绿、上升为红；<b>Top-20 平均相似度、Top-1、平均相似度</b>上升为绿、下降为红。</li>
-          <li><b>结果数</b>只作参考，跌破基准 10% 时标红；<b>Top-20 重叠</b>基准为「—」，不参与好坏判定。</li>
-          <li>退化指标行整行浅红底；结论一句话按最新一次重放 vs 基准生成，固定显示在对比表下方。</li>
-        </ul>
-      </div>
-
-      <div class="dev-block">
-        <h4>5 难例样本集</h4>
-        <p>
-          从结果页单条点踩自动汇总的难例，用于专测薄弱点，不做人工标注；一行 = 一个被点踩的任务。
-          列为任务号 / 搜索词 / 踩数 / 时间 / 操作；踩数按条目去重，同一条被踩多次只算 1 条。
-        </p>
-        <p>
-          点「发起评测」复用「设为基准」逻辑，直接进评测列表最前；已在评测中的 query 按钮禁用并显示「已在评测」。
-        </p>
-      </div>
-
-      <div class="dev-block">
-        <h4>6 检查评测数据</h4>
-        <p>
-          对比详情里只读检查 4 项，逐项给 ✓/✕ 与说明，不改任何数据、不写存储：
-          样本够不够、有没有重复用、样本还有效吗、评价矛盾吗。
-        </p>
-      </div>
-
-      <div class="dev-block">
-        <h4>7 回归阻断</h4>
-        <p>
-          判定：踩数上升 / 踩率 +5% / 结果数 −10%，任一成立即已劣化；都不成立为正常，无重放为未评测。
-          劣化时在对比视图给出阻断提示（只提示、不强制拦截），列表可按「已劣化」筛选；本期不自动回滚。
-        </p>
-      </div>
-    </DevNotesDrawer>
   </div>
 </template>
 
@@ -432,7 +344,6 @@ import {
   replayEvaluation,
 } from '../../api'
 import type { BehaviorVO, EvaluationDetailVO, EvaluationRowVO, HardCaseVO } from '../../api/types'
-import DevNotesDrawer from '../../components/DevNotesDrawer.vue'
 import { fmtTime } from '../../utils/format'
 
 type ConclusionKey = 'degraded' | 'normal' | 'unevaluated'
@@ -470,8 +381,6 @@ const PAGE_SIZE = 10
 const HARD_PAGE_SIZE = 10
 const PICK_PAGE_SIZE = 8
 const FETCH_SIZE = 200
-
-const devOpen = ref(false)
 
 // ---------- 评测列表 ----------
 const loading = ref(false)
@@ -1707,99 +1616,6 @@ onBeforeUnmount(() => {
   border: 1px solid #e6e9f0;
   background: #f7f8fb;
   color: #5b6577;
-}
-
-/* ---------- 研发说明内容 ---------- */
-.dev-lead {
-  margin: 0 0 10px;
-  color: #667085;
-  font-size: 11.5px;
-  line-height: 1.65;
-}
-
-.dev-block {
-  margin-bottom: 10px;
-  padding: 11px 13px;
-  border: 1px solid #e4eaf3;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.dev-block h4 {
-  margin: 0 0 5px;
-  color: #1f2934;
-  font-size: 12px;
-}
-
-.dev-block p {
-  margin: 0;
-  color: #667085;
-  font-size: 11.5px;
-  line-height: 1.7;
-}
-
-.dev-block p + p {
-  margin-top: 6px;
-}
-
-.dev-block ul {
-  margin: 2px 0 0 16px;
-  padding: 0;
-}
-
-.dev-block li {
-  margin-bottom: 3px;
-  color: #667085;
-  font-size: 11.5px;
-  line-height: 1.7;
-}
-
-.dev-block li b {
-  color: #344054;
-}
-
-.dev-block code {
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: #f2f5fa;
-  color: #475467;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-}
-
-.dev-tbl {
-  width: 100%;
-  margin: 2px 0 0;
-  border-collapse: collapse;
-  font-size: 11.5px;
-}
-
-.dev-tbl th {
-  padding: 5px 7px;
-  border-bottom: 1px solid #e4eaf3;
-  background: #f8fafd;
-  color: #98a2b3;
-  font-weight: 600;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.dev-tbl td {
-  padding: 5px 7px;
-  border-bottom: 1px solid #eef2f8;
-  color: #667085;
-  line-height: 1.6;
-  vertical-align: top;
-}
-
-.dev-tbl tr:last-child td {
-  border-bottom: 0;
-}
-
-.dev-tbl td.k {
-  color: #344054;
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 @media (max-width: 760px) {

@@ -4,9 +4,6 @@
       <div>
         <h1 class="cm-page-title">搜索结果摘要</h1>
       </div>
-      <button class="dev-entry" type="button" title="研发说明" @click="devOpen = true">
-        <span class="de-q" aria-hidden="true">?</span>研发说明
-      </button>
     </header>
 
     <section class="cm-panel task-card" aria-label="任务信息">
@@ -144,60 +141,6 @@
         </span>
       </div>
     </section>
-
-    <DevNotesDrawer v-model="devOpen" title="研发需求说明">
-      <p class="help-lead">
-        本页是<b>搜索结果摘要</b>：任务信息（任务号、状态、当时条件、检索策略与结果数）+ 结果摘要（Top-20）。
-        摘要只存条目 ID + 名称 + 分数，不存文件本体；保留 30 天，到期只留条数与赞踩汇总。
-      </p>
-
-      <div>
-        <div class="hb-t">任务信息 8 项</div>
-        <table class="help-table">
-          <thead>
-            <tr><th>字段</th><th>口径</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>任务号</td><td>地址栏 taskNo 带入，等宽字体、整段可选中复制；摘要按任务号回读，不回落其他任务。</td></tr>
-            <tr><td>搜索词</td><td>本次检索的输入内容；文件检索无文本时显示「—」。</td></tr>
-            <tr><td>模态对</td><td>文搜图 / 图搜图 / 文搜视频等；目标模态为空（全部）时显示「文搜全部」。</td></tr>
-            <tr><td>检索策略</td><td>策略编号 + 版本号（如 STG… v3），取不到显示「—」；悬停可看本次相似度阈值。</td></tr>
-            <tr><td>时间</td><td>检索发起时间，YYYY-MM-DD HH:mm:ss。</td></tr>
-            <tr><td>结果数（当时）</td><td>本次实际下发条数，不是摘要表行数（摘要只取 Top-20）。</td></tr>
-            <tr><td>状态</td><td>已封存 / 未封存；提交不匹配反馈即自动封存，封存后勾选与提交锁死。</td></tr>
-            <tr><td>记录方式</td><td>固定「系统自动记录」：摘要由结果页写入，本页只读。</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div>
-        <div class="hb-t">结果摘要（Top-20）</div>
-        <table class="help-table">
-          <thead>
-            <tr><th>列</th><th>取值与说明</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>排名</td><td>按相似度降序的序号，从 1 起。</td></tr>
-            <tr><td>条目 ID</td><td>ITM 编号，等宽字体、整段可选中复制。</td></tr>
-            <tr><td>名称</td><td>超长单行省略，悬停看全量；条目已删除时显示「已删除」。</td></tr>
-            <tr><td>相似度</td><td>保留两位小数（toFixed(2)），蓝色粗体。</td></tr>
-            <tr><td>勾选</td><td>常显 checkbox，不再切换「选择模式」；封存后全部禁用。</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p class="help-note">
-        <b>提交与封存：</b>已选 ≥1 条后「标记不匹配」→ feedbacks（entryType=mismatch，sourceTaskNo / sourceQuery + 勾选条目 {itemId, name, source}）→
-        成功后 sealTask；提交即封存，同一任务不可重复提交。去向不在本页预填，留到结果运营处理。
-      </p>
-      <p class="help-note">
-        <b>空态：</b>失败任务不生成摘要，只展示失败原因与「查看失败任务」；expired=true（超过 30 天）只保留条数与赞踩汇总；两者都给「返回检索台」。
-        无摘要记录时显示「未找到该任务的摘要」，不复用其他任务数据，任务号仍显示地址栏里的真实任务号。
-      </p>
-      <p class="help-note">
-        <b>重放：</b>任务带重放来源时顶部显示「⟳ 重放结果 · 当时 X 条 → 现在 Y 条」，摘要展示本次重放的 Top-20。
-      </p>
-    </DevNotesDrawer>
   </div>
 </template>
 
@@ -208,7 +151,6 @@ import { ElMessage } from 'element-plus'
 import { createFeedback, failedTasks, searchSummary, sealTask } from '../../api'
 import type { FailedTaskVO, ResultItemVO, SearchSummaryVO } from '../../api/types'
 import { fmtTime } from '../../utils/format'
-import DevNotesDrawer from '../../components/DevNotesDrawer.vue'
 
 type PageMode = 'loading' | 'ready' | 'failed' | 'expired' | 'notfound'
 
@@ -217,7 +159,6 @@ const MODALITY_SHORT: Record<string, string> = { text: '文', image: '图', audi
 const route = useRoute()
 const taskNo = String(route.params.taskNo)
 
-const devOpen = ref(false)
 const loading = ref(false)
 const mode = ref<PageMode>('loading')
 const summary = ref<SearchSummaryVO | null>(null)

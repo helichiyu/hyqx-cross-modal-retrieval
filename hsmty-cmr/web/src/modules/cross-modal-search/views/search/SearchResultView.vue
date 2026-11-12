@@ -8,9 +8,6 @@
         <button class="fav-entry" type="button" title="查看我的收藏" @click="openFavorites">
           收藏夹 ({{ favoriteCount }})
         </button>
-        <button class="dev-entry" type="button" title="研发说明" @click="devOpen = true">
-          <span class="de-q" aria-hidden="true">?</span>研发说明
-        </button>
       </div>
     </header>
 
@@ -378,75 +375,6 @@
     <div class="toast" :class="{ show: toastVisible, ok: toastType === 'ok', err: toastType === 'err' }">
       {{ toastMessage }}
     </div>
-
-    <DevNotesDrawer v-model="devOpen" title="研发需求说明">
-      <p class="help-lead">
-        本页定位【设计】：查看本次搜索结果——卡片浏览、单条查看、单条赞踩、收藏、筛选与排除清单核对。结果、来源与分数均来自后端结果集（408 算子输出）。
-      </p>
-
-      <div>
-        <div class="hb-t">F1 检索上下文条</div>
-        <p class="help-note">
-          展示本次检索的查询对象、模态对、任务号与运行号，并提供返回来源页与回检索台的入口。上下文信息只读；最左「← 返回」按
-          ?back= 指向搜索行为 / 效果评测（缺省回检索台），右侧「检索台 →」携当前 q 回检索台回填；重放态隐藏「检索台 →」。任务号由
-          P1 检索台在每次检索时生成，随 URL 的 task 参数传入；本页赞 / 踩与封存按该任务号归属。
-        </p>
-      </div>
-
-      <div>
-        <div class="hb-t">F2 结果筛选</div>
-        <p class="help-note">
-          按相似度阈值与来源过滤结果，并在结果区提示被硬过滤的条数。相似度阈值初值取自所选检索策略的 ?thr=，缺省 0.50；可在本页临时调整；重置筛选回落到策略阈值而非固定值，阈值落在滑块默认区间外时自动撑开区间。
-          来源列表从本次结果集去重生成，最前固定「全部来源」，每项右侧显示该来源的结果条数，常驻展开、单选、可滚动。筛选后为空时结果区显示「该来源下暂无结果」，可重置筛选，不跳整页空态。
-        </p>
-        <p class="help-note">
-          数据源黑名单与条目屏蔽独立生效，计数合并为「本次共排除 N 条」；点「查看过滤清单」可打开只读清单，逐条列出被排除条目的条目 ID / 名称 / 来源 / 过滤原因，底部汇总总数与按原因计数，用于核对是否误杀。清单只读，不改结果集、不改数据、不写存储。
-        </p>
-      </div>
-
-      <div>
-        <div class="hb-t">F3 展示方案（分组 / 排序 / 热力图）</div>
-        <p class="help-note">
-          分组 Tab 为全部 / 图像 / 视频 / 文本 / 音频，按模态过滤；排序固定相似度降序；对齐热力图开关默认关，开启后按蓝→红着色显示对齐分。分组、排序、热力图均为本页临时状态，不写存储、不回写其他页；文本分组 0 条置灰。
-        </p>
-      </div>
-
-      <div>
-        <div class="hb-t">F4 结果列表与条目</div>
-        <p class="help-note">
-          卡片展示条目 ID、模态徽标、来源、对齐分与相似度，支持查看单条详情（占位大图 + 名称 / 条目 ID / 来源 / 相似度 / 模态）、单条赞 / 踩与收藏 / 取消收藏。点击卡片打开查看弹窗（只读，不外发数据）；赞 / 踩不弹窗、不填理由，同方向再点取消，点反方向改为反方向；收藏按钮切换本条收藏态，不触发查看。
-        </p>
-        <p class="help-note">
-          评价口径：只做单条评价，赞 / 踩二选一，记在数据条目，供结果运营处理；都不点 = 未评价。单条赞 / 踩只在当次运行有效；离开页面即封存评价，赞 / 踩置灰不可改并显示封存提示；再评价需重新执行（新任务号）。
-        </p>
-      </div>
-
-      <div>
-        <div class="hb-t">F5 空结果归因与处置</div>
-        <p class="help-note">
-          空结果时给归因三分类（过滤过严 / 语义偏离 / 覆盖缺失）+ 三动作：放宽过滤（回检索台 ?relax=1）、相似 query（取自后端推荐词并回填检索台）、需求登记（进结果运营 ?zero=1&task=&back=P2，由结果运营登记反馈单并跟进处置）。
-          归因依据取本次结果集真实数据（下发条数、下发前过滤条数、策略阈值），不在本页伪造分析结论或本地处置台账。
-        </p>
-      </div>
-
-      <div>
-        <div class="hb-t">F6 视图状态与系统边界</div>
-        <p class="help-note">
-          可呈现结果 / 加载 / 空结果 / 引擎错误四态，同一时刻只显示一个，全部由接口状态驱动。两条硬约束：结果区按分页口径展示；音搜图 / 图搜音等无共享空间组合不提供检索。
-        </p>
-      </div>
-
-      <div>
-        <div class="hb-t">收藏</div>
-        <p class="help-note">
-          把感兴趣的条目标记下来，收藏只记录条目 ID 与元数据，不复制文件本身（数据不出域）；收藏夹可查看与移除，跨任务保留。页头入口显示「收藏夹 (N)」。
-        </p>
-      </div>
-
-      <p class="help-note">
-        <b>编号规范【研发】：</b>业务编号按《平台相关ID生成规范-1026》32.1：任务 TASK / 策略 STG / 结果集 RST / 条目 ITM（等宽可复制）。本页结果、来源、相似度与对齐分均来自后端检索结果集。
-      </p>
-    </DevNotesDrawer>
   </div>
 </template>
 
@@ -465,7 +393,6 @@ import {
   voteItem,
 } from '../../api'
 import { ApiError } from '../../api/http'
-import DevNotesDrawer from '../../components/DevNotesDrawer.vue'
 import MediaPreview from '../../components/MediaPreview.vue'
 import { fmtTime } from '../../utils/format'
 import type { HistoryDetailVO, ResultItemVO } from '../../api/types'
@@ -500,7 +427,6 @@ const viewTarget = ref<ViewTarget | null>(null)
 const excludedOpen = ref(false)
 const replayWas = ref<number | null>(null)
 
-const devOpen = ref(false)
 const toastVisible = ref(false)
 const toastMessage = ref('')
 const toastType = ref<'info' | 'ok' | 'err'>('info')

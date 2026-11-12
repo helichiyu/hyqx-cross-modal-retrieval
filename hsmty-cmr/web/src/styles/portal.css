@@ -166,40 +166,6 @@ body {
 }
 .cm-panel-title { margin: 0; font-size: 15px; font-weight: 700; color: #1f2a44; }
 
-/* ---------- 研发说明入口（九页统一） ---------- */
-.dev-entry {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 30px;
-  padding: 0 13px 0 5px;
-  border: 1px solid #d7e0f0;
-  border-radius: 999px;
-  background: #fff;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
-}
-.dev-entry:hover { border-color: #b9c9ff; background: var(--system-blue-weak); color: var(--system-blue); }
-.dev-entry:hover .de-q { background: var(--system-blue); color: #fff; }
-.dev-entry .de-q {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--system-blue-weak);
-  color: var(--system-blue);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 20px;
-  text-align: center;
-  transition: background 0.15s, color 0.15s;
-}
-
 /* ---------- chips ---------- */
 .cm-chip-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cm-chip {
@@ -241,10 +207,11 @@ body {
   font-size: 11.5px;
   font-weight: 600;
   color: #7a8493;
-  padding: 9px 12px;
+  /* 水平内边距由 Element Plus 的 .cell（0 12px）承担，避免双重叠加压缩可用宽度 */
+  padding: 9px 0;
   border-bottom: 1px solid var(--content-line);
 }
-.page-card .el-table td.el-table__cell { padding: 9px 12px; border-bottom: 1px solid #eef2f8; }
+.page-card .el-table td.el-table__cell { padding: 9px 0; border-bottom: 1px solid #eef2f8; }
 .page-card .el-table .el-button + .el-button { margin-left: 6px; }
 
 /* ---------- 分页：高 28、圆角 5、有线框 ---------- */
