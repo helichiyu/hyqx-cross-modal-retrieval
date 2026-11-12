@@ -66,6 +66,9 @@ LOCAL_DB_PASSWORD=... java -jar hsmty-module-cmr-start/target/hsmty-module-cmr-s
 `local` 会放行全部路径并由 `LocalDevSecurityConfiguration` 注入固定身份，仅限本机使用，
 不得用于共享/生产环境。
 
+本机 MySQL / Redis / 算子 / 后端 / 前端的启动顺序、端口、停止方式与数据库增删改查，
+见 [docs/本机联调手册.md](docs/本机联调手册.md)。
+
 ## 4. 接口与权限
 
 所有接口返回平台 `ApiResult`（成功 `code=0000`，业务失败码带前缀，如 `C1003`），
