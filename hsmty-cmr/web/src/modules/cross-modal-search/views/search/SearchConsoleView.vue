@@ -939,9 +939,9 @@ function onKeydown(event: KeyboardEvent) {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 60px;
+  height: 74px;
   margin: 50px auto 0;
-  padding: 0 0 0 18px;
+  padding: 0 0 0 20px;
   border: 1px solid #e3ecfa;
   border-radius: 17px;
   background: #fff;
@@ -981,15 +981,15 @@ function onKeydown(event: KeyboardEvent) {
   border: 0;
   outline: none;
   background: transparent;
-  font-size: 15.5px;
+  font-size: 16.5px;
   color: #1b2b45;
   letter-spacing: 0.005em;
 }
 .search-field input::placeholder { color: #9dabc1; }
 .btn-search {
   flex: 0 0 auto;
-  width: 118px;
-  height: 60px;
+  width: 128px;
+  height: 72px;
   padding: 0;
   border: 0;
   border-radius: 15px;
