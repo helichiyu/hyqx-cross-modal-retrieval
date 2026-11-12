@@ -65,19 +65,6 @@ function buildUrl(path: string, query?: Record<string, QueryValue>): string {
   return qs ? `${url}?${qs}` : url
 }
 
-async function readBody(response: Response): Promise<ApiResult<unknown> | null> {
-  return (await response
-    .clone()
-    .json()
-    .catch(() => null)) as ApiResult<unknown> | null
-}
-
-async function parseError(response: Response): Promise<ApiError> {
-  const body = await readBody(response)
-  const message = body?.message || response.statusText || '请求失败'
-  return new ApiError(body?.code ?? String(response.status), message, response.status)
-}
-
 async function request<T>(path: string, init: RequestInit): Promise<T> {
   const response = await fetch(path, { credentials: 'include', ...init })
   const body = (await response.json().catch(() => null)) as ApiResult<T> | null
@@ -125,22 +112,5 @@ export const http = {
 
   upload<T>(path: string, form: FormData): Promise<T> {
     return request<T>(buildUrl(path), { method: 'POST', body: form })
-  },
-
-  async download(path: string): Promise<{ blob: Blob; filename: string }> {
-    const response = await fetch(buildUrl(path), { method: 'GET', credentials: 'include' })
-    if (!response.ok) {
-      throw await parseError(response)
-    }
-    const disposition = response.headers.get('Content-Disposition') || ''
-    const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(disposition)
-    const plainMatch = /filename="?([^";]+)"?/i.exec(disposition)
-    let filename = 'download'
-    if (utf8Match) {
-      filename = decodeURIComponent(utf8Match[1])
-    } else if (plainMatch) {
-      filename = plainMatch[1]
-    }
-    return { blob: await response.blob(), filename }
   },
 }

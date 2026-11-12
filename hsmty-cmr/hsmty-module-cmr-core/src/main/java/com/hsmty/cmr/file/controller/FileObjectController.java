@@ -81,7 +81,7 @@ public class FileObjectController {
         return ApiResult.success();
     }
 
-    @Operation(summary = "下载文件内容")
+    @Operation(summary = "预览文件内容（inline，不提供下载）")
     @PreAuthorize("hasAnyAuthority('cmr:file:read')")
     @GetMapping("{id}/content")
     public ResponseEntity<StreamingResponseBody> content(@PathVariable Long id) {
@@ -89,7 +89,7 @@ public class FileObjectController {
         MediaType mediaType = StringUtils.hasText(content.contentType())
                 ? MediaType.parseMediaType(content.contentType())
                 : MediaType.APPLICATION_OCTET_STREAM;
-        ContentDisposition disposition = ContentDisposition.attachment()
+        ContentDisposition disposition = ContentDisposition.inline()
                 .filename(content.filename(), StandardCharsets.UTF_8)
                 .build();
         StreamingResponseBody body = outputStream -> {

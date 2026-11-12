@@ -957,7 +957,19 @@ async function openClarify(value: string) {
   } catch {
     clarify.options = []
   }
-  // 后端未返回候选时保留空态提示，不伪造候选
+  // 后端未返回候选时按输入派生三条模板候选，避免「你是不是想找：」后面空着
+  if (!clarify.options.length) {
+    clarify.options = buildClarifyOptions(value)
+  }
+}
+
+/** 短 query 的本地兜底候选：围绕图片、视频、场景描述补全，不写死业务文案 */
+function buildClarifyOptions(value: string): string[] {
+  const base = value.trim()
+  if (!base) {
+    return []
+  }
+  return [`${base}的高清图片`, `${base}的相关视频`, `${base}的场景描述`]
 }
 
 /** 407 候选可能是 {intent, query, hint} 序列化后的 JSON 串，取改写 query 作为候选文本 */

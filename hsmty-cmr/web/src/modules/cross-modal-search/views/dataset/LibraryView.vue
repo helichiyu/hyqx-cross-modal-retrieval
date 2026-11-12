@@ -237,7 +237,7 @@
         </div>
         <template v-else>
           <p class="field-tip">
-            选择上游数据集后，系统拉取条目与原始文件到共享卷，并自动触发 401→406 建库链，完成后该数据集可检索。
+            选择上游数据集后，系统只拉取元数据并生成 manifest，自动触发 401→405 建库链，完成后该数据集可检索。
           </p>
           <el-table :data="ingestDatasets" size="small" empty-text="上游未返回数据集">
             <el-table-column label="dataset_id" min-width="140">

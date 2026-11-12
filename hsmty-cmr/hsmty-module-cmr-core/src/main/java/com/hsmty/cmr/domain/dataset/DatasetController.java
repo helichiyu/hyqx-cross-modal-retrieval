@@ -4,7 +4,6 @@ import com.hsmty.core.common.entity.ApiPageResult;
 import com.hsmty.core.common.entity.ApiResult;
 import com.hsmty.cmr.common.api.PageQuery;
 import com.hsmty.cmr.common.api.PageResult;
-import com.hsmty.cmr.domain.dataset.dto.AdjudicateDTO;
 import com.hsmty.cmr.domain.dataset.dto.DatasetCreateDTO;
 import com.hsmty.cmr.domain.dataset.service.DatasetService;
 import com.hsmty.cmr.domain.dataset.vo.DatasetDetailVO;
@@ -19,13 +18,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 库管理接口（P4）：数据集登记/裁决/确认投产/重建
+ * 库管理接口（P4）：数据集登记/重建
  *
  * @author cmr
  * @since 2026-11-03
@@ -60,22 +58,6 @@ public class DatasetController {
     @GetMapping("{id}")
     public ApiResult<DatasetDetailVO> detail(@PathVariable Long id) {
         return ApiResult.success(datasetService.detail(id));
-    }
-
-    @Operation(summary = "评定挂起裁决（pass=续跑建库 / 不通过=剔除）")
-    @PreAuthorize("hasAnyAuthority('cmr:dataset:adjudicate')")
-    @PostMapping("{id}/adjudicate")
-    public ApiResult<Void> adjudicate(@PathVariable Long id, @Valid @RequestBody AdjudicateDTO dto) {
-        datasetService.adjudicate(id, Boolean.TRUE.equals(dto.getPass()), dto.getNote());
-        return ApiResult.success();
-    }
-
-    @Operation(summary = "召回率不足人工确认投产（激活候选索引）")
-    @PreAuthorize("hasAnyAuthority('cmr:dataset:confirm')")
-    @PostMapping("{id}/confirm-production")
-    public ApiResult<Void> confirmProduction(@PathVariable Long id) {
-        datasetService.confirmProduction(id);
-        return ApiResult.success();
     }
 
     @Operation(summary = "重建（全链重跑，新任务）")

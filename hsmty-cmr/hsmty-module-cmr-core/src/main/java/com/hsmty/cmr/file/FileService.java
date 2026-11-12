@@ -13,13 +13,11 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
-import java.util.zip.ZipOutputStream;
 
 /**
  * 共享卷文件服务：dataset/runtime 白名单、防穿越、查询文件上传、数据集压缩包安全解压
@@ -142,43 +140,6 @@ public class FileService {
             return toLogical(DATASET, target);
         } catch (IOException e) {
             throw new BizException("文件保存失败: " + e.getMessage(), e);
-        }
-    }
-
-    /** 批量打包共享卷文件；同名文件自动追加序号，返回临时 ZIP 文件 */
-    public Path createZip(java.util.List<String> logicalPaths) {
-        BizException.assertTrue(logicalPaths == null || logicalPaths.isEmpty(), "打包文件路径不能为空");
-        BizException.assertTrue(logicalPaths.size() > 200, "单次最多打包 200 个文件");
-        Path zip;
-        try {
-            zip = Files.createTempFile("cmr-package-", ".zip");
-        } catch (IOException e) {
-            throw new BizException("创建临时 ZIP 失败: " + e.getMessage(), e);
-        }
-        try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zip))) {
-            Map<String, Integer> names = new LinkedHashMap<>();
-            for (String logicalPath : logicalPaths) {
-                LogicalFile logical = resolve(logicalPath);
-                String fileName = logical.absolute().getFileName().toString();
-                int sequence = names.merge(fileName, 1, Integer::sum);
-                if (sequence > 1) {
-                    int dot = fileName.lastIndexOf('.');
-                    fileName = dot > 0
-                            ? fileName.substring(0, dot) + "-" + sequence + fileName.substring(dot)
-                            : fileName + "-" + sequence;
-                }
-                out.putNextEntry(new ZipEntry(fileName));
-                Files.copy(logical.absolute(), out);
-                out.closeEntry();
-            }
-            return zip;
-        } catch (IOException e) {
-            try {
-                Files.deleteIfExists(zip);
-            } catch (IOException ignored) {
-                // 删除失败不影响原始异常。
-            }
-            throw new BizException("文件打包失败: " + e.getMessage(), e);
         }
     }
 

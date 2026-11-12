@@ -19,14 +19,11 @@ import java.math.BigDecimal;
 @Table(value = "cmr_dataset", onInsert = AuditListener.class, onUpdate = AuditListener.class)
 public class CmrDataset extends BaseEntity {
 
-    /** 状态机 */
+    /** 状态机：ingest → stored → indexing → searchable（无人工卡点，无 scoring/stuck/rejected） */
     public static final String STATUS_INGEST = "ingest";
-    public static final String STATUS_SCORING = "scoring";
     public static final String STATUS_STORED = "stored";
     public static final String STATUS_INDEXING = "indexing";
     public static final String STATUS_SEARCHABLE = "searchable";
-    public static final String STATUS_STUCK = "stuck";
-    public static final String STATUS_REJECTED = "rejected";
 
     private String bizNo;
 
@@ -43,17 +40,34 @@ public class CmrDataset extends BaseEntity {
 
     private String status;
 
+    /**
+     * 历史卡点原因，仅保留列兼容存量数据；建库链已无人工卡点，新数据恒为 null。
+     *
+     * @deprecated 402 评定/406 投产校验下线后不再写入
+     */
+    @Deprecated
     private String stuckReason;
 
-    /** 原始文件逻辑目录 dataset/ds/{bizNo} */
+    /** 数据源逻辑目录 dataset/ds/{bizNo}/{datasetId}（回源模式仅存 manifest，不存原始内容） */
     private String fileRoot;
 
     /** 401 报告摘要 JSON */
     private String metaJson;
 
+    /**
+     * 历史 402 评定分，仅保留列兼容存量数据；新数据恒为 null。
+     *
+     * @deprecated 402 评定已从建库链移除
+     */
+    @Deprecated
     private BigDecimal score;
 
-    /** pass/suspend/reject */
+    /**
+     * 历史评定结论 pass/suspend/reject，仅保留列兼容存量数据。
+     *
+     * @deprecated 402 评定已从建库链移除
+     */
+    @Deprecated
     private String decision;
 
     private Integer itemCount;

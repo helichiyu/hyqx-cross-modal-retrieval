@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
+
+    <!-- 数据流 3.1：不设人工卡点，402 评定 / 406 投产校验下线 -->
+
+    <changeSet id="cmr-remove-gate-dict-20261112" author="cmr" context="mysql,postgresql">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="cmr_dict"/>
+        </preConditions>
+        <sql>
+            DELETE FROM cmr_dict WHERE type = 'cmr_dataset_status' AND alias IN ('scoring', 'stuck', 'rejected');
+            DELETE FROM cmr_dict WHERE type = 'cmr_decision';
+        </sql>
+        <rollback>
+            <sql>
+                INSERT INTO cmr_dict (id, type, alias, label, sort) VALUES
+                (3101002, 'cmr_dataset_status', 'scoring', '评定中', 2),
+                (3101006, 'cmr_dataset_status', 'stuck', '卡住', 6),
+                (3101007, 'cmr_dataset_status', 'rejected', '已剔除', 7),
+                (3102001, 'cmr_decision', 'pass', '通过', 1),
+                (3102002, 'cmr_decision', 'suspend', '挂起', 2),
+                (3102003, 'cmr_decision', 'reject', '不通过', 3);
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="cmr-remove-gate-status-migrate-20261112" author="cmr" context="mysql,postgresql">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="cmr_dataset"/>
+        </preConditions>
+        <comment>存量卡点数据集回填：有 active 索引的转可检索，其余转已入库等待重建</comment>
+        <sql>
+            UPDATE cmr_dataset d
+            SET status = CASE
+                    WHEN EXISTS (SELECT 1 FROM cmr_index i
+                                 WHERE i.dataset_id = d.id AND i.status = 'active' AND i.del_flag = 'F')
+                        THEN 'searchable'
+                    ELSE 'stored'
+                END,
+                stuck_reason = NULL
+            WHERE d.status IN ('scoring', 'stuck', 'rejected');
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

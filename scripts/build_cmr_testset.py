@@ -37,6 +37,8 @@ from pathlib import Path
 
 import httpx
 
+from enrich_cmr_testset import TEXT_DOCS, _build_image_variants, _build_video, _mix_audio
+
 ROOT = Path(__file__).resolve().parents[1]
 MIRROR = "https://hf-mirror.com"
 DATASETS = {
@@ -108,7 +110,9 @@ def _write_jsonl(path: Path, rows: list[dict]) -> None:
     )
 
 
-def build(out: Path, eval_out: Path, cache: Path, n_images: int, n_audio: int, n_videos: int) -> None:
+def build(out: Path, eval_out: Path, cache: Path, n_images: int, n_audio: int, n_videos: int,
+          video_seconds: int = 6, fps: int = 12, image_variants: int = 10,
+          audio_mixes: int = 20) -> None:
     if out.exists():
         shutil.rmtree(out)
     for sub in ("images", "audio", "videos", "text"):
@@ -166,19 +170,22 @@ def build(out: Path, eval_out: Path, cache: Path, n_images: int, n_audio: int, n
         )
         src.unlink()
 
-    # ---- 视频：用前 n_videos 张图合成 2 秒 2fps 短片 ----
+    # ---- 视频：用前 n_videos 张图合成带推拉运镜的短片，横屏/方形/竖屏轮换 ----
     n_videos = min(n_videos, len(chosen_ids))
     video_queries: list[tuple[str, str]] = []
     for i, image_id in enumerate(chosen_ids[:n_videos], 1):
         name = f"video_{i:02d}.mp4"
-        subprocess.run(
-            [ff, "-y", "-hide_banner", "-loglevel", "error",
-             "-loop", "1", "-i", str(out / "images" / f"{image_id}.jpg"),
-             "-t", "2", "-r", "2", "-vf", "scale=640:-2,format=yuv420p",
-             "-c:v", "libx264", "-pix_fmt", "yuv420p", str(out / "videos" / name)],
-            check=True,
-        )
+        _build_video(out / "images" / f"{image_id}.jpg", out / "videos" / name, i, video_seconds, fps)
         video_queries.append((image_queries[image_id], name))
+
+    # ---- 图片比例变体：覆盖方形 / 竖屏 / 横屏，便于验证展示框自适应 ----
+    for j in range(min(image_variants, len(chosen_ids))):
+        _build_image_variants(out / "images" / f"{chosen_ids[j]}.jpg", out / "images")
+
+    # ---- 混合音频：两条环境音叠加，补充可播放的音频条目 ----
+    audio_files = [out / "audio" / r["file"] for r in picked]
+    for k in range(min(audio_mixes, len(audio_files) // 2)):
+        _mix_audio(audio_files[k], audio_files[k + 1], out / "audio" / f"mixed_{k + 1:02d}.wav")
 
     # ---- 文本 + metadata ----
     (out / "text" / "notes.txt").write_text(
@@ -187,7 +194,13 @@ def build(out: Path, eval_out: Path, cache: Path, n_images: int, n_audio: int, n
         "仅用于算子链路与指标回归测试，不代表真实业务数据分布。\n",
         encoding="utf-8",
     )
-    file_count = len(chosen_ids) + len(picked) + n_videos + 1
+    for text_name, content in TEXT_DOCS.items():
+        (out / "text" / text_name).write_text(content, encoding="utf-8")
+    text_count = len(TEXT_DOCS) + 1
+    file_count = sum(
+        1 for p in out.rglob("*")
+        if p.is_file() and p.name != "metadata.json"
+    )
     (out / "metadata.json").write_text(
         json.dumps({
             "name": "cmr-testset-flickr30kcn-esc50",
@@ -226,6 +239,10 @@ def main() -> None:
     ap.add_argument("--images", type=int, default=100)
     ap.add_argument("--audio", type=int, default=50)
     ap.add_argument("--videos", type=int, default=10)
+    ap.add_argument("--video-seconds", type=int, default=6, help="合成视频时长（秒）")
+    ap.add_argument("--fps", type=int, default=12, help="合成视频帧率")
+    ap.add_argument("--image-variants", type=int, default=10, help="为前 N 张图派生比例变体")
+    ap.add_argument("--audio-mixes", type=int, default=20, help="生成 N 条混合音频")
     ap.add_argument("--seed", type=int, default=42, help="保留参数；当前按 id 稳定选择")
     args = ap.parse_args()
 
@@ -237,6 +254,10 @@ def main() -> None:
         args.images,
         args.audio,
         args.videos,
+        args.video_seconds,
+        args.fps,
+        args.image_variants,
+        args.audio_mixes,
     )
 
 

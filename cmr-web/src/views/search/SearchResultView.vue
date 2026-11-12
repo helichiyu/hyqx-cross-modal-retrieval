@@ -46,7 +46,6 @@
 
         <div class="batch-bar" :class="{ show: selectedCount > 0 }">
           已选 <b>{{ selectedCount }}</b> 条
-          <button type="button" @click="downloadSelected">批量回源下载</button>
           <button type="button" class="bb-clear" @click="clearSelection">清除选择</button>
         </div>
 
@@ -121,7 +120,7 @@
                         对齐分 <i class="al-chip" :style="{ background: heatColor(alignScoreOf(item)) }">{{ alignLabelOf(item) }}</i>
                       </div>
                       <div v-if="expandedId === item.id && !item.deleted" class="rc-media">
-                        <MediaPreview :path="item.sourceFile" />
+                        <MediaPreview :path="item.sourceFile" :text="item.text" />
                       </div>
                     </div>
                     <div class="rc-right">
@@ -197,7 +196,7 @@
                 <div class="state-wrap">
                   <div class="state-ico" style="background:#eef4ff">📐</div>
                   <h3>系统边界</h3>
-                  <p class="st-desc">① 展示上限：结果区按 <b>Top50</b> 分页口径展示。<br>② 跨模态边界：无共享空间组合不提供检索。<br>③ 批量上限：单次批量操作 ≤ 200 条。<br>④ 回源边界：回源下载需源库授权。</p>
+                  <p class="st-desc">① 展示上限：结果区按 <b>Top50</b> 分页口径展示。<br>② 跨模态边界：无共享空间组合不提供检索。<br>③ 批量上限：单次批量操作 ≤ 200 条。<br>④ 出域边界：平台不提供下载与导出，媒体预览由服务端代理回源。</p>
                   <div class="state-actions"><button class="btn-primary" type="button" @click="demoView = actualView">返回结果态</button></div>
                 </div>
               </div>
@@ -281,10 +280,10 @@
   <div class="dev-body">
 <div class="dev-card" id="dc-ov" style="scroll-margin-top:12px"><div class="dc-head"><span class="dc-id" style="background:#1f5fd4">总览</span><span class="dc-name">页面定位 / 闭环 / 模块清单 / 编号与演示性质</span></div><div class="dc-body"><div class="ov-grid"><div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>本页定位【设计】</h4><p>检索结果的浏览与筛选现场（流B 主战场）；反馈归类进入流C 策略闭环。</p></div><div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>平台全景闭环【研发】</h4><p><a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a> 发起检索 → <a class="dev-xref" href="P6_任务管理_v5.0_20261025.html">P6</a> 任务调度 → 本页浏览/筛选 → <a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a> 结果运营（精选/反馈）→ <a class="dev-xref" href="P5_策略管理_v5.0_20261025.html">P5</a> 策略调整 → <a class="dev-xref" href="P8_评测_v5.0_20261025.html">P8</a> 评测验证 → 下次检索生效。</p></div><div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>三级模块清单【设计】</h4><p>主挂×1：空结果归因处置（F7）；联动×3：批量操作（F3）、D4 展示方案（F5）、反馈归类入口（F8，登记归类在 P7）。</p></div><div class="dev-ov" style="margin:0;border:none;padding:6px 4px"><h4>编号规范与演示性质【研发】</h4><p>业务编号按《平台相关ID生成规范-1026》32.1：任务 TASK / 库 KB / 策略 STG / 结果集 RST / 条目 ITM（等宽可复制）。<br>本页为页内模拟，不请求真实引擎；召回/相似度均为示例数据，不构成交付承诺。</p></div></div></div></div>
 <div class="dev-card" id="dc-f1"><div class="dc-head"><span class="dc-id">F1</span><span class="dc-name">检索上下文条</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">展示本次检索的查询对象、模态对、任务号，提供「查看任务上下文」「修改检索」两个跳转。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">常驻；来自 <a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a> 检索发起（携 query/模态对/场景）。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>query（上游带入）、模态对、任务号（TASK 业务编号，等宽可复制）</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">仅展示不可编辑；「查看任务上下文」跳 <a class="dev-xref" href="P3_任务详情_v5.0_20261025.html">P3</a>（携 ?task=），「修改检索」回 <a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a>（携 ?q= 回填）。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>两个跳转：P3?task= / P1?q=</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v">只读展示，无提交无异步，本点不涉及异常。</div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">静态展示。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=<a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a>；下游=<a class="dev-xref" href="P3_任务详情_v5.0_20261025.html">P3</a> / <a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a>。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">query/模态对/任务号正确；两个跳转参数正确。</div></div></div></div>
-<div class="dev-card" id="dc-f3"><div class="dc-head"><span class="dc-id">F3</span><span class="dc-name">批量操作</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">对勾选条目批量回源下载。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">勾选 ≥1 条时显示批量条。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>勾选的条目集合（单次 ≤ 200 条）</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">批量回源下载＝两层权限校验。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>已选计数、批量条显隐、toast</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>guest 无下载权限</li><li>超 200 条自动截断并提示</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">隐藏（0 条）/ 显示（≥1 条）。</div></div><div class="dc-row "><div class="dc-k">上下游依赖</div><div class="dc-v">下游无跳转（下载在本页完成）。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">计数正确；权限拦截正确。</div></div></div></div>
+<div class="dev-card" id="dc-f3"><div class="dc-head"><span class="dc-id">F3</span><span class="dc-name">批量操作</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">对勾选条目批量提交结果反馈。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">勾选 ≥1 条时显示批量条。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>勾选的条目集合（单次 ≤ 200 条）</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">批量反馈沿用单条反馈校验，不复制文件本体。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>已选计数、批量条显隐、toast</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>已封存结果不可再提交反馈</li><li>超 200 条自动截断并提示</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">隐藏（0 条）/ 显示（≥1 条）。</div></div><div class="dc-row "><div class="dc-k">上下游依赖</div><div class="dc-v">下游无跳转（反馈在本页完成）。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">计数正确；已封存拦截正确。</div></div></div></div>
 <div class="dev-card" id="dc-f4"><div class="dc-head"><span class="dc-id">F4</span><span class="dc-name">结果筛选</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">按质量等级区间、相似度阈值、来源过滤结果。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">侧栏常驻，可收起。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>质量等级区间 D~A（双柄）、相似度阈值 ≥0.50、来源下拉</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">双柄质量区间、相似度阈值滑块、来源下拉；实时联动渲染结果卡片。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>过滤后的结果卡片（F6）</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>过滤后无结果触发空态归因（F7）</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">默认全部；收起/展开。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">本页内联动 F6；质量等级继承自 <a class="dev-xref" href="P4_库管理_v5.2_20261026.html">P4</a> 接入评定。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">三筛选联动正确；重置恢复默认。</div></div></div></div>
 <div class="dev-card" id="dc-f5"><div class="dc-head"><span class="dc-id">F5</span><span class="dc-name">展示方案（联动 D4）</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">按模态分组、排序、对齐热力图开关展示结果。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">展示方案条常驻；分组/排序/热力图默认在 <a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a> 配置。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>分组 Tab（全部/图像/视频/文本/音频）、排序（相似度降序）、热力图开关</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">分组=按模态过滤；排序=相似度降序；热力图开关默认关，开启显示文/视对齐分并按蓝→红着色。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>结果卡片重排 / 对齐分着色（F6）</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>文本分组 0 条置灰</li><li>对齐分默认收起（开关 HTML 与 JS 初始态一致）</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">默认全部 + 相似度排序 + 热力图关。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=<a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a> 展示方案配置；本页 F6。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">分组/相似度排序/热力图联动正确；开关初态一致。</div></div></div></div>
-<div class="dev-card" id="dc-f6"><div class="dc-head"><span class="dc-id">F6</span><span class="dc-name">结果列表与条目</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">展示结果卡片（缩略图/来源/质量等级/相似度/对齐分），支持勾选、单条回源下载、单条反馈。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">结果区常驻（结果态）。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>结果条目（ITM 编号、来源、模态、相似度、质量等级）</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">卡片勾选→批量条（F3）；单条回源下载=两层权限+来源标注；单条反馈→弹窗（F8）。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>卡片列表 + 下载/反馈 toast</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>guest 无下载权限</li><li>结果区按 Top50 分页口径（演示为 Top8 预览）</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">结果态 / 加载态（骨架屏）。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=F4/F5 过滤排序；下游=F3 批量 / F8 反馈。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">样例条目渲染正确；勾选/下载/反馈行为正确。</div></div></div></div>
+<div class="dev-card" id="dc-f6"><div class="dc-head"><span class="dc-id">F6</span><span class="dc-name">结果列表与条目</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">展示结果卡片（缩略图/来源/质量等级/相似度/对齐分），支持勾选与单条反馈。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">结果区常驻（结果态）。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>结果条目（ITM 编号、来源、模态、相似度、质量等级）</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">卡片勾选→批量条（F3）；单条反馈→弹窗（F8）；媒体仅预览，不提供下载。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>卡片列表 + 反馈 toast</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>已封存不可反馈</li><li>结果区按 Top50 分页口径（演示为 Top8 预览）</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">结果态 / 加载态（骨架屏）。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=F4/F5 过滤排序；下游=F3 批量 / F8 反馈。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">样例条目渲染正确；勾选/反馈行为正确。</div></div></div></div>
 <div class="dev-card" id="dc-f7"><div class="dc-head"><span class="dc-id">F7</span><span class="dc-name">空结果归因处置（主挂）</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">空结果时给归因三分类 + 三动作。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">无结果时触发空态。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>query、目标库、归因分析结果</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">归因三分类（过滤过严/语义偏离/覆盖缺失）；三动作=放宽过滤（回 P1 ?relax=1）/相似 query（回填 P1）/需求登记（回 P7 ?zero=）。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>三张归因卡 + 三个动作</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>空态只显示归因卡，不显示结果列表</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">空态。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">下游=<a class="dev-xref" href="P1_检索台_v5.0_20261025.html">P1</a>（放宽/相似）、<a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a>（需求登记）。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">三归因卡文案正确；三动作跳转携参正确。</div></div></div></div>
 <div class="dev-card" id="dc-f8"><div class="dc-head"><span class="dc-id">F8</span><span class="dc-name">反馈归类入口（联动 P7）</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">把结果反馈送入 <a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a> 反馈面板；登记归类与分发在 P7 完成（主挂 D4，本页只做入口）。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">检索上下文条右侧「结果反馈归类 →」链接（携结果集编号）。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>结果集编号 RST（随链接携带）</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">点击跳 <a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a> 反馈面板；反馈表单统一在 P7 维护。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>跳转 P7?rs=…</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v">纯跳转，无提交；反馈类型必选等校验在 P7 执行。</div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">静态链接。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=本页结果集；下游=<a class="dev-xref" href="P7_结果运营_v5.0_20261025.html">P7</a> 反馈面板。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">链接携结果集编号正确；P7 侧可定位反馈面板。</div></div></div></div>
 <div class="dev-card" id="dc-f9"><div class="dc-head"><span class="dc-id">F9</span><span class="dc-name">视图状态与系统边界</span></div><div class="dc-body"><div class="dc-row "><div class="dc-k">职责</div><div class="dc-v">声明本页可呈现的视图状态（结果/加载/空结果/引擎错误/边界）与产品硬边界。</div></div><div class="dc-row "><div class="dc-k">入口/前置</div><div class="dc-v">左下角「原型演示」浮条切换视图，仅用于评审覆盖；正式由接口状态驱动。</div></div><div class="dc-row k-in"><div class="dc-k">输入</div><div class="dc-v"><ul><li>视图选择（五态按钮）</li><li>登录态与库授权（正式决定可见范围，由 P4 授予）</li></ul></div></div><div class="dc-row "><div class="dc-k">处理规则</div><div class="dc-v">五态互斥显示；边界态列四条硬约束：Top50 分页 / 批量 ≤200 / 回源两层权限 / 无共享空间组合不渲染。</div></div><div class="dc-row k-out"><div class="dc-k">输出</div><div class="dc-v"><ul><li>当前视图状态 + 边界说明</li></ul></div></div><div class="dc-row k-err"><div class="dc-k">异常与边界</div><div class="dc-v"><ul><li>错误态含系统错误码 ENG-TIMEOUT-504，可重试</li></ul></div></div><div class="dc-row "><div class="dc-k">状态</div><div class="dc-v">五态切换即时生效。</div></div><div class="dc-row k-dep"><div class="dc-k">上下游依赖</div><div class="dc-v">上游=P4 库管理（库授权）；视图状态由任务/结果集接口给出。</div></div><div class="dc-row "><div class="dc-k">验收点</div><div class="dc-v">五态切换正确；边界态四条齐全；错误态可重试回结果态。</div></div></div></div>
@@ -297,7 +296,6 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adoptResults, clickResult, createFeedback, pageFeedbacks, rerunSearchResults, searchResults, sealTask, toggleFavorite, voteItem } from '../../api'
-import { http } from '../../api/http'
 import MediaPreview from '../../components/MediaPreview.vue'
 import type { FeedbackVO, HistoryDetailVO, Id, MismatchItem, ResultItemVO } from '../../api/types'
 
@@ -373,11 +371,29 @@ const qualityLabel = computed(() => `${['D', 'C', 'B', 'A'][qualityMin.value]} ~
 const rangeFillStyle = computed(() => ({ left: `${qualityMin.value / 3 * 100}%`, width: `${(qualityMax.value - qualityMin.value) / 3 * 100}%` }))
 const selectedCount = computed(() => selectedIds.value.size)
 const allPicked = computed(() => filteredItems.value.length > 0 && feedbackForm.items.length === filteredItems.value.length)
-const sourceOptions = computed(() => ['全部来源', ...new Set(items.value.map(item => itemSource(item)))])
-const groupTotal = computed(() => activeGroup.value === 'all' ? items.value.length : groupCount(activeGroup.value))
+/**
+ * 同一源文件的多个抽取位置（视频抽帧、音频切片）只保留最高分一条，
+ * 避免同一素材在结果里重复占卡位；文本按条目保留，避免段落被合并。
+ */
+const uniqueItems = computed(() => {
+  const seen = new Set<string>()
+  const result: ResultItemVO[] = []
+  for (const item of [...items.value].sort((a, b) => b.score - a.score)) {
+    const key = item.modality === 'text'
+      ? `item:${item.itemId}`
+      : (item.sourceFile?.trim() || `item:${item.itemId}`)
+    if (!seen.has(key)) {
+      seen.add(key)
+      result.push(item)
+    }
+  }
+  return result
+})
+const sourceOptions = computed(() => ['全部来源', ...new Set(uniqueItems.value.map(item => itemSource(item)))])
+const groupTotal = computed(() => activeGroup.value === 'all' ? uniqueItems.value.length : groupCount(activeGroup.value))
 const similarQueries = computed(() => [`${contextQuery.value} 高清`, `${contextQuery.value} 位置示意`, contextQuery.value])
 
-const filteredItems = computed(() => items.value
+const filteredItems = computed(() => uniqueItems.value
   .filter(item => activeGroup.value === 'all' || item.modality === activeGroup.value)
   .filter(item => {
     const quality = qualityLevel(item)
@@ -429,7 +445,9 @@ function feedbackTarget(feedback: FeedbackVO) {
 }
 
 function groupCount(key: string) {
-  return key === 'all' ? items.value.length : items.value.filter(item => item.modality === key).length
+  return key === 'all'
+    ? uniqueItems.value.length
+    : uniqueItems.value.filter(item => item.modality === key).length
 }
 
 function modalityLabel(modality: string) {
@@ -536,28 +554,6 @@ async function setAdopted(adopted: boolean) {
     await adoptResults(resultSetId.value, adopted)
     adoptStatus.value = adopted ? 'adopted' : 'discarded'
     showToast(adopted ? '结果集已采用' : '结果集已废弃', 'ok')
-  } catch (error) {
-    showToast((error as Error).message, 'err')
-  }
-}
-
-async function downloadSelected() {
-  const selected = items.value.filter(item => !item.deleted && selectedIds.value.has(item.id) && item.sourceFile)
-  if (!selected.length) {
-    showToast('所选条目没有可回源文件', 'err')
-    return
-  }
-  try {
-    const blob = await http.postBlob('file/package', {
-      paths: selected.map(item => item.sourceFile),
-    })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `cmr-results-${resultSetId.value}.zip`
-    anchor.click()
-    URL.revokeObjectURL(url)
-    showToast('ZIP 打包下载已完成', 'ok')
   } catch (error) {
     showToast((error as Error).message, 'err')
   }
@@ -742,8 +738,11 @@ function closeDev() { devOpen.value = false }
 
 <style scoped>
 .p2-main-col { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
-.rc-media { width: 100%; margin-top: 8px; border-top: 1px dashed #eef2f8; padding-top: 8px; }
-.rc-media :deep(.media) { max-height: 220px; }
+.rc-media {
+  width: 100%; margin-top: 8px; border-top: 1px dashed #eef2f8; padding-top: 8px;
+  --preview-media-max: 280px;
+  --preview-text-max: 260px;
+}
 .rc-vote { display: flex; gap: 4px; margin-top: 6px; justify-content: flex-end; }
 .rc-vbtn {
   border: 1px solid var(--content-line); background: #fff; border-radius: 6px;

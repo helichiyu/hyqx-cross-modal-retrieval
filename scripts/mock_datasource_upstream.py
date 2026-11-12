@@ -3,7 +3,7 @@
 """本地模拟上游数据源（P4「接入」联调用）。
 
 实现 docs 里约定的三只读接口，用于在没有真实上游时验证
-「测试连接 → 同步发现 → 接入拉内容 → 401~406 建库」整条链路：
+「测试连接 → 同步发现 → 接入只拉元数据 → 401→405 自动激活」整条链路：
 
     GET /datasets                          数据集列表
     GET /datasets/{dataset_id}             数据集详情
@@ -32,8 +32,8 @@ def build_datasets(base: str) -> list[dict]:
             "dataset_id": "ds_alpha",
             "name": "alpha-sample",
             "version": "v1",
-            "item_count": 3,
-            "modal_types": ["text", "image"],
+            "item_count": 5,
+            "modal_types": ["text", "image", "audio", "video"],
         },
         {
             "dataset_id": "ds_blacklist_demo",
@@ -59,6 +59,14 @@ def build_items(dataset_id: str, base: str) -> list[dict]:
             {
                 "item_id": "it_003",
                 "modals": [{"type": "text", "content": "海边的小狗在海浪里追逐玩具"}],
+            },
+            {
+                "item_id": "it_004",
+                "modals": [{"type": "audio", "url": f"{base}/media/podcast.wav"}],
+            },
+            {
+                "item_id": "it_005",
+                "modals": [{"type": "video", "url": f"{base}/media/clip.mp4"}],
             },
         ]
     if dataset_id == "ds_blacklist_demo":

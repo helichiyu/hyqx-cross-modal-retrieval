@@ -33,9 +33,9 @@ import static com.hsmty.cmr.domain.dataset.entity.table.CmrDatasetTableDef.CMR_D
 import static com.hsmty.cmr.domain.dataset.entity.table.CmrIndexTableDef.CMR_INDEX;
 
 /**
- * 数据集服务：登记接入（创建 + 异步建库任务）、裁决、确认投产、重建、索引激活
+ * 数据集服务：登记接入（创建 + 异步建库任务）、重建、索引回滚激活
  *
- * <p>状态机强制：非法流转直接 code=1（02 库表设计第 3 节）。
+ * <p>按数据流 3.1 不设人工卡点：建库链 405 完成后自动激活，不再有评定裁决与投产确认。
  *
  * @author cmr
  * @since 2026-11-03
@@ -73,7 +73,7 @@ public class DatasetService {
         return PageResult.of(vos, page.getTotalRow(), query.getPageNum(), query.getPageSize());
     }
 
-    /** 登记接入：解压/定位数据目录 → 建数据集（ingest）→ 建任务异步跑 401→406 */
+    /** 登记接入：解压/定位数据目录 → 建数据集（ingest）→ 建任务异步跑 401→405 */
     @Transactional(rollbackFor = Exception.class)
     public DatasetVO create(DatasetCreateDTO dto) {
         boolean hasFile = dto.getFile() != null && !dto.getFile().isEmpty();
@@ -90,13 +90,13 @@ public class DatasetService {
     }
 
     /**
-     * 数据源接入：上游内容已落到共享卷时登记数据集并提交建库任务（401→406）
+     * 数据源接入：上游 manifest 已落到共享卷时登记数据集并提交建库任务（401→405）
      *
      * @param datasourceId 来源数据源
      * @param name         数据集名称
      * @param version      版本号
      * @param scene        业务场景
-     * @param fileRoot     已落盘的逻辑目录（dataset/...）
+     * @param fileRoot     manifest 逻辑目录（dataset/...，不含原始内容）
      * @return 新数据集
      */
     @Transactional(rollbackFor = Exception.class)
@@ -112,7 +112,7 @@ public class DatasetService {
      * @param name              数据集名称
      * @param version           版本号
      * @param scene             业务场景
-     * @param fileRoot          已落盘的逻辑目录（dataset/...）
+     * @param fileRoot          manifest 逻辑目录（dataset/...，不含原始内容）
      * @return 新数据集
      */
     @Transactional(rollbackFor = Exception.class)
@@ -200,53 +200,13 @@ public class DatasetService {
                 .build();
     }
 
-    /** 评定挂起裁决：通过→续跑建库（幂等重跑）；不通过→已剔除（终态） */
-    @Transactional(rollbackFor = Exception.class)
-    public void adjudicate(Long id, boolean pass, String note) {
-        CmrDataset dataset = requireDataset(id);
-        BizException.assertTrue(!CmrDataset.STATUS_STUCK.equals(dataset.getStatus()),
-                "仅卡住状态的数据集可裁决");
-        BizException.assertTrue(!"suspend".equals(dataset.getDecision()),
-                "该数据集不是评定挂起（suspend），不可裁决");
-        if (pass) {
-            dataset.setStatus(CmrDataset.STATUS_STORED);
-            dataset.setStuckReason(null);
-            // ignoreNulls=false：Flex 默认跳过 null 字段，否则卡住原因清不掉
-            datasetMapper.update(dataset, false);
-            submitBuild(dataset);
-            log.info("裁决通过，续跑建库: dataset={} note={}", dataset.getBizNo(), note);
-        } else {
-            dataset.setStatus(CmrDataset.STATUS_REJECTED);
-            dataset.setStuckReason(note != null && !note.isBlank() ? note : "人工裁决不通过");
-            datasetMapper.update(dataset);
-            log.info("裁决不通过，数据集已剔除: dataset={}", dataset.getBizNo());
-        }
-    }
-
-    /** 召回率不足人工确认投产：激活最新候选索引 → 可检索 */
-    @Transactional(rollbackFor = Exception.class)
-    public void confirmProduction(Long id) {
-        CmrDataset dataset = requireDataset(id);
-        BizException.assertTrue(!CmrDataset.STATUS_STUCK.equals(dataset.getStatus()),
-                "仅卡住状态的数据集可确认投产");
-        CmrIndex candidate = indexMapper.selectOneByQuery(QueryWrapper.create()
-                .where(CMR_INDEX.DATASET_ID.eq(id).and(CMR_INDEX.STATUS.eq(CmrIndex.STATUS_CANDIDATE)))
-                .orderBy(CMR_INDEX.ID.desc())
-                .limit(1));
-        BizException.assertNull(candidate, "没有可投产的候选索引");
-        buildPipeline.activate(candidate, dataset);
-        log.info("人工确认投产，索引激活: dataset={} index={}", dataset.getBizNo(), candidate.getIndexDir());
-    }
-
-    /** 重建（全链重跑，新任务；rejected 终态不可重建） */
+    /** 重建（全链重跑，新任务） */
     @Transactional(rollbackFor = Exception.class)
     public TaskVO rebuild(Long id) {
         CmrDataset dataset = requireDataset(id);
-        BizException.assertTrue(CmrDataset.STATUS_REJECTED.equals(dataset.getStatus()),
-                "已剔除的数据集不可重建");
         dataset.setStatus(CmrDataset.STATUS_INGEST);
         dataset.setStuckReason(null);
-        // ignoreNulls=false：Flex 默认跳过 null 字段，否则卡住原因清不掉
+        // ignoreNulls=false：Flex 默认跳过 null 字段，否则历史卡点原因清不掉
         datasetMapper.update(dataset, false);
         return toTaskVO(submitBuild(dataset));
     }
@@ -259,17 +219,6 @@ public class DatasetService {
                 .errorMsg(t.getErrorMsg()).startedTime(t.getStartedTime())
                 .finishedTime(t.getFinishedTime()).createTime(t.getCreateTime())
                 .build();
-    }
-
-    /** 回滚激活：candidate/retired 索引重新激活 */
-    @Transactional(rollbackFor = Exception.class)
-    public IndexVO activateIndex(Long indexId) {
-        CmrIndex index = indexMapper.selectOneById(indexId);
-        BizException.assertNull(index, "索引不存在");
-        BizException.assertTrue(CmrIndex.STATUS_ACTIVE.equals(index.getStatus()), "该索引已处于激活状态");
-        CmrDataset dataset = requireDataset(index.getDatasetId());
-        buildPipeline.activate(index, dataset);
-        return IndexVO.from(indexMapper.selectOneById(indexId));
     }
 
     public List<IndexVO> indexesOf(Long datasetId) {

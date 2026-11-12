@@ -1,12 +1,15 @@
 """401m_ingest_check 数据接入校验算子。
 
-对上传/指定的数据集目录做三项校验（对应数据流 3.1"接入"）：
-1. 模态识别：魔数 + 扩展名双重判定，不一致记疑似
-2. 可解码性：逐文件试解码（图片 PIL verify / 音视频 ffmpeg 探测 / 文本 utf-8 试读）
-3. 条数与场景核对：若目录内有 metadata.json（name/count/modalities/scenes），核对实际与声明
+两种输入模式（对应数据流 3.1"接入"）：
 
-产出 report.json（含 decodableRate/modalityCoverage/countRate，供 402 评定直接取用）
-+ 失败样本清单 + lineage.jsonl。不做通过/挂起/剔除判定（那是 402 的职责）。
+1. manifest 模式（数据源回源接入，平台只保留向量与元数据）：目录内存在
+   manifest.jsonl 时按行校验条目契约——itemId、1-4 个 modals、文本 content
+   非空、媒体为 http(s) URL。不下载任何原始内容。
+2. 目录模式（本地目录/压缩包接入）：逐文件做模态识别（魔数 + 扩展名）、
+   可解码性探测（PIL / ffmpeg / utf-8 试读）。
+
+两种模式都会在目录内有 metadata.json 时核对条数与模态声明，产出
+report.json + 失败样本清单 + lineage.jsonl。不做通过/挂起/剔除判定。
 """
 
 from __future__ import annotations
@@ -53,6 +56,22 @@ def _magic_modality(path: Path) -> str | None:
     return None  # 文本无魔数，靠扩展名 + 试读
 
 
+def _is_http_url(value: object) -> bool:
+    return isinstance(value, str) and value.startswith(("http://", "https://"))
+
+
+def _read_manifest(path: Path) -> list[dict]:
+    lines = []
+    for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not raw.strip():
+            continue
+        try:
+            lines.append(json.loads(raw))
+        except json.JSONDecodeError as e:
+            raise OperatorError(f"manifest.jsonl 第 {lineno} 行不是合法 JSON: {e}")
+    return lines
+
+
 def _decodable(path: Path, modality: str) -> str | None:
     """可解码返回 None，否则返回失败原因。"""
     try:
@@ -88,6 +107,8 @@ class Operator(OperatorBase):
                 raise OperatorError("401 的 inputFile 必须是数据集目录")
         else:
             src_dir = self.input_root / unique_id
+        if (src_dir / "manifest.jsonl").exists():
+            return self._check_manifest(src_dir, task_out, unique_id)
         files = [
             p for p in sorted(src_dir.rglob("*"))
             if p.is_file() and p.suffix.lower() != ".zip" and p.name != "metadata.json"
@@ -170,5 +191,105 @@ class Operator(OperatorBase):
             "outputFile": str(report_path),
             "lineageFile": str(lineage_path),
             "failuresFile": str(task_out / "failures.json"),
+            **{k: report[k] for k in ("totalFiles", "decodableRate", "modalityCoverage", "countRate", "failureCount")},
+        }
+
+    def _check_manifest(self, src_dir: Path, task_out: Path, unique_id: str) -> dict:
+        """manifest 模式：只校验条目契约，不下载原始内容、不做解码探测。"""
+        entries = _read_manifest(src_dir / "manifest.jsonl")
+        if not entries:
+            raise OperatorError(f"manifest.jsonl 为空: {src_dir}")
+
+        detected: dict[str, int] = {m: 0 for m in MODALITIES}
+        failures: list[dict] = []
+        seen_ids: set[str] = set()
+        lineage_path = task_out / "lineage.jsonl"
+
+        with open(lineage_path, "w", encoding="utf-8") as fl:
+            for idx, entry in enumerate(entries):
+                item_id = entry.get("itemId") if isinstance(entry, dict) else None
+                if not isinstance(item_id, str) or not item_id.strip():
+                    failures.append({"itemIndex": idx, "reason": "缺少 itemId"})
+                    continue
+                if item_id in seen_ids:
+                    failures.append({"itemId": item_id, "reason": "itemId 重复"})
+                    continue
+                seen_ids.add(item_id)
+                modals = entry.get("modals")
+                if not isinstance(modals, list) or not 1 <= len(modals) <= 4:
+                    failures.append({"itemId": item_id, "reason": "modals 必须为 1-4 项"})
+                    continue
+                mods: list[str] = []
+                invalid = None
+                for modal in modals:
+                    if not isinstance(modal, dict):
+                        invalid = "modal 不是对象"
+                        break
+                    mtype = modal.get("type")
+                    if mtype not in MODALITIES:
+                        invalid = f"未知模态 {mtype}"
+                        break
+                    if mtype == "text":
+                        content = modal.get("content")
+                        if not isinstance(content, str) or not content.strip():
+                            invalid = "文本条目 content 为空"
+                            break
+                    elif not _is_http_url(modal.get("url")):
+                        invalid = f"{mtype} 条目缺少 http(s) url"
+                        break
+                    mods.append(mtype)
+                if invalid:
+                    failures.append({"itemId": item_id, "reason": invalid})
+                    continue
+                for m in mods:
+                    detected[m] += 1
+                fl.write(json.dumps({"uniqueId": unique_id, "operatorId": self.operator_id,
+                                     "sourceFile": item_id, "modalities": mods,
+                                     "decodable": True}, ensure_ascii=False) + "\n")
+
+        reconcile = None
+        meta_file = src_dir / "metadata.json"
+        if meta_file.exists():
+            declared = json.loads(meta_file.read_text(encoding="utf-8"))
+            declared_mods = set(declared.get("modalities", []))
+            detected_mods = {m for m, n in detected.items() if n > 0}
+            declared_count = declared.get("count")
+            reconcile = {
+                "declaredCount": declared_count,
+                "actualCount": len(entries),
+                "countMatch": declared_count is None or declared_count == len(entries),
+                "declaredModalities": sorted(declared_mods),
+                "detectedModalities": sorted(detected_mods),
+                "modalityMatch": not declared_mods or declared_mods == detected_mods,
+                "scenes": declared.get("scenes", []),
+            }
+
+        total = len(entries)
+        failed = len(failures)
+        expected_mods = set(reconcile["declaredModalities"]) if reconcile else set()
+        expected_mods = expected_mods or set(MODALITIES)
+        report = {
+            "mode": "manifest",
+            "datasetDir": self.relpath(src_dir),
+            "totalFiles": total,
+            "totalItems": total,
+            "detected": detected,
+            "decodable": detected,
+            "decodableRate": round((total - failed) / total, 4),
+            "modalityCoverage": round(len({m for m, n in detected.items() if n > 0} & expected_mods) / len(expected_mods), 4),
+            "countRate": (round(min(total / reconcile["declaredCount"], 1.0), 4)
+                          if reconcile and reconcile.get("declaredCount") else 1.0),
+            "mismatchedExt": [],
+            "reconcile": reconcile,
+            "failureCount": failed,
+        }
+        report_path = task_out / "report.json"
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        (task_out / "failures.json").write_text(json.dumps(failures, ensure_ascii=False, indent=2), encoding="utf-8")
+        return {
+            "outputFile": str(report_path),
+            "lineageFile": str(lineage_path),
+            "failuresFile": str(task_out / "failures.json"),
+            "mode": "manifest",
             **{k: report[k] for k in ("totalFiles", "decodableRate", "modalityCoverage", "countRate", "failureCount")},
         }

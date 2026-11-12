@@ -147,7 +147,7 @@ cmr:
   # 检索算子独立容器；本地/测试用 127.0.0.1，生产用 compose 内服务名或实际地址
   operator:
     base-url: '${CMR_OPERATOR_BASE_URL:http://127.0.0.1:6300}'
-    # 在线链（407/408）与批量链（401–406/409）超时，单位 ms
+    # 在线链（407/408）与批量链（401→405/409）超时，单位 ms
     timeout-search-ms: '${CMR_OPERATOR_TIMEOUT_SEARCH_MS:60000}'
     timeout-batch-ms: '${CMR_OPERATOR_TIMEOUT_BATCH_MS:1800000}'
   # 共享卷：数据集原始文件与运行时索引的逻辑根目录
@@ -165,9 +165,8 @@ cmr:
     search-log-days: '${CMR_SEARCH_LOG_DAYS:30}'
     search-log-batch-size: '${CMR_SEARCH_LOG_BATCH_SIZE:1000}'
     search-log-cron: '${CMR_SEARCH_LOG_CLEANUP_CRON:0 30 2 * * *}'
-  # 406 投产校验默认评测文件与验收线
+  # 409 评测验收线（406 投产校验已下线）
   eval:
-    default-eval-file: 'dataset/eval/default.jsonl'
     lines:
       recall: 0.8
       precision:

@@ -127,8 +127,6 @@ public class CmrProperties {
 
     @Data
     public static class Eval {
-        /** 406 投产校验默认评测文件（相对项目根的逻辑路径） */
-        private String defaultEvalFile = "dataset/eval/default.jsonl";
         private final Lines lines = new Lines();
     }
 

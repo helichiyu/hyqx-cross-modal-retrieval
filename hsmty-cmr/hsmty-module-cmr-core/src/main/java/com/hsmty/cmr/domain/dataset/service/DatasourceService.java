@@ -59,6 +59,12 @@ public class DatasourceService {
     private static final Set<String> PULL_PROTOCOLS = Set.of("pull", "http", "api");
     private static final Set<String> PUSH_PROTOCOLS = Set.of("push", "upload");
 
+    /** 回源代理只放行媒体路径，避免借已登记主机读取数据集等受保护接口 */
+    private static final Set<String> MEDIA_EXTENSIONS = Set.of(
+            ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp",
+            ".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac",
+            ".mp4", ".webm", ".mov", ".mkv", ".avi");
+
     /** 上游 4 项必填的固定顺序（与契约 dataset_id|name|item_count|modals 一致） */
     private static final List<String> REQUIRED_FIELDS = List.of("dataset_id", "name", "item_count", "modals");
 
@@ -101,7 +107,9 @@ public class DatasourceService {
                         "GET {base}/datasets/{dataset_id}/items?page=1&size=20"),
                 "dataset", dataset,
                 "item", item,
-                "pushMode", "不支持 push；数据源只拉元数据，文件仍在来源方，检索按 ID 引用");
+                "pushMode", "不支持 push；平台只拉元数据与条目定位，图片/音频/视频按 modals[].url 回源，"
+                        + "不落原始内容；media URL 必须自包含鉴权（预签名）或公开可读，"
+                        + "并在接入与检索期间持续可访问");
     }
 
     /** 拉取上游数据集列表（P4 数据源库列表 + 4 项必填校验） */
@@ -146,9 +154,10 @@ public class DatasourceService {
     }
 
     /**
-     * 接入（P4）：拉取上游数据集条目内容落到共享卷，登记本地数据集并触发 401→406 建库链。
+     * 接入（P4）：只拉取上游元数据与条目定位，落 manifest；原始内容仍在上游，按 URL 回源。
      *
-     * <p>与同步的分工：同步只发现元数据；接入才真正下载内容并建索引。
+     * <p>与同步的分工：同步只发现数据集；接入登记数据集并生成 403 可解析的 manifest，
+     * 触发 401→405 建库链。共享卷不保存图片/音频/视频本体。
      */
     public DatasetVO ingest(Long id, DatasourceIngestDTO dto) {
         CmrDatasource datasource = requireDatasource(id);
@@ -166,89 +175,120 @@ public class DatasourceService {
                 .findFirst()
                 .orElseThrow(() -> new BizException("上游数据集不存在或已被黑名单排除: " + datasetId));
 
-        // 去重：同一数据源的同一上游数据集只允许接入一次，避免重复下载与重复建库
+        // 去重：同一数据源的同一上游数据集只允许接入一次，避免重复建库
         BizException.assertTrue(datasetService.existsUpstream(datasource.getId(), datasetId), "该上游数据集已接入");
 
         Path dir = fileService.datasetRoot().resolve("ds").resolve(datasource.getBizNo()).resolve(safeName(datasetId));
-        int fetched = pullItems(datasource, base, datasetId, dir);
-        BizException.assertTrue(fetched <= 0, "上游数据集无可用条目: " + datasetId);
+        int itemCount = writeManifest(datasource, base, datasetId, dir, upstream);
+        BizException.assertTrue(itemCount <= 0, "上游数据集无可用条目: " + datasetId);
 
         String logicalRoot = "dataset/ds/" + datasource.getBizNo() + "/" + safeName(datasetId);
         String name = dto.getName() != null && !dto.getName().isBlank()
                 ? dto.getName() : String.valueOf(upstream.get("name"));
         DatasetVO dataset = datasetService.registerUpstream(datasource.getId(), datasetId, name,
                 dto.getVersion(), dto.getScene(), logicalRoot);
-        log.info("数据源接入: source={} datasetId={} files={} dataset={}",
-                datasource.getBizNo(), datasetId, fetched, dataset.getBizNo());
+        log.info("数据源接入: source={} datasetId={} items={} dataset={}",
+                datasource.getBizNo(), datasetId, itemCount, dataset.getBizNo());
         return dataset;
     }
 
-    /** 逐条目下载模态内容到本地目录，返回落盘文件数 */
-    private int pullItems(CmrDatasource datasource, String base, String datasetId, Path dir) {
+    /**
+     * 分页拉取条目元数据，写 manifest.jsonl 与 metadata.json（不下载任何媒体文件）。
+     *
+     * <p>manifest 每行 {@code {"itemId","modals":[{"type","content"|"url","ext"}]}}；
+     * 403 据此按 URL 流式取用原始内容，解析完即清理临时文件。
+     */
+    private int writeManifest(CmrDatasource datasource, String base, String datasetId, Path dir,
+                              java.util.Map<String, Object> upstream) {
         BizException.assertTrue(!dirBelongs(dir), "接入目录非法");
         try {
             Files.createDirectories(dir);
         } catch (IOException e) {
             throw new BizException("接入目录创建失败: " + e.getMessage(), e);
         }
-        int fetched = 0;
-        for (int page = 1; page <= 50; page++) {
+        List<String> lines = new ArrayList<>();
+        Set<String> modalities = new LinkedHashSet<>();
+        Integer declaredCount = intOf(upstream.get("itemCount"));
+        // 按上游声明条数推算翻页上限；未声明时保留 1000 页硬保护，避免上游分页异常导致死循环
+        int maxPages = declaredCount != null && declaredCount > 0
+                ? (declaredCount + 99) / 100 + 5 : 1000;
+        int page = 1;
+        for (; page <= maxPages; page++) {
             String body = getJson(datasource, base + "/datasets/" + datasetId + "/items?page=" + page + "&size=100");
             List<java.util.Map<String, Object>> items = unwrapList(body, "items");
             if (items.isEmpty()) {
                 break;
             }
             for (java.util.Map<String, Object> item : items) {
-                fetched += saveItem(dir, item);
+                String line = manifestLine(item, modalities);
+                if (line != null) {
+                    lines.add(line);
+                }
             }
             if (items.size() < 100) {
                 break;
             }
         }
-        return fetched;
+        BizException.assertTrue(page > maxPages, "上游条目分页超过安全上限 " + maxPages + " 页，请检查分页契约");
+        if (declaredCount != null && declaredCount > 0) {
+            BizException.assertTrue(lines.size() != declaredCount,
+                    "manifest 条目数与上游声明不一致：声明 " + declaredCount + " 条，实际 " + lines.size() + " 条");
+        }
+        try {
+            Files.writeString(dir.resolve("manifest.jsonl"), String.join("\n", lines) + (lines.isEmpty() ? "" : "\n"),
+                    StandardCharsets.UTF_8);
+            Files.writeString(dir.resolve("metadata.json"), com.hsmty.cmr.common.util.JsonUtils.write(
+                            java.util.Map.of("name", String.valueOf(upstream.get("name")),
+                                    "count", declaredCount != null && declaredCount > 0 ? declaredCount : lines.size(),
+                                    "modalities", new ArrayList<>(modalities),
+                                    "scenes", List.of("upstream"))),
+                    StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new BizException("manifest 写入失败: " + e.getMessage(), e);
+        }
+        return lines.size();
     }
 
-    private int saveItem(Path dir, java.util.Map<String, Object> item) {
-        String itemId = safeName(str(item.get("item_id")));
-        if (itemId.isBlank() || !(item.get("modals") instanceof List<?> modals)) {
-            return 0;
+    private String manifestLine(java.util.Map<String, Object> item, Set<String> modalities) {
+        String itemId = str(item.get("item_id"));
+        if (itemId == null || !(item.get("modals") instanceof List<?> modals) || modals.isEmpty()) {
+            return null;
         }
-        int saved = 0;
+        List<java.util.Map<String, Object>> normalized = new ArrayList<>();
         for (Object modal : modals) {
             if (!(modal instanceof java.util.Map<?, ?> m)) {
                 continue;
             }
             String type = str(m.get("type"));
-            if (type == null) {
+            if (type == null || !Set.of("text", "image", "audio", "video").contains(type)) {
                 continue;
             }
-            Object content = m.get("content");
-            Object url = m.get("url");
-            Path target = dir.resolve(itemId + "_" + type + (content != null ? ".txt" : extOf(str(url))));
-            try {
-                if (content != null) {
-                    Files.writeString(target, String.valueOf(content), StandardCharsets.UTF_8);
-                    saved++;
-                } else if (url != null) {
-                    download(str(url), target);
-                    saved++;
+            java.util.Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("type", type);
+            // 契约：文本只写 content，图片/音频/视频只写 url；401/403 按同一口径校验
+            if ("text".equals(type)) {
+                Object content = m.get("content");
+                if (content == null || String.valueOf(content).isBlank()) {
+                    continue;
                 }
-            } catch (IOException | InterruptedException e) {
-                if (e instanceof InterruptedException) {
-                    Thread.currentThread().interrupt();
+                entry.put("content", String.valueOf(content));
+            } else {
+                Object url = m.get("url");
+                if (url == null) {
+                    continue;
                 }
-                log.warn("条目模态下载失败 item={} type={}: {}", itemId, type, e.getMessage());
+                String urlText = String.valueOf(url);
+                entry.put("url", urlText);
+                entry.put("ext", extOf(urlText));
             }
+            normalized.add(entry);
+            modalities.add(type);
         }
-        return saved;
-    }
-
-    private void download(String url, Path target) throws IOException, InterruptedException {
-        HttpResponse<Path> response = HTTP_CLIENT.send(
-                HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(30)).GET().build(),
-                HttpResponse.BodyHandlers.ofFile(target));
-        BizException.assertTrue(response.statusCode() < 200 || response.statusCode() >= 300,
-                "条目内容下载失败 HTTP " + response.statusCode());
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        return com.hsmty.cmr.common.util.JsonUtils.write(
+                java.util.Map.of("itemId", itemId, "modals", normalized));
     }
 
     private String extOf(String url) {
@@ -272,6 +312,110 @@ public class DatasourceService {
     /** 接入目录必须落在 dataset/ds 下，防止越界写 */
     private boolean dirBelongs(Path dir) {
         return dir.toAbsolutePath().normalize().startsWith(fileService.datasetRoot().resolve("ds"));
+    }
+
+    /**
+     * 媒体 URL 是否属于已登记数据源（回源代理的 SSRF 白名单）。
+     *
+     * @param url 上游媒体地址
+     * @return 命中已登记数据源返回 true
+     */
+    public boolean isTrustedMediaUrl(String url) {
+        return matchingDatasource(url) != null;
+    }
+
+    /**
+     * 回源请求头：命中数据源且配置了 token/basic 认证时返回 Authorization 值。
+     *
+     * @param url 上游媒体地址
+     * @return Authorization 值；无需认证或不在白名单时返回 null
+     */
+    public String authHeaderFor(String url) {
+        CmrDatasource datasource = matchingDatasource(url);
+        if (datasource == null) {
+            return null;
+        }
+        String authConfig = decryptAuth(datasource);
+        if (authConfig == null || authConfig.isBlank()) {
+            return null;
+        }
+        if ("token".equals(datasource.getAuthType())) {
+            return "Bearer " + authConfig;
+        }
+        if ("basic".equals(datasource.getAuthType())) {
+            String credential = authConfig.contains(":") ? authConfig : authConfig + ":";
+            return "Basic " + Base64.getEncoder()
+                    .encodeToString(credential.getBytes(StandardCharsets.UTF_8));
+        }
+        return null;
+    }
+
+    /**
+     * 按协议 + 主机 + 端口 + 路径匹配已登记数据源，避免回源代理访问任意地址。
+     *
+     * <p>除主机一致外还要求：URL 必须位于数据源接口地址之下，且扩展名为媒体类型。
+     * 这样即使上游的 /datasets 等受保护接口与媒体同主机，也无法借回源代理读取。
+     */
+    private CmrDatasource matchingDatasource(String url) {
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+        URI target;
+        try {
+            target = URI.create(url);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+        if (!"http".equalsIgnoreCase(target.getScheme()) && !"https".equalsIgnoreCase(target.getScheme())) {
+            return null;
+        }
+        if (!isMediaPath(target.getPath())) {
+            return null;
+        }
+        int targetPort = effectivePort(target);
+        List<CmrDatasource> sources = datasourceMapper.selectListByQuery(QueryWrapper.create());
+        for (CmrDatasource source : sources) {
+            if (source.getEndpoint() == null || source.getEndpoint().isBlank()) {
+                continue;
+            }
+            try {
+                URI base = URI.create(trimBase(source.getEndpoint()));
+                if (target.getScheme().equalsIgnoreCase(base.getScheme())
+                        && target.getHost() != null && target.getHost().equalsIgnoreCase(base.getHost())
+                        && targetPort == effectivePort(base)
+                        && pathUnderBase(target.getPath(), base.getPath())) {
+                    return source;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // 跳过格式非法的数据源地址
+            }
+        }
+        return null;
+    }
+
+    /** 路径必须带媒体扩展名，且不能包含路径穿越片段 */
+    private boolean isMediaPath(String path) {
+        if (path == null || path.indexOf("..") >= 0) {
+            return false;
+        }
+        int dot = path.lastIndexOf('.');
+        return dot >= 0 && MEDIA_EXTENSIONS.contains(path.substring(dot).toLowerCase(java.util.Locale.ROOT));
+    }
+
+    /** 目标路径需位于数据源接口路径之下（数据源地址无路径时不限制） */
+    private boolean pathUnderBase(String targetPath, String basePath) {
+        if (basePath == null || basePath.isBlank() || "/".equals(basePath)) {
+            return true;
+        }
+        String prefix = basePath.endsWith("/") ? basePath : basePath + "/";
+        return targetPath != null && (targetPath.equals(basePath) || targetPath.startsWith(prefix));
+    }
+
+    private int effectivePort(URI uri) {
+        if (uri.getPort() > 0) {
+            return uri.getPort();
+        }
+        return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
     }
 
     private CmrDatasource requireDatasource(Long id) {

@@ -69,7 +69,7 @@ public class DatasourceController {
         return ApiResult.success(datasourceService.sync(id));
     }
 
-    @Operation(summary = "接入上游数据集（拉内容落共享卷并触发 401→406 建库链）")
+    @Operation(summary = "接入上游数据集（只落元数据 manifest，触发 401→405 建库链）")
     @PreAuthorize("hasAnyAuthority('cmr:dataset:create')")
     @PostMapping("{id}/ingest")
     public ApiResult<com.hsmty.cmr.domain.dataset.vo.DatasetVO> ingest(@PathVariable Long id,

@@ -79,7 +79,7 @@ LOCAL_DB_PASSWORD=... java -jar hsmty-module-cmr-start/target/hsmty-module-cmr-s
 | --- | --- | --- |
 | 鉴权/字典 | `auth`、`dict`、`recommend-words` | 当前用户、字典项、推荐词维护 |
 | 文件 | `file`、`files` | 上传、按路径下载、文件对象分页/详情/批量查 |
-| 库管理 | `datasets`、`datasources`、`datasource-blacklist`、`indexes` | 数据集审核/生产化/重建、数据源对接与测试、同步、上游数据集拉取与接入（401→406）、黑名单、索引激活 |
+| 库管理 | `datasets`、`datasources`、`datasource-blacklist`、`indexes` | 数据集登记与重建、数据源对接与测试、同步、上游数据集接入（401→405 自动激活，回源不落原始内容）、黑名单、索引回滚激活 |
 | 检索 | `search`、`search-history` | 407 查询理解、408 检索落库、结果回看/重跑/点击埋点、收藏 |
 | 行为/摘要 | `search-behaviors`、`search-summary` | 行为流水、屏蔽条目与解除、任务摘要与封存、赞踩 |
 | 策略 | `strategies` | 草稿保存、发布、下线/上线、版本列表/回滚、跨策略与跨版本对比、一致性检查 |

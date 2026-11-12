@@ -28,5 +28,6 @@
     <include file="db/changelog/cmr/020_cmr_dataset_upstream_dataset_id.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/cmr/021_cmr_datasource_test_result_columns.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/cmr/022_cmr_dataset_upstream_backfill.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/cmr/023_cmr_remove_manual_gates.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

@@ -80,13 +80,17 @@ class Operator(OperatorBase):
                     "normalizedQuery": query,
                 }
 
-        # 过短查询提示补充（规则兜底）
+        # 过短查询提示补充（规则兜底）：按输入派生三条模板候选，避免澄清浮层只有提示没有例子
         if len(query) < 4:
             return {
                 "queryModality": "text",
                 "needClarify": True,
-                "clarifyOptions": [],
-                "hint": "查询过短，请补充描述（如对象、场景、动作）",
+                "clarifyOptions": [
+                    {"intent": f"{query}（图片）", "query": f"{query}的高清图片", "hint": "图片"},
+                    {"intent": f"{query}（视频）", "query": f"{query}的相关视频", "hint": "视频"},
+                    {"intent": f"{query}（场景）", "query": f"{query}的场景描述", "hint": "场景"},
+                ],
+                "hint": "查询过短，已按图片、视频和场景给出改写建议；也可以仍按原词检索",
                 "normalizedQuery": query,
             }
 

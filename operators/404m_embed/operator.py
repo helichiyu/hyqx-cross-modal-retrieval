@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 import threading
 from pathlib import Path
@@ -163,16 +164,22 @@ class Operator(OperatorBase):
 
         out_path = task_out / "embeddings.jsonl"
         count = 0
-        with open(out_path, "w", encoding="utf-8") as f:
-            for batch in _batched(items, BATCH_SIZE):
-                vectors = self._embed_batch(batch)
-                for it, vec in zip(batch, vectors):
-                    f.write(json.dumps({
-                        "itemId": it["itemId"],
-                        "modality": it["modality"],
-                        "vector": [round(float(x), 6) for x in vec],
-                    }, ensure_ascii=False) + "\n")
-                    count += 1
+        try:
+            with open(out_path, "w", encoding="utf-8") as f:
+                for batch in _batched(items, BATCH_SIZE):
+                    vectors = self._embed_batch(batch)
+                    for it, vec in zip(batch, vectors):
+                        f.write(json.dumps({
+                            "itemId": it["itemId"],
+                            "modality": it["modality"],
+                            "vector": [round(float(x), 6) for x in vec],
+                        }, ensure_ascii=False) + "\n")
+                        count += 1
+        finally:
+            # 回源模式清理：成功或失败都删除 403 临时下载的上游原始内容与抽帧/切片产物。
+            # 任务重试会从 401 重跑整链并重新下载，因此失败清理不会破坏重试。
+            if payload.get("cleanupSources", True):
+                self._cleanup_temp(items_path)
 
         return {
             "outputFile": str(out_path),
@@ -180,6 +187,14 @@ class Operator(OperatorBase):
             "dim": 512,
             "modelVersion": self.model_version,
         }
+
+    @staticmethod
+    def _cleanup_temp(items_path: Path) -> None:
+        base = items_path.parent
+        for name in ("_source", "_derived"):
+            temp = base / name
+            if temp.is_dir():
+                shutil.rmtree(temp, ignore_errors=True)
 
     # ---- 内部 ----
 

@@ -59,8 +59,10 @@ export const uploadFile = (file: File) => {
   return http.upload<{ path: string }>('file/upload', form)
 }
 
-export const fileUrl = (path: string, download = false) =>
-  `file?path=${encodeURIComponent(path)}${download ? '&download=true' : ''}`
+// 共享卷路径走 /file?path=；上游 http(s) 地址走服务端回源代理 /file/source?url=，
+// 前端不直连上游、不落原始内容。
+export const fileUrl = (path: string) =>
+  /^https?:\/\//i.test(path) ? `file/source?url=${encodeURIComponent(path)}` : `file?path=${encodeURIComponent(path)}`
 
 // ---------- 库管理 ----------
 
@@ -70,12 +72,6 @@ export const pageDatasets = (params: Record<string, unknown>) =>
 export const createDataset = (form: FormData) => http.post<DatasetVO>('datasets', form)
 
 export const datasetDetail = (id: Id) => http.get<DatasetDetailVO>(`datasets/${id}`)
-
-export const adjudicateDataset = (id: Id, pass: boolean, note?: string) =>
-  http.post<void>(`datasets/${id}/adjudicate`, { pass, note })
-
-export const confirmProduction = (id: Id) =>
-  http.post<void>(`datasets/${id}/confirm-production`)
 
 export const rebuildDataset = (id: Id) => http.post<TaskVO>(`datasets/${id}/rebuild`)
 
@@ -101,8 +97,6 @@ export const removeBlacklist = (id: Id) => http.delete<void>(`datasource-blackli
 
 export const listIndexes = (datasetId: Id) =>
   http.get<IndexVO[]>('indexes', { datasetId })
-
-export const activateIndex = (id: Id) => http.post<IndexVO>(`indexes/${id}/activate`)
 
 // ---------- 任务 ----------
 

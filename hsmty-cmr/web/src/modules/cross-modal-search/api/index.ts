@@ -56,8 +56,10 @@ export const uploadFile = (file: File) => {
   return http.upload<{ path: string }>('file/upload', form)
 }
 
-export const fileUrl = (path: string, download = false) =>
-  `file?path=${encodeURIComponent(path)}${download ? '&download=true' : ''}`
+// 共享卷路径走 /file?path=；上游 http(s) 地址走服务端回源代理 /file/source?url=，
+// 前端不直连上游、不落原始内容。
+export const fileUrl = (path: string) =>
+  /^https?:\/\//i.test(path) ? `file/source?url=${encodeURIComponent(path)}` : `file?path=${encodeURIComponent(path)}`
 
 // ---------- 库管理 ----------
 
@@ -67,12 +69,6 @@ export const pageDatasets = (params: Record<string, unknown>) =>
 export const createDataset = (form: FormData) => http.post<DatasetVO>('datasets', form)
 
 export const datasetDetail = (id: Id) => http.get<DatasetDetailVO>(`datasets/${id}`)
-
-export const adjudicateDataset = (id: Id, pass: boolean, note?: string) =>
-  http.post<void>(`datasets/${id}/adjudicate`, { pass, note })
-
-export const confirmProduction = (id: Id) =>
-  http.post<void>(`datasets/${id}/confirm-production`)
 
 export const rebuildDataset = (id: Id) => http.post<TaskVO>(`datasets/${id}/rebuild`)
 
@@ -89,7 +85,7 @@ export const datasourceDatasets = (id: Id) => http.get<RemoteDatasetsVO>(`dataso
 
 export const datasourceContract = () => http.get<Record<string, unknown>>('datasources/contract')
 
-/** 接入上游数据集：拉取条目/文件到共享卷并触发 401→406 建库 */
+/** 接入上游数据集：只拉取元数据/manifest，并自动触发 401→405 建库链 */
 export const ingestDatasource = (id: Id, body: { datasetId: string; name?: string; version?: string; scene?: string }) =>
   http.post<{ bizNo: string; name: string; status: string }>(`datasources/${id}/ingest`, body)
 
@@ -106,8 +102,6 @@ export const removeBlacklist = (id: Id) => http.delete<void>(`datasource-blackli
 
 export const listIndexes = (datasetId: Id) =>
   http.get<IndexVO[]>('indexes', { datasetId })
-
-export const activateIndex = (id: Id) => http.post<IndexVO>(`indexes/${id}/activate`)
 
 // ---------- 任务 ----------
 

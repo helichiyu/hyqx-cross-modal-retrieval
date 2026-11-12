@@ -111,16 +111,4 @@ export const http = {
     }
     return resp.blob()
   },
-  /** 携带 JSON 入参获取文件流（批量打包下载用） */
-  async postBlob(path: string, body: unknown): Promise<Blob> {
-    const resp = await fetch(`${BASE}${path}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    if (!resp.ok) {
-      throw new ApiError(`文件获取失败(${resp.status})`, resp.status)
-    }
-    return resp.blob()
-  },
 }

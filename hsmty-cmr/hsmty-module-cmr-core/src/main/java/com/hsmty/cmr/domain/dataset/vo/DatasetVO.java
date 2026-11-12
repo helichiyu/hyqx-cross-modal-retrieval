@@ -4,7 +4,6 @@ import com.hsmty.cmr.domain.dataset.entity.CmrDataset;
 import lombok.Builder;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -33,12 +32,6 @@ public class DatasetVO {
 
     private String status;
 
-    private String stuckReason;
-
-    private BigDecimal score;
-
-    private String decision;
-
     private Integer itemCount;
 
     private String modalityJson;
@@ -52,8 +45,7 @@ public class DatasetVO {
                 .id(e.getId()).bizNo(e.getBizNo()).datasourceId(e.getDatasourceId())
                 .upstreamDatasetId(e.getUpstreamDatasetId())
                 .name(e.getName()).version(e.getVersion()).scene(e.getScene())
-                .status(e.getStatus()).stuckReason(e.getStuckReason())
-                .score(e.getScore()).decision(e.getDecision())
+                .status(e.getStatus())
                 .itemCount(e.getItemCount()).modalityJson(e.getModalityJson())
                 .currentIndexId(e.getCurrentIndexId()).createTime(e.getCreateTime())
                 .build();

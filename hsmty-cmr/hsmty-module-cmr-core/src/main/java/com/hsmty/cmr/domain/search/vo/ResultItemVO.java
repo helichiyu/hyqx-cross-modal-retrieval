@@ -6,7 +6,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 
 /**
- * 结果集条目视图（sourceFile 为逻辑路径，可经 /file?path= 预览）
+ * 结果集条目视图（sourceFile 为共享卷逻辑路径或上游媒体 URL，分别经 /file?path= 与 /file/source?url= 预览）
  *
  * @author cmr
  * @since 2026-11-03

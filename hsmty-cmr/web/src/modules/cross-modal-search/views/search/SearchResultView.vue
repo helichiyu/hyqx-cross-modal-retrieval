@@ -307,7 +307,7 @@
     <!-- 查看弹窗（只读：占位大图 + 元数据） -->
     <el-dialog v-model="viewOpen" title="查看" width="520px">
       <div class="view-media">
-        <MediaPreview v-if="viewTarget?.sourceFile" :path="viewTarget.sourceFile" class="vm-media" />
+        <MediaPreview v-if="viewTarget?.sourceFile" :path="viewTarget.sourceFile" :text="viewTarget.text" class="vm-media" />
         <template v-else>
           <div class="vm-ico" aria-hidden="true">{{ viewIcon }}</div>
           <div class="vm-cap">{{ viewCaption }}</div>
@@ -522,6 +522,7 @@ interface ViewTarget {
   score: number | null
   modality: string | null
   sourceFile: string | null
+  text: string | null
 }
 
 const groups = [
@@ -599,20 +600,37 @@ const similarQueries = computed(() => {
 const sliderMin = computed(() => String(Math.min(0.5, threshold.value)))
 const sliderMax = computed(() => String(Math.max(0.99, threshold.value)))
 
+/**
+ * 同一源文件的多个抽取位置（视频抽帧、音频切片）只保留最高分一条，避免同一素材重复占卡位。
+ * 文本按条目保留，避免同一文本文件的多个段落被合并掉。
+ */
+const uniqueItems = computed(() => {
+  const seen = new Map<string, ResultItemVO>()
+  for (const item of [...items.value].sort((a, b) => alignScoreOf(b) - alignScoreOf(a))) {
+    const key = item.modality === 'text'
+      ? `item:${item.itemId}`
+      : (item.sourceFile?.trim() || `item:${item.itemId}`)
+    if (!seen.has(key)) {
+      seen.set(key, item)
+    }
+  }
+  return [...seen.values()]
+})
+
 const sourceOptions = computed(() => {
   const counts = new Map<string, number>()
-  for (const item of items.value) {
+  for (const item of uniqueItems.value) {
     const name = itemSource(item)
     counts.set(name, (counts.get(name) || 0) + 1)
   }
   return [
-    { name: '全部来源', count: items.value.length },
+    { name: '全部来源', count: uniqueItems.value.length },
     ...[...counts.entries()].map(([name, count]) => ({ name, count })),
   ]
 })
 
 const filteredItems = computed(() =>
-  items.value
+  uniqueItems.value
     .filter(item => activeGroup.value === 'all' || item.modality === activeGroup.value)
     // 相似度阈值比较的是真实余弦对齐分；score 是融合分（含词面加成），不是 0~1 相似度
     .filter(item => alignScoreOf(item) >= threshold.value)
@@ -772,8 +790,10 @@ function resetFilters() {
 }
 
 function groupCount(key: string) {
-  // 分组计数与结果区可浏览条数一致，统一用实际下发条目数
-  return key === 'all' ? items.value.length : items.value.filter(item => item.modality === key).length
+  // 分组计数与结果区可浏览条数一致：同一源文件只算一条
+  return key === 'all'
+    ? uniqueItems.value.length
+    : uniqueItems.value.filter(item => item.modality === key).length
 }
 
 function toggleHeat() {
@@ -835,6 +855,7 @@ function openItemView(item: ResultItemVO, reportClick = true) {
     score: alignScoreOf(item),
     modality: item.modality,
     sourceFile: item.sourceFile ?? null,
+    text: item.text ?? null,
   }
   viewOpen.value = true
   // 点击埋点：后端按 resultSetId + rank 记录，供 P6 搜索行为与 P8 评测的点击统计
@@ -861,6 +882,7 @@ function openFavoriteView(fav: FavoriteEntry) {
     score: null,
     modality: null,
     sourceFile: null,
+    text: null,
   }
   viewOpen.value = true
 }
@@ -2157,10 +2179,11 @@ function showToast(message: string, type: 'info' | 'ok' | 'err' = 'info') {
   color: var(--system-blue);
 }
 
-/* 查看弹窗 */
+/* 查看弹窗：容器高度由媒体原始比例撑开，禁止固定高度导致媒体压住下方元数据 */
 .view-media {
-  height: 220px;
-  background: linear-gradient(135deg, #eaf0ff, #f6f9ff);
+  height: auto;
+  min-height: 120px;
+  background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2168,6 +2191,12 @@ function showToast(message: string, type: 'info' | 'ok' | 'err' = 'info') {
   gap: 8px;
   color: var(--system-blue);
   border-radius: 8px;
+  overflow: visible;
+}
+.view-media .vm-media {
+  width: 100%;
+  --preview-media-max: min(52vh, 420px);
+  --preview-text-max: min(40vh, 320px);
 }
 .view-media .vm-ico {
   font-size: 44px;

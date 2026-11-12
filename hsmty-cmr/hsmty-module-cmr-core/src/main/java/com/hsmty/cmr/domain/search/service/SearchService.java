@@ -82,6 +82,9 @@ public class SearchService {
     /** 文本查询少于该字数且未澄清时拒绝检索（P1 澄清规则） */
     private static final int CLARIFY_MIN_CHARS = 4;
 
+    /** 默认业务场景；未显式传 scene 时优先该场景的激活索引 */
+    private static final String DEFAULT_SCENE = "general";
+
     /** 剔除明细最多返回 100 条（excludedCount 仍为全量） */
     private static final int EXCLUDED_ITEM_LIMIT = 100;
 
@@ -475,7 +478,13 @@ public class SearchService {
         return evaluation == null ? null : evaluation.getId();
     }
 
-    /** 按场景取激活索引：场景匹配优先，兜底最新激活 */
+    /**
+     * 按场景取激活索引：场景匹配优先，未指定场景时优先通用场景。
+     *
+     * <p>不能直接兜底“最新激活”：联调/专项场景（如 e2e）的数据集激活后会排在通用场景之前，
+     * 导致默认检索被小样本索引抢占，全量索引不可见。因此 scene 为空时先找 general，
+     * 找不到才回退最新激活。
+     */
     private CmrIndex activeIndexOf(String scene) {
         List<CmrIndex> actives = indexMapper.selectListByQuery(QueryWrapper.create()
                 .where(CMR_INDEX.STATUS.eq(CmrIndex.STATUS_ACTIVE))
@@ -483,18 +492,23 @@ public class SearchService {
         if (actives.isEmpty()) {
             return null;
         }
-        if (!blank(scene)) {
-            Map<Long, String> sceneById = new LinkedHashMap<>();
-            for (CmrDataset ds : datasetMapper.selectAll()) {
-                sceneById.put(ds.getId(), ds.getScene());
-            }
-            for (CmrIndex idx : actives) {
-                if (scene.equals(sceneById.get(idx.getDatasetId()))) {
-                    return idx;
-                }
+        Map<Long, String> sceneById = new LinkedHashMap<>();
+        for (CmrDataset ds : datasetMapper.selectAll()) {
+            sceneById.put(ds.getId(), ds.getScene());
+        }
+        String effectiveScene = blank(scene) ? DEFAULT_SCENE : scene;
+        for (CmrIndex idx : actives) {
+            if (effectiveScene.equals(sceneById.get(idx.getDatasetId()))) {
+                return idx;
             }
         }
-        return actives.get(0);
+        // 兜底只选归属数据集仍存在的索引，避免落到无主的历史 active 索引
+        for (CmrIndex idx : actives) {
+            if (sceneById.containsKey(idx.getDatasetId())) {
+                return idx;
+            }
+        }
+        return null;
     }
 
     private SearchResultVO assemble(CmrSearchHistory history) {

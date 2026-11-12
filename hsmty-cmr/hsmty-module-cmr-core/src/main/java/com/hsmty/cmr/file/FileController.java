@@ -1,11 +1,13 @@
 package com.hsmty.cmr.file;
 
 import com.hsmty.core.common.entity.ApiResult;
-import com.hsmty.cmr.file.dto.FilePackageDTO;
+import com.hsmty.cmr.domain.dataset.service.DatasourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
@@ -16,7 +18,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,49 +26,102 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Map;
-import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * 共享卷文件接口：媒体预览（Range）/材料下载统一入口、查询文件上传
+ * 共享卷文件接口：媒体预览（Range）、查询文件上传（数据不出域，不提供下载/导出）
  *
  * @author cmr
  * @since 2026-11-03
  */
+@Slf4j
 @Tag(name = "文件")
 @RestController
 @RequestMapping("file")
 @RequiredArgsConstructor
 public class FileController {
 
-    private final FileService fileService;
+    private static final HttpClient UPSTREAM = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build();
 
-    @Operation(summary = "预览/下载共享卷文件（支持 Range）")
+    private final FileService fileService;
+    private final DatasourceService datasourceService;
+
+    @Operation(summary = "预览共享卷文件（支持 Range，不提供下载）")
     @PreAuthorize("hasAnyAuthority('cmr:file:read')")
     @GetMapping
     public ResponseEntity<Resource> read(@RequestParam String path,
-                                         @RequestParam(required = false, defaultValue = "false") boolean download,
                                          HttpServletRequest request) throws IOException {
         LogicalFile logical = fileService.resolve(path);
         long length = Files.size(logical.absolute());
-        return serve(logical, length, download, request.getHeader(HttpHeaders.RANGE));
+        return serve(logical, length, request.getHeader(HttpHeaders.RANGE));
     }
 
-    @Operation(summary = "批量打包下载共享卷文件（ZIP）")
+    @Operation(summary = "回源预览上游媒体（服务端代理，不提供下载）")
     @PreAuthorize("hasAnyAuthority('cmr:file:read')")
-    @PostMapping("package")
-    public void packageFiles(@jakarta.validation.Valid @RequestBody FilePackageDTO dto,
-                             HttpServletResponse response) throws IOException {
-        java.nio.file.Path zip = fileService.createZip(dto.getPaths());
-        try {
-            response.setContentType("application/zip");
-            response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=cmr-results.zip");
-            Files.copy(zip, response.getOutputStream());
-            response.flushBuffer();
-        } finally {
-            Files.deleteIfExists(zip);
+    @GetMapping("source")
+    public ResponseEntity<Resource> source(@RequestParam String url, HttpServletRequest request)
+            throws IOException, InterruptedException {
+        if (!datasourceService.isTrustedMediaUrl(url)) {
+            return upstreamError(HttpStatus.FORBIDDEN, "仅允许回源已登记数据源的媒体地址");
         }
+        URI uri;
+        try {
+            uri = URI.create(url);
+        } catch (IllegalArgumentException e) {
+            return upstreamError(HttpStatus.BAD_REQUEST, "媒体地址不合法");
+        }
+        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
+                .timeout(Duration.ofSeconds(30))
+                .header(HttpHeaders.ACCEPT, "*/*")
+                .GET();
+        String authorization = datasourceService.authHeaderFor(url);
+        if (authorization != null) {
+            builder.header(HttpHeaders.AUTHORIZATION, authorization);
+        }
+        String range = request.getHeader(HttpHeaders.RANGE);
+        if (range != null) {
+            builder.header(HttpHeaders.RANGE, range);
+        }
+        HttpResponse<InputStream> upstream;
+        try {
+            upstream = UPSTREAM.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
+        } catch (IOException e) {
+            log.warn("回源失败 url={} cause={}", url, e.getMessage());
+            return upstreamError(HttpStatus.BAD_GATEWAY, "上游内容暂不可取");
+        }
+        // 只透传 2xx（含 Range 的 206）；3xx 因禁用重定向、4xx/5xx 一律按上游不可用返回占位
+        if (upstream.statusCode() < 200 || upstream.statusCode() >= 300) {
+            upstream.body().close();
+            return upstreamError(HttpStatus.BAD_GATEWAY, "上游内容不可用 HTTP " + upstream.statusCode());
+        }
+        HttpHeaders headers = new HttpHeaders();
+        copyHeader(upstream, headers, HttpHeaders.CONTENT_TYPE);
+        copyHeader(upstream, headers, HttpHeaders.CONTENT_LENGTH);
+        copyHeader(upstream, headers, HttpHeaders.CONTENT_RANGE);
+        copyHeader(upstream, headers, HttpHeaders.ACCEPT_RANGES);
+        return new ResponseEntity<>(new InputStreamResource(upstream.body()), headers,
+                HttpStatus.valueOf(upstream.statusCode()));
+    }
+
+    private void copyHeader(HttpResponse<?> upstream, HttpHeaders target, String name) {
+        upstream.headers().firstValue(name).ifPresent(value -> target.set(name, value));
+    }
+
+    /** 回源失败走非 2xx 纯文本，前端据此显示占位态而不是把错误 JSON 当成媒体 */
+    private ResponseEntity<Resource> upstreamError(HttpStatus status, String message) {
+        return ResponseEntity.status(status)
+                .contentType(new MediaType("text", "plain", StandardCharsets.UTF_8))
+                .body(new ByteArrayResource(message.getBytes(StandardCharsets.UTF_8)));
     }
 
     @Operation(summary = "上传查询文件（以图/音/视搜检索）")
@@ -78,14 +132,10 @@ public class FileController {
     }
 
     /** Range 单段解析与 206 响应；无 Range 返回 200 全量 */
-    private ResponseEntity<Resource> serve(LogicalFile logical, long length, boolean download, String rangeHeader)
+    private ResponseEntity<Resource> serve(LogicalFile logical, long length, String rangeHeader)
             throws IOException {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType(logical.mime()));
-        if (download) {
-            headers.setContentDisposition(org.springframework.http.ContentDisposition.attachment()
-                    .filename(logical.absolute().getFileName().toString()).build());
-        }
         headers.set(HttpHeaders.ACCEPT_RANGES, "bytes");
 
         if (rangeHeader == null || !rangeHeader.startsWith("bytes=") || rangeHeader.contains(",")) {

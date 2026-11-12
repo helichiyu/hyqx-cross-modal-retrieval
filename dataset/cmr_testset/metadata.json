@@ -1,7 +1,7 @@
 {
   "name": "cmr-testset-flickr30kcn-esc50",
   "version": "v1",
-  "count": 161,
+  "count": 229,
   "modalities": [
     "text",
     "image",

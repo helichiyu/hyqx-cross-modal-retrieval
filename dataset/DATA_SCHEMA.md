@@ -57,15 +57,15 @@ dataset/sample/
 ## 5. 四模态回归测试集 `cmr_testset/`
 
 `sample/` 只用于链路冒烟；需要真实语义和指标回归时使用 `dataset/cmr_testset/`：
-100 张图 + 50 条音频 + 10 段合成视频 + 1 个文本（约 13MB，可入库）。
+100 张原图 + 30 张比例变体 + 50 条音频 + 20 条混合音频 + 20 段合成视频 + 9 篇文本（约 21MB，可入库）。
 
 | 路径 | 内容 |
 | --- | --- |
-| `cmr_testset/images/` | 100 张 jpg，来自 Flickr30K-CN |
-| `cmr_testset/audio/` | 50 条 5s、16kHz 单声道 wav，ESC-50 动物类 |
-| `cmr_testset/videos/` | 10 段 2s mp4，由前 10 张图合成，用于覆盖视频抽帧 |
-| `cmr_testset/text/notes.txt` | 说明文本 |
-| `cmr_testset/metadata.json` | 401 声明的 count/modalities |
+| `cmr_testset/images/` | 100 张 jpg（Flickr30K-CN）+ 30 张方形/竖屏/横屏比例变体 |
+| `cmr_testset/audio/` | 50 条 5s、16kHz 单声道 wav（ESC-50 动物类）+ 20 条混合音频 |
+| `cmr_testset/videos/` | 20 段 6s/12fps mp4，横屏/方形/竖屏轮换，带推近、平移或拉远运镜 |
+| `cmr_testset/text/` | 说明、动物、风景、美食、运动、交通、声音、视频、检索指南共 9 篇 |
+| `cmr_testset/metadata.json` | 401 声明的 count/modalities（count 为实际文件数） |
 | `cmr_testset_eval/eval_image.jsonl` | 100 条中文查询 → 图像 |
 | `cmr_testset_eval/eval_audio.jsonl` | 50 条英文查询 → 音频 |
 | `cmr_testset_eval/eval_video.jsonl` | 10 条中文查询 → 视频 |
@@ -76,5 +76,9 @@ dataset/sample/
   ```bash
   python -m pip install pyarrow
   python scripts/build_cmr_testset.py --images 1000 --audio 200
+  ```
+- 已有数据目录做增量补素材（视频运镜、比例变体、混合音频、多篇文本）：
+  ```bash
+  .venv/Scripts/python scripts/enrich_cmr_testset.py --dataset dataset/cmr_testset
   ```
 - 来源与许可见 [cmr_testset_ATTRIBUTION.md](cmr_testset_ATTRIBUTION.md)；仅限内部测试，对外交付前需确认授权。

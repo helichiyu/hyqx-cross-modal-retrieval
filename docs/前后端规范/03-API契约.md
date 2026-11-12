@@ -14,14 +14,14 @@
 | 方法 | 路径 | 权限码 | 状态 | 说明 |
 | --- | --- | --- | --- | --- |
 | GET | /auth/me | 登录即可 | 平台提供 | 当前用户+角色+权限码列表，由 HSMTY 统一身份服务提供，本服务不实现 |
-| GET | /file?path=runtime/... | cmr:file:read | 规划 | 共享卷文件（白名单+防穿越）；支持 Range；媒体预览/材料下载统一入口 |
+| GET | /file?path=runtime/... | cmr:file:read | 已实现 | 共享卷文件（白名单+防穿越）；支持 Range；仅预览，不提供下载 |
+| GET | /file/source?url=... | cmr:file:read | 已实现 | 服务端回源代理上游媒体（仅限已登记数据源地址，支持 Range，前端不直连上游；不可达时返回明确错误占位） |
 | POST | /file/upload | cmr:search:create | 规划 | 查询文件上传至共享卷（以图/音/视搜检索）→ `{path:"dataset/query/xxx"}`，作为 `queryFile` 传算子 |
-| POST | /file/package | cmr:file:read | 规划 | 批量打包共享卷文件：`{paths:[...]}` → ZIP（单次 ≤200） |
 | GET | /dict/{type} | 登录即可 | 平台提供 | 字典项（`cmr_*` 类型，来源 3100），统一来源 |
 | POST | /files | cmr:file:upload | 已实现 | 文件对象上传（multipart：`file`、`bizType`）→ `FileObjectVO` |
 | GET | /files | cmr:file:page | 已实现 | 文件对象分页：`keyword`/`status`/`page`/`limit` |
 | GET | /files/{id} | cmr:file:detail | 已实现 | 文件对象详情 |
-| GET | /files/{id}/content | cmr:file:read | 已实现 | 文件下载（`Content-Disposition` 带原始文件名） |
+| GET | /files/{id}/content | cmr:file:read | 已实现 | 文件内容在线预览（`Content-Disposition: inline`，不提供附件下载） |
 | DELETE | /files | cmr:file:remove | 已实现 | 批量逻辑删除：`{ids:[...]}` |
 | POST | /files/by-ids | cmr:file:read | 已实现 | Feign 批量查询 `Collection<Long>` → `List<FileObjectVO>` |
 
@@ -30,10 +30,8 @@
 | 方法 | 路径 | 权限码 | 说明 |
 | --- | --- | --- | --- |
 | GET | /datasets | cmr:dataset:page | 分页：status/scene/name/时间筛选；含当前索引与激活状态 |
-| POST | /datasets | cmr:dataset:create | 登记接入：{datasourceId?, name, scene, fileUploadId?/datasetPath?} → 创建 DS+TASK(type=build)，异步跑 401→406 |
-| GET | /datasets/{id} | cmr:dataset:detail | 详情：状态、评分、模态统计、报告、血缘摘要、任务 |
-| POST | /datasets/{id}/adjudicate | cmr:dataset:adjudicate | 评定挂起裁决：{pass:true/false, note}；通过→续跑建库，不通过→已剔除 |
-| POST | /datasets/{id}/confirm-production | cmr:dataset:confirm | 召回率不足人工确认投产：激活该索引→可检索 |
+| POST | /datasets | cmr:dataset:create | 登记接入：{datasourceId?, name, scene, fileUploadId?/datasetPath?} → 创建 DS+TASK(type=build)，异步跑 401→405 并自动激活索引 |
+| GET | /datasets/{id} | cmr:dataset:detail | 详情：状态、条目/模态统计、报告、任务 |
 | POST | /datasets/{id}/rebuild | cmr:dataset:create | 从断点/全链重跑（幂等，新 TASK） |
 | GET | /datasources | cmr:dataset:page | 数据源列表（含 datasetCount、连接状态、必填自检、向量化/总条数、最近同步时间） |
 | POST | /datasources | cmr:dataset:create | 登记数据源：{name, endpoint(http/https), protocol, authType, authConfig}；token/basic 认证信息必填 |
@@ -41,7 +39,7 @@
 | GET | /datasources/contract | cmr:dataset:page | 上游对接契约（只读）：数据集/条目接口、必填字段、模态规则、推送方式说明 |
 | GET | /datasources/{id}/datasets | cmr:dataset:page | 拉取上游数据集列表：GET {base}/datasets；dataset_id/name/item_count 必填，modal_types 可选 |
 | POST | /datasources/{id}/sync | cmr:dataset:update | 同步元数据（只发现，不建库）：要求数据源已连接；黑名单命中的来源/数据集跳过并返回 skippedBlacklisted；写入 required_ok/upstream_dataset_id/total_count/last_sync_time |
-| POST | /datasources/{id}/ingest | cmr:dataset:create | 接入上游数据集：{datasetId, name?, version?, scene?} → 拉取条目内容落共享卷 `dataset/ds/{数据源号}/{datasetId}`，登记本地数据集并触发 401→406；要求已连接且 4 项必填通过；黑名单数据集不可接入 |
+| POST | /datasources/{id}/ingest | cmr:dataset:create | 接入上游数据集：{datasetId, name?, version?, scene?} → 只拉元数据与条目定位，写 `manifest.jsonl`（不下载原始内容），登记本地数据集并触发 401→405；要求已连接且 4 项必填通过；黑名单数据集不可接入 |
 | GET | /datasource-blacklist | cmr:dataset:page | 数据源黑名单列表 |
 | POST | /datasource-blacklist | cmr:dataset:create | 拉黑数据源 {sourceName, reason} |
 | DELETE | /datasource-blacklist/{id} | cmr:dataset:update | 解除拉黑 |
@@ -81,7 +79,7 @@
 | 方法 | 路径 | 权限码 | 说明 |
 | --- | --- | --- | --- |
 | GET | /tasks | cmr:task:page | 分页：type/status/失败处置/时间；列表两列：任务状态、失败处置（无失败显示 —） |
-| GET | /tasks/{id} | cmr:task:detail | 任务信息 + 步骤日志（材料：各环节 outputFile 可经 /file 查看）+ 关联对象链接 |
+| GET | /tasks/{id} | cmr:task:detail | 任务信息 + 步骤日志（材料：各环节 outputFile 可经 /file 预览）+ 关联对象链接 |
 
 任务只读展示（数据流 3.3：失败处置系统自动，不设人工改状态接口）。
 
@@ -153,7 +151,7 @@ v5 口径：**一条 query 一条评测**，以历史检索为基准，重放后
 | 页面 | 主要接口 |
 | --- | --- |
 | P1 检索台 | /search/suggest、/search/understand、/search、/strategies/options、/file/upload |
-| P2 结果页 | /search/results/{id}、rerun、adopt/discard、/click、/search/tasks/{taskNo}/vote、/search/favorites、/search-summary/{taskNo}/seal、/feedbacks、/file/package |
+| P2 结果页 | /search/results/{id}、rerun、adopt/discard、/click、/search/tasks/{taskNo}/vote、/search/favorites、/search-summary/{taskNo}/seal、/feedbacks |
 | P3 搜索结果摘要 | /search-summary/{taskNo}、/search/tasks/{taskNo}/vote、/search/favorites、/feedbacks |
 | P4 数据源库管理 | /datasets*、/datasources*、/datasources/contract、/datasources/{id}/datasets、/datasources/{id}/sync、/datasource-blacklist*、/indexes* |
 | P5 策略管理 | /strategies*、/strategies/options、/strategies/{id}/offline、/strategies/{id}/online |

@@ -137,9 +137,6 @@ export interface DatasetVO {
   version: string | null
   scene: string | null
   status: string
-  stuckReason: string | null
-  score: number | null
-  decision: string | null
   itemCount: number | null
   modalityJson: string | null
   currentIndexId: Id | null
@@ -153,7 +150,6 @@ export interface IndexVO {
   modelVersion: string | null
   status: string
   countsJson: string | null
-  checkResultJson: string | null
   activatedTime: string | null
   createTime: string | null
 }
