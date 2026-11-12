@@ -37,10 +37,10 @@ public class StrategySaveDTO {
     @Schema(description = "两阶段重排开关；新建缺省 true，编辑缺省保留现值")
     private Boolean rerank;
 
-    @Schema(description = "返回条数 1-100，缺省 20")
+    @Schema(description = "返回条数 1-100，缺省 50")
     @Min(1)
     @Max(100)
-    private Integer topK = 20;
+    private Integer topK = 50;
 
     /** 相似度阈值 0.30-0.99；缺省时新建取 0.60、编辑保留库中现值（null 表示未提供） */
     @Schema(description = "相似度阈值 0.30-0.99；新建缺省 0.60，编辑缺省保留现值")

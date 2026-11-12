@@ -101,7 +101,7 @@ public class CmrProperties {
         /** 无激活索引（cmr_index.status=active）时的兜底索引目录 */
         private String indexDir = "runtime/demo_index";
         /** 默认返回条数（策略与请求均未指定 topK 时） */
-        private int topK = 20;
+        private int topK = 50;
         /** 默认相似度阈值 */
         private BigDecimal threshold = new BigDecimal("0.60");
         /** 检索摘要保留天数 */

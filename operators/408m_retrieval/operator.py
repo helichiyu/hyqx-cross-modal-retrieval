@@ -6,9 +6,13 @@
 四协议的 /predict 复用同一检索逻辑，保持管线兼容。
 
 融合算法（借鉴 DigUp，其实测优于 RRF）：
-- 每通道余弦分做 z-score 归一，取 max(z, 0)
+- 按目标模态分别做 z-score 归一，取 max(z, 0)：
+  CLIP 的文本-文本余弦普遍在 0.7~0.9，文本-图像只有 0.3~0.5，混在一起归一会让
+  文本条目把 z 值占满、图像/视频条目全部被压到 0；按模态分别归一后各模态在自己的
+  分布内比较，才能公平地与权重相乘
 - 按策略四模态权重加权（合计必须 100）
-- 精确词命中加成：wordWeight * coverage^1.5（发票号/错误码这类 embedding 保不住的词）
+- 精确词命中加成：wordWeight * coverage^1.5（发票号/错误码/原句这类 embedding 保不住的词）
+  放在按模态归一之后计算，字面命中的文本条目才会置顶，而不会把所有文本整体抬高
 
 通道规则：
 - 文本查询 → CLIP 文本向量检 clip 通道（文/图/视频帧）+ CLAP 文本向量检 clap 通道（音频）
@@ -33,6 +37,7 @@ from operators.common import index_store  # noqa: E402
 from operators.common.base import OperatorBase, OperatorError  # noqa: E402
 
 MODALITIES = ("text", "image", "audio", "video")
+
 
 
 class _Reranker:
@@ -128,7 +133,7 @@ class Operator(OperatorBase):
         started = time.time()
 
         # 1. 召回：按查询模态确定要搜的通道
-        candidates: dict[str, dict] = {}  # itemId -> {meta, z}
+        candidates: dict[str, dict] = {}  # itemId -> {meta, sim}（sim 为原始余弦）
         if query_text:
             if set(targets) & {"text", "image", "video"}:
                 self._collect(index_dir, self._embed(unique_id, queryText=query_text),
@@ -152,7 +157,8 @@ class Operator(OperatorBase):
         if not candidates:
             return self._result(payload, query_text, query_modality, [], weights, rerank, threshold, started)
 
-        # 2. 融合：z-score 加权 + 精确词加成
+        # 2. 归一 + 融合：按模态 z-score 加权 + 精确词加成
+        self._normalize(candidates)
         fused = self._fuse(list(candidates.values()), weights, word_weight, query_text)
 
         # 2.1 相似度阈值：按原始余弦（alignScore）过滤，低于策略阈值的不下发
@@ -200,7 +206,8 @@ class Operator(OperatorBase):
         # 其它模态一起带出来；这里必须按目标模态裁剪，命中不足 top_k 时扩大取回窗口，
         # 避免目标模态条目（如 20 条视频对上 1000 条图像）被淹没。
         allowed = set(targets) if targets else None
-        fetch = max(top_k * 5, 50)
+        # 取回窗口要够大：按模态归一需要每种模态都有足够样本，否则分布估计失真
+        fetch = max(top_k * 10, 200)
         while True:
             top = index_store.search(index_dir, vec, channel, fetch)
             metas = index_store.get_items(index_dir, [rid for rid, _ in top])
@@ -213,14 +220,30 @@ class Operator(OperatorBase):
             break
         if not pairs:
             return
-        scores = np.array([s for _, s, _ in pairs], dtype=np.float32)
-        mean, std = float(scores.mean()), max(float(scores.std()), 1e-6)
         for _, s, meta in pairs:
-            z = max((s - mean) / std, 0.0)
             item_id = meta["itemId"]
-            if item_id not in candidates or z > candidates[item_id]["z"]:
-                # sim 保留原始余弦（0~1），供 similarity 阈值过滤与对齐分展示
-                candidates[item_id] = {"meta": meta, "z": z, "sim": float(s)}
+            # sim 保留原始余弦（0~1），供 similarity 阈值过滤与对齐分展示
+            if item_id not in candidates or s > candidates[item_id]["sim"]:
+                candidates[item_id] = {"meta": meta, "sim": float(s)}
+
+    @staticmethod
+    def _normalize(candidates: dict[str, dict]) -> None:
+        """按模态分别做 z-score 归一，写入每条候选的 z。
+
+        文本-文本余弦（~0.7-0.9）与跨模态余弦（~0.3-0.5）不在同一量纲，
+        混在一起归一会把非文本条目整体压到 0；按模态分组归一后各模态在自己的
+        分布内可比，再由策略权重决定 modalities 之间的取舍。
+        """
+        groups: dict[str, list[float]] = {}
+        for c in candidates.values():
+            groups.setdefault(c["meta"]["modality"], []).append(c["sim"])
+        stats = {}
+        for modality, sims in groups.items():
+            arr = np.array(sims, dtype=np.float32)
+            stats[modality] = (float(arr.mean()), max(float(arr.std()), 1e-6))
+        for c in candidates.values():
+            mean, std = stats[c["meta"]["modality"]]
+            c["z"] = max((c["sim"] - mean) / std, 0.0)
 
     def _fuse(self, cands: list[dict], weights: dict, word_weight: float,
               query_text: str) -> list[dict]:

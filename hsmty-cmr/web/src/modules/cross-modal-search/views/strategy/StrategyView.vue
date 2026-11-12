@@ -151,7 +151,7 @@
           <div v-show="recallHelpOpen" id="recallHelp" class="ed-help">
             <p><b>相似度阈值：</b>低于此值的条目不返回。调高更准更少，调低更全更杂。</p>
             <p><b>融合权重：</b>只对含多种表征的条目生效（视频的画面 / 音频 / 字幕）；图片与文档为单表征，不参与加权。</p>
-            <p><b>结果条数：</b>由相似度阈值决定，结果分页展示。</p>
+            <p><b>结果条数：</b>阈值筛完后按融合分排序，最多下发 N 条（1–100）。</p>
           </div>
           <div class="rc-line">
             <span class="ed-label">相似度阈值</span>
@@ -166,6 +166,19 @@
               inputmode="decimal"
             />
             <span class="ed-fixed">低于此值的条目不返回</span>
+          </div>
+          <div class="rc-line">
+            <span class="ed-label">结果条数</span>
+            <el-input-number
+              v-model="editor.topK"
+              class="rc-input"
+              :min="1"
+              :max="100"
+              :step="10"
+              :controls="false"
+              inputmode="numeric"
+            />
+            <span class="ed-fixed">单次检索最多返回的条数（1–100），超过部分不再下发</span>
           </div>
           <div class="fuse-head">
             <span class="fuse-title">融合权重</span>
@@ -508,7 +521,7 @@ const editor = reactive({
   scene: 'general',
   threshold: DEFAULT_THRESHOLD,
   /** 原型已移除「返回条数」输入；StrategySaveDTO.topK 有默认值 20，必须显式透传现值，否则保存会把它写回 20 */
-  topK: 20,
+  topK: 50,
   weights: { ...DEFAULT_WEIGHTS } as Record<WeightKey, number>,
   rerank: true,
 })
@@ -756,7 +769,7 @@ function openNewStrategy() {
   editor.name = ''
   editor.scene = 'general'
   editor.threshold = DEFAULT_THRESHOLD
-  editor.topK = 20
+  editor.topK = 50
   editor.weights = { ...DEFAULT_WEIGHTS }
   editor.rerank = true
   recallHelpOpen.value = false
@@ -775,7 +788,7 @@ async function openEditor(row: StrategyVO) {
       base?.threshold === null || base?.threshold === undefined
         ? DEFAULT_THRESHOLD
         : Number(base.threshold)
-    editor.topK = base?.topK ?? 20
+    editor.topK = base?.topK ?? 50
     editor.weights = readWeights(base?.weightsJson)
     editor.rerank = base ? base.rerank !== false : true
     recallHelpOpen.value = false

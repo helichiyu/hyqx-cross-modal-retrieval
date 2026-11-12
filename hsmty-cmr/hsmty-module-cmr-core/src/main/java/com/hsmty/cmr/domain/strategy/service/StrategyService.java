@@ -775,7 +775,7 @@ public class StrategyService {
         draft.setName(strategy.getName());
         draft.setWeightsJson(JsonUtils.write(weights));
         draft.setRerank(Boolean.TRUE.equals(rerank));
-        draft.setTopK(topK == null ? 20 : topK);
+        draft.setTopK(topK == null ? 50 : topK);
         draft.setThreshold(threshold == null ? properties.getSearch().getThreshold() : threshold);
         if (isNew) {
             draft.setSource("new");

@@ -21,7 +21,7 @@ models:
 # 检索服务默认参数（调用方可经请求覆盖）
 retrieval:
   active_index: runtime/demo_index   # 当前可检索索引目录（后端投产后可改）
-  top_k: 20
+  top_k: 50
   weights: { text: 25, image: 25, audio: 25, video: 25 }   # 四模态融合权重，合计须为 100
   rerank: false
   rerank_top_n: 50
