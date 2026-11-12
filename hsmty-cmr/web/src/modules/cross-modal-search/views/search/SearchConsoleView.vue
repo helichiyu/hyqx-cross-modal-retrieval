@@ -917,7 +917,7 @@ function onKeydown(event: KeyboardEvent) {
 }
 .hero h1 {
   margin: 0;
-  font-size: 32px;
+  font-size: 42px;
   line-height: 1.1;
   font-weight: 700;
   letter-spacing: 0.01em;
