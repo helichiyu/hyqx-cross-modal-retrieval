@@ -75,6 +75,14 @@ public class SearchBehaviorController {
         return ApiResult.success(searchService.blockedItems());
     }
 
+    @Operation(summary = "屏蔽条目详情（回查媒体路径与文本，供运营复核）")
+    @PreAuthorize("hasAnyAuthority('cmr:search:page')")
+    @GetMapping("blocked-items/{id}")
+    public ApiResult<Map<String, Object>> blockedItemDetail(
+            @org.springframework.web.bind.annotation.PathVariable Long id) {
+        return ApiResult.success(searchService.blockedItemDetail(id));
+    }
+
     @Operation(summary = "解除屏蔽")
     @PreAuthorize("hasAnyAuthority('cmr:feedback:update')")
     @PostMapping("blocked-items/{id}/unblock")

@@ -1,6 +1,7 @@
 import { http } from './http'
 import type {
   BehaviorVO,
+  BlockedItemDetailVO,
   BlockedItemVO,
   DatasetDetailVO,
   DatasetVO,
@@ -213,6 +214,9 @@ export const toggleFavorite = (body: Record<string, unknown>) =>
 export const myFavorites = () => http.get<Record<string, unknown>[]>('search/favorites')
 
 export const listBlockedItems = () => http.get<BlockedItemVO[]>('search-behaviors/blocked-items')
+
+export const blockedItemDetail = (id: Id) =>
+  http.get<BlockedItemDetailVO>(`search-behaviors/blocked-items/${id}`)
 
 export const unblockItem = (id: Id) =>
   http.post<void>(`search-behaviors/blocked-items/${id}/unblock`)

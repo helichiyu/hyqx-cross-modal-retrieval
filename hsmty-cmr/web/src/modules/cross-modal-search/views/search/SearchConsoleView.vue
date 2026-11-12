@@ -925,7 +925,8 @@ function onKeydown(event: KeyboardEvent) {
 }
 .hero h1 span { color: var(--system-blue); }
 .hero-sub {
-  margin: 8px auto 0;
+  /* 标题、搜索框、检索类型之间留出呼吸空间 */
+  margin: 14px auto 0;
   max-width: 660px;
   font-size: 14.5px;
   line-height: 1.55;
@@ -939,7 +940,7 @@ function onKeydown(event: KeyboardEvent) {
   align-items: center;
   gap: 10px;
   height: 60px;
-  margin: 20px auto 0;
+  margin: 34px auto 0;
   padding: 0 0 0 18px;
   border: 1px solid #e3ecfa;
   border-radius: 17px;
@@ -1094,7 +1095,7 @@ function onKeydown(event: KeyboardEvent) {
   gap: 16px;
   flex-wrap: wrap;
   min-height: 50px;
-  margin: 14px auto 0;
+  margin: 30px auto 0;
   max-width: 1000px;
   text-align: left;
 }

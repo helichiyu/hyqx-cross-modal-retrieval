@@ -45,44 +45,44 @@
         :row-class-name="rowClassName"
         :empty-text="emptyText"
       >
-        <el-table-column prop="bizNo" label="评测编号" width="150" show-overflow-tooltip>
+        <el-table-column prop="bizNo" label="评测编号" width="126" show-overflow-tooltip>
           <template #default="{ row }">
             <span class="mono">{{ row.bizNo }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="搜索词" min-width="220" show-overflow-tooltip>
+        <el-table-column label="搜索词" min-width="160" show-overflow-tooltip>
           <template #default="{ row }">
             <span class="ev-q">{{ row.query || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="基准任务" width="160" show-overflow-tooltip>
+        <el-table-column label="基准任务" width="140" show-overflow-tooltip>
           <template #default="{ row }">
             <span class="mono">{{ row.baseTaskNo || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="基准时间" width="160">
+        <el-table-column label="基准时间" width="150">
           <template #default="{ row }">{{ fmtTime(row.baseTime) }}</template>
         </el-table-column>
-        <el-table-column label="基准结果数" width="104" align="center">
+        <el-table-column label="基准结果数" width="88" align="center">
           <template #default="{ row }">{{ row.baseN ?? 0 }} 条</template>
         </el-table-column>
-        <el-table-column label="踩数" width="74" align="center">
+        <el-table-column label="踩数" width="60" align="center">
           <template #default="{ row }">{{ row.baseDown ?? 0 }}</template>
         </el-table-column>
-        <el-table-column label="重放次数" width="90" align="center">
+        <el-table-column label="重放次数" width="80" align="center">
           <template #default="{ row }">{{ row.replayCount }} 次</template>
         </el-table-column>
-        <el-table-column label="结论" width="96" align="center">
+        <el-table-column label="结论" width="80" align="center">
           <template #default="{ row }">
             <el-tooltip :content="rowTip(row)" placement="top">
               <span class="badge" :class="badgeClass(row)">{{ badgeLabel(row) }}</span>
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column label="最近重放" width="160">
+        <el-table-column label="最近重放" width="150">
           <template #default="{ row }">{{ row.latestTime ? fmtTime(row.latestTime) : '—' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="180" align="right" fixed="right">
+        <el-table-column label="操作" width="136" align="right" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openCompare(row)">查看对比</el-button>
             <el-button
@@ -1087,6 +1087,13 @@ onBeforeUnmount(() => {
 }
 
 /* ---------- 表格 ---------- */
+/* 表格左右留白，与面板边框保持和其他页面一致的间距 */
+.eval-table,
+.sample-table {
+  width: auto;
+  margin: 0 18px;
+}
+
 .ev-q {
   font-weight: 600;
   color: #273244;
@@ -1101,7 +1108,7 @@ onBeforeUnmount(() => {
 }
 
 .eval-pager {
-  padding: 4px 14px 6px;
+  padding: 4px 18px 6px;
 }
 
 /* ---------- 难例样本集 ---------- */

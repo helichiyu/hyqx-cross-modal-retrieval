@@ -1029,6 +1029,66 @@ private String datasetGrade(Long datasetId) {
                 }).toList();
     }
 
+    /**
+     * 屏蔽条目详情：回查条目在检索快照中的模态、媒体路径与文本，供运营复核。
+     *
+     * <p>屏蔽记录只保存条目 ID 与来源，媒体路径不落库；这里按该条目最近出现的
+     * 检索历史定位索引（cmr_index 或快照 indexDir），从 meta.db 还原元数据。
+     * 索引已重建或条目已删除时元数据为空，调用方仍可展示屏蔽记录本身。</p>
+     *
+     * @param blockedId 屏蔽记录 ID
+     * @return 屏蔽记录 + 可用的条目元数据
+     * @author cmr
+     * @since 2026-11-12
+     */
+    public Map<String, Object> blockedItemDetail(Long blockedId) {
+        com.hsmty.cmr.domain.operation.entity.CmrBlockedItem entity =
+                blockedItemMapper.selectOneById(blockedId);
+        BizException.assertNull(entity, "屏蔽记录不存在");
+        ItemMetaService.ItemMeta meta = resolveBlockedMeta(entity.getItemId());
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("id", entity.getId());
+        item.put("itemId", entity.getItemId());
+        item.put("itemName", entity.getItemName() != null ? entity.getItemName()
+                : (meta == null ? null : meta.name()));
+        item.put("source", entity.getSource() != null ? entity.getSource()
+                : (meta == null ? null : meta.sourceFile()));
+        item.put("reason", entity.getReason());
+        item.put("feedbackId", entity.getFeedbackId());
+        item.put("createTime", entity.getCreateTime());
+        item.put("modality", meta == null ? null : meta.modality());
+        item.put("sourceFile", meta == null ? null : meta.sourceFile());
+        item.put("locatorJson", meta == null ? null : meta.locatorJson());
+        item.put("text", meta == null ? null : meta.text());
+        item.put("resolved", meta != null);
+        return item;
+    }
+
+    /** 屏蔽条目元数据回查：按最近命中该条目的检索快照逐条尝试，命中即返回 */
+    private ItemMetaService.ItemMeta resolveBlockedMeta(String itemId) {
+        if (blank(itemId)) {
+            return null;
+        }
+        List<CmrResultItem> rows = resultItemMapper.selectListByQuery(QueryWrapper.create()
+                .where(CMR_RESULT_ITEM.ITEM_ID.eq(itemId))
+                .orderBy(CMR_RESULT_ITEM.ID.desc())
+                .limit(5));
+        for (CmrResultItem row : rows) {
+            CmrSearchHistory history = row.getSearchId() == null ? null
+                    : historyMapper.selectOneById(row.getSearchId());
+            if (history == null) {
+                continue;
+            }
+            Map<String, ItemMetaService.ItemMeta> metas = history.getIndexId() != null
+                    ? itemMetaService.lookup(history.getIndexId(), List.of(itemId))
+                    : itemMetaService.lookupByDir(snapshotIndexDir(history), List.of(itemId));
+            if (!metas.isEmpty()) {
+                return metas.get(itemId);
+            }
+        }
+        return null;
+    }
+
     /** 解除屏蔽 */
     @Transactional(rollbackFor = Exception.class)
     public void unblock(Long blockedId) {

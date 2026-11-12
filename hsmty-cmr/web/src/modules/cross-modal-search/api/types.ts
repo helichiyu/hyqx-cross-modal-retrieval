@@ -539,6 +539,16 @@ export interface BlockedItemVO {
   createTime: string | null
 }
 
+/** 屏蔽条目详情：含回查到的媒体路径与文本，用于运营复核 */
+export interface BlockedItemDetailVO extends BlockedItemVO {
+  modality: string | null
+  sourceFile: string | null
+  locatorJson: string | null
+  text: string | null
+  /** 是否在检索快照中回查到条目元数据（索引重建/条目删除时为 false） */
+  resolved: boolean
+}
+
 export interface DatasourceBlacklistVO {
   id: Id
   datasetId: string | null

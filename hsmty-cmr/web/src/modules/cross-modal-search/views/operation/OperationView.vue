@@ -97,13 +97,46 @@
             <span class="fb-time">{{ row.createTime ? fmtTime(row.createTime) : '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="110" fixed="right">
+        <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
+            <el-button link type="primary" @click="openBlockedDetail(row)">查看</el-button>
             <el-button link type="danger" :loading="unblockingId === row.id" @click="removeBlocked(row)">移除屏蔽</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
+
+    <!-- 屏蔽条目详情：回查条目原貌（媒体/文本），确认屏蔽对象是否准确 -->
+    <el-dialog v-model="viewVisible" title="屏蔽条目详情" width="760px">
+      <div v-loading="viewLoading" class="bk-detail">
+        <dl class="bk-meta">
+          <dt>条目 ID</dt>
+          <dd class="mono">{{ viewRow?.itemId || '—' }}</dd>
+          <dt>名称</dt>
+          <dd>{{ viewRow?.itemName || '—' }}</dd>
+          <dt>模态</dt>
+          <dd>{{ modalityLabel(viewRow?.modality) }}</dd>
+          <dt>来源</dt>
+          <dd class="bk-wrap">{{ viewRow?.source || '—' }}</dd>
+          <dt>来源文件</dt>
+          <dd class="mono bk-wrap">{{ viewRow?.sourceFile || '—' }}</dd>
+          <dt>屏蔽原因</dt>
+          <dd class="bk-wrap">{{ viewRow?.reason || '—' }}</dd>
+          <dt>屏蔽时间</dt>
+          <dd>{{ viewRow?.createTime ? fmtTime(viewRow.createTime) : '—' }}</dd>
+        </dl>
+        <div class="bk-step">条目原貌</div>
+        <MediaPreview
+          v-if="viewRow?.sourceFile || viewRow?.text"
+          :path="viewRow?.sourceFile"
+          :text="viewRow?.text"
+          class="bk-media"
+        />
+        <div v-else-if="!viewLoading" class="bk-missing">
+          索引已重建或条目已随数据集删除，无法回查原始文件；以上为登记屏蔽时保留的记录。
+        </div>
+      </div>
+    </el-dialog>
 
     <!-- 登记反馈：唯一入口为结果页「空结果处置 · 需求登记」带 ?zero= 进来 -->
     <el-dialog v-model="registerVisible" title="登记反馈" width="720px">
@@ -249,6 +282,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
+  blockedItemDetail,
   createFeedback,
   handleFeedback,
   listBlockedItems,
@@ -256,8 +290,9 @@ import {
   pageFeedbacks,
   unblockItem,
 } from '../../api'
-import type { BehaviorVO, BlockedItemVO, FeedbackVO, Id } from '../../api/types'
-import { fmtTime } from '../../utils/format'
+import type { BehaviorVO, BlockedItemDetailVO, BlockedItemVO, FeedbackVO, Id } from '../../api/types'
+import MediaPreview from '../../components/MediaPreview.vue'
+import { fmtTime, modalityLabel } from '../../utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -328,6 +363,9 @@ const judge = ref('data_bad')
 const blockedRows = ref<BlockedItemVO[]>([])
 const blockedLoading = ref(false)
 const unblockingId = ref<Id | null>(null)
+const viewVisible = ref(false)
+const viewLoading = ref(false)
+const viewRow = ref<BlockedItemDetailVO | null>(null)
 
 const isZero = computed(() => current.value?.entryType === 'zero')
 const targetDisposition = computed(() => {
@@ -411,6 +449,21 @@ async function loadBlocked() {
     ElMessage.error((error as Error).message)
   } finally {
     blockedLoading.value = false
+  }
+}
+
+async function openBlockedDetail(row: BlockedItemVO) {
+  viewVisible.value = true
+  viewLoading.value = true
+  viewRow.value = null
+  try {
+    viewRow.value = await blockedItemDetail(row.id)
+  } catch (error) {
+    // 回查失败时退回列表记录，至少能看到屏蔽对象与原因
+    viewRow.value = { ...row, modality: null, sourceFile: null, locatorJson: null, text: null, resolved: false }
+    ElMessage.error((error as Error).message)
+  } finally {
+    viewLoading.value = false
   }
 }
 
@@ -767,15 +820,52 @@ onBeforeUnmount(() => {
 .judge-opt .jo-txt b { color: #1f2a44; font-weight: 600; }
 .judge-opt .jo-to { color: var(--system-blue); font-weight: 600; white-space: nowrap; }
 
-.dev-stack { display: flex; flex-direction: column; gap: 14px; }
-.dev-lead { margin: 0; color: #475467; font-size: 12.5px; line-height: 1.75; }
-.dev-lead b { color: #1f2a44; }
-.dev-lead code { padding: 1px 5px; border-radius: 4px; background: #f1f5ff; color: var(--system-blue); font-size: 11.5px; }
-.dev-sec h4 { margin: 0 0 6px; color: #1f2a44; font-size: 13px; }
-.dev-sec ul { display: flex; flex-direction: column; gap: 4px; margin: 0; padding-left: 18px; }
-.dev-sec li { color: #475467; font-size: 12px; line-height: 1.7; }
-.dev-sec b { color: #1f2a44; }
-.dev-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.dev-table th, .dev-table td { padding: 6px 9px; border: 1px solid #e6edf8; text-align: left; vertical-align: top; }
-.dev-table th { background: #f7f9fd; color: var(--muted); font-weight: 600; }
+/* ---------- 屏蔽条目详情 ---------- */
+.bk-detail { min-height: 120px; }
+
+.bk-meta {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 8px 12px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid #eef2f8;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.bk-meta dt { color: var(--muted); font-size: 12px; }
+.bk-meta dd { margin: 0; color: #273244; font-size: 12.5px; line-height: 1.6; }
+.bk-wrap { overflow-wrap: anywhere; }
+
+.bk-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 8px;
+  color: #475467;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bk-step::before { content: ''; width: 3px; height: 12px; border-radius: 2px; background: var(--system-blue); }
+
+.bk-media {
+  max-height: 420px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid #eef2f8;
+  border-radius: 8px;
+  background: #f8fafd;
+}
+
+.bk-missing {
+  padding: 22px 14px;
+  border: 1px dashed #dbe4f5;
+  border-radius: 8px;
+  background: #fbfdff;
+  color: var(--muted-soft);
+  font-size: 12.5px;
+  text-align: center;
+}
 </style>

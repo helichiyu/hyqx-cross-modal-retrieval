@@ -9,7 +9,6 @@
     <section class="cm-panel lib-panel" aria-label="数据源">
       <div class="panel-head">
         <div class="sec-head">
-          <span class="sec-idx" aria-hidden="true">1</span>
           <span class="sec-title">数据源</span>
         </div>
         <div class="ph-tools">
@@ -1003,18 +1002,6 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 .sec-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.sec-idx {
-  flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  background: var(--system-blue);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 18px;
-  text-align: center;
-}
 .sec-title { font-size: 15px; font-weight: 700; color: #1f2a44; white-space: nowrap; }
 .ph-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .hint {
