@@ -52,3 +52,7 @@ cmr-backend/src/main/resources/application-local.yml
 
 # 临时抓取/中转目录
 .tmp_fetch/
+
+# 独立仓库（各自独立 commit/push，本仓库不跟踪）
+hsmty-module-cms-server/
+hsmty-web/
