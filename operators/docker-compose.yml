@@ -10,7 +10,7 @@ name: op-cross-modal-search
 services:
   op-cross-modal-search:
     build: .                       # 构建上下文只含算子服务（router + common + 9 算子）
-    image: op-cross-modal-search:1.1.0
+    image: op-cross-modal-search:1.0.0
     container_name: op-cross-modal-search
     ports:
       - "${CMR_OPERATOR_PORT:-17021}:6300"   # 对外唯一端口，改宿主机端口只改 CMR_OPERATOR_PORT

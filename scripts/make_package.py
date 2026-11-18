@@ -37,7 +37,7 @@ PKG_README = """# 跨模态检索中心 · 算子服务交付包
 
     curl http://127.0.0.1:17021/healthz
 
-- 服务名/容器名/镜像名均为 op-cross-modal-search，compose 项目名同名；镜像 tag 1.1.0。
+- 服务名/容器名/镜像名均为 op-cross-modal-search，compose 项目名同名；镜像 tag 1.0.0。
 - 宿主机端口用环境变量控制：CMR_OPERATOR_PORT=17021（不设置则默认 17021），只改这一处，无需改文件。
 - 任务与索引持久化在 ./runtime（可用 CMR_HOST_RUNTIME_DIR 指向宿主机其它目录），权重挂载在 ./weight。
 - 数据集目录默认 ./dataset，只读挂载到 /app/dataset（可用 CMR_HOST_DATASET_DIR 指向与后端共享的目录）；
@@ -45,7 +45,7 @@ PKG_README = """# 跨模态检索中心 · 算子服务交付包
 - 配置只改 config.yaml（容器内可用环境变量 CMR_MODEL_ROOT 等覆盖路径，见 docker-compose.yml）。
 - 9 个算子的接口字段见随附《算子说明书》，调用样例见《接口调用示例》，分工见《前后端对接说明》。
 
-## 入站认证（1.1.0 起，平台规范 3.4）
+## 入站认证（平台规范 3.4）
 
 - 启用：环境注入 `CMR_AUTH_TOKEN_SHA256=<调用方令牌的 SHA-256 摘要>`（compose 已转注为
   容器变量 `AUTH_TOKEN_SHA256`，多个摘要用空格/逗号分隔），改环境变量重启即生效，

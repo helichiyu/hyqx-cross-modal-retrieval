@@ -50,7 +50,7 @@ services:
     build:
       context: ../operators        # 算子服务交付根，构建上下文只含算子服务
       dockerfile: Dockerfile
-    image: cmr-operators:1.1.0
+    image: cmr-operators:1.0.0
     container_name: cmr-operators
     environment:
       CMR_MODEL_ROOT: /weight
