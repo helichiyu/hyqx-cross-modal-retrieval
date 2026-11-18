@@ -50,10 +50,13 @@ services:
     build:
       context: ../operators        # 算子服务交付根，构建上下文只含算子服务
       dockerfile: Dockerfile
-    image: cmr-operators:1.0
+    image: cmr-operators:1.1.0
     container_name: cmr-operators
     environment:
       CMR_MODEL_ROOT: /weight
+      # 入站认证（平台规范 3.4）：注入调用方令牌摘要即启用 X-Token 校验；
+      # 启用后后端调用算子必须携带 X-Token 头，不注入则认证关闭（仅限内网测试）
+      AUTH_TOKEN_SHA256: ${CMR_AUTH_TOKEN_SHA256:-}
       TZ: Asia/Shanghai
     volumes:
       # 模型权重：宿主机目录（三个模型子目录），不进镜像

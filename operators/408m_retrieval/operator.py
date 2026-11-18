@@ -34,6 +34,7 @@ from starlette.concurrency import run_in_threadpool
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from operators.common import index_store  # noqa: E402
+from operators.common.auth_guard import internal_headers  # noqa: E402
 from operators.common.base import OperatorBase, OperatorError  # noqa: E402
 
 MODALITIES = ("text", "image", "audio", "video")
@@ -192,8 +193,10 @@ class Operator(OperatorBase):
     def _embed(self, unique_id: str, **kwargs) -> np.ndarray:
         import httpx
         port = self.cfg["server"]["port"]
+        # 算子间内调走容器回环；认证开启时凭进程内令牌放行（见 common/auth_guard.py）
         r = httpx.post(f"http://127.0.0.1:{port}/404m_embed/predict",
-                       json={"uniqueId": unique_id, **kwargs}, timeout=300)
+                       json={"uniqueId": unique_id, **kwargs},
+                       headers=internal_headers(), timeout=300)
         body = r.json()
         if body.get("code") != 0:
             raise OperatorError(f"404 向量化失败: {body.get('msg')}")

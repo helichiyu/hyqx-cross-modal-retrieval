@@ -21,6 +21,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from operators.common.auth_guard import internal_headers  # noqa: E402
 from operators.common.base import OperatorBase, OperatorError  # noqa: E402
 
 DEFAULT_LINES = {"recall": 0.8, "precision": None, "ndcg": None}
@@ -148,7 +149,9 @@ class Operator(OperatorBase):
             "query": query, "indexDir": str(index_dir), "topK": k,
             "weights": payload.get("weights"), "rerank": payload.get("rerank", False),
         }
-        r = httpx.post(f"http://127.0.0.1:{port}/408m_retrieval/search", json=body, timeout=300)
+        # 算子间内调走容器回环；认证开启时凭进程内令牌放行（见 common/auth_guard.py）
+        r = httpx.post(f"http://127.0.0.1:{port}/408m_retrieval/search",
+                       json=body, headers=internal_headers(), timeout=300)
         resp = r.json()
         if resp.get("code") != 0:
             raise OperatorError(f"408 检索失败: {resp.get('msg')}")

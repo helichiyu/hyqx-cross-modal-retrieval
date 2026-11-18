@@ -13,9 +13,12 @@ from pathlib import Path
 import yaml
 from fastapi import FastAPI
 
+from operators.common.auth_guard import docs_off_kwargs, install_auth
 from operators.common.loading import load_operator
 from operators.router.operator_router import build_operator_router
 
+# INFO 级日志输出到标准输出（容器 PYTHONUNBUFFERED=1 保证实时，docker logs 可查）
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("router")
 
 # PACKAGE_ROOT = operators/（算子服务交付根，含 config.yaml、router/ 与 9 个算子目录）
@@ -44,7 +47,9 @@ def create_app() -> FastAPI:
         logger.info("registered operators: %s", sorted(app.state.operators))
         yield
 
-    app = FastAPI(title="跨模态检索算子服务", lifespan=lifespan)
+    # 认证启用时关闭 /docs /redoc /openapi.json；拦截器装在根应用一次，9 个算子全受保护
+    app = FastAPI(title="跨模态检索算子服务", lifespan=lifespan, **docs_off_kwargs())
+    install_auth(app)
     app.state.config = cfg
     app.state.operators = {}
 
