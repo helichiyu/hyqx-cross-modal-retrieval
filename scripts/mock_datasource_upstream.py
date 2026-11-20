@@ -13,7 +13,11 @@
 用法：
     .venv/Scripts/python.exe scripts/mock_datasource_upstream.py --port 7001 --media dataset/v5_sample
 
-默认数据集：ds_alpha（3 条，含文本与图片）、ds_blacklist_demo（1 条，用于黑名单联调）。
+服务器部署（绑 0.0.0.0 时必须用 --base-url 指定后端可达的地址，
+否则 media URL 会拼成 http://0.0.0.0:7001/... 无法回源）：
+    python3 scripts/mock_datasource_upstream.py --host 0.0.0.0 --port 7001 --base-url http://<服务器IP>:7001 --media ./v5_sample
+
+默认数据集：ds_alpha（5 条，含文本与图片）、ds_blacklist_demo（1 条，用于黑名单联调）。
 """
 
 from __future__ import annotations
@@ -150,12 +154,15 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=7001)
     parser.add_argument("--media", default="dataset/v5_sample", help="模态文件目录")
+    parser.add_argument("--base-url", default=None,
+                        help="对外基地址，用于拼接 media URL；缺省取 http://{host}:{port}。"
+                             "绑 0.0.0.0 时必填后端可达的地址，如 http://192.168.1.105:7001")
     args = parser.parse_args()
 
     Handler.media_root = Path(args.media)
-    Handler.base = f"http://{args.host}:{args.port}"
+    Handler.base = (args.base_url or f"http://{args.host}:{args.port}").rstrip("/")
     server = ThreadingHTTPServer((args.host, args.port), Handler)
-    print(f"mock upstream listening on {Handler.base}, media={Handler.media_root}")
+    print(f"mock upstream listening on {args.host}:{args.port}, base={Handler.base}, media={Handler.media_root}")
     server.serve_forever()
 
 
